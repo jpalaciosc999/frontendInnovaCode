@@ -1,117 +1,160 @@
 import { useEffect, useState } from 'react';
-import api from '../api/axios';
+import type { Departamento, DepartamentoForm } from '../interfaces/departamentos';
+import {
+  obtenerDepartamentos,
+  crearDepartamento,
+  actualizarDepartamento,
+  eliminarDepartamento
+} from '../services/departamentos.service';
 
-interface Departamento {
-  DEP_ID: number;
-  DEP_NOMBRE: string;
-  DEP_DESCRIPCION: string;
-  DEP_ESTADO: string;
-}
+const initialForm: DepartamentoForm = {
+  nombre: '',
+  descripcion: '',
+  estado: ''
+};
 
-const vacio = { DEP_NOMBRE: '', DEP_DESCRIPCION: '', DEP_ESTADO: 'A' };
+function Departamentos() {
+  const [datos, setDatos]             = useState<Departamento[]>([]);
+  const [cargando, setCargando]       = useState(true);
+  const [error, setError]             = useState('');
+  const [mensaje, setMensaje]         = useState('');
+  const [modoEdicion, setModoEdicion] = useState(false);
+  const [depId, setDepId]             = useState<number | null>(null);
+  const [form, setForm]               = useState<DepartamentoForm>(initialForm);
 
-export default function Departamentos() {
-  const [datos, setDatos]     = useState<Departamento[]>([]);
-  const [form, setForm]       = useState(vacio);
-  const [editId, setEditId]   = useState<number | null>(null);
-  const [mensaje, setMensaje] = useState('');
-
-  const cargar = async () => {
-    const res = await api.get('/departamentos');
-    setDatos(res.data);
-  };
-
-  useEffect(() => { cargar(); }, []);
-
-  const guardar = async () => {
-    const body = { nombre: form.DEP_NOMBRE, descripcion: form.DEP_DESCRIPCION, estado: form.DEP_ESTADO };
-    if (editId) {
-      await api.put(`/departamentos/${editId}`, body);
-      setMensaje('Departamento actualizado correctamente');
-    } else {
-      await api.post('/departamentos', body);
-      setMensaje('Departamento creado correctamente');
+  const cargarDepartamentos = async () => {
+    try {
+      setCargando(true);
+      setError('');
+      const data = await obtenerDepartamentos();
+      setDatos(data);
+    } catch (err: any) {
+      setError('Error cargando departamentos: ' + err.message);
+    } finally {
+      setCargando(false);
     }
-    setForm(vacio);
-    setEditId(null);
-    cargar();
-    setTimeout(() => setMensaje(''), 3000);
   };
 
-  const editar = (dep: Departamento) => {
-    setForm({ DEP_NOMBRE: dep.DEP_NOMBRE, DEP_DESCRIPCION: dep.DEP_DESCRIPCION, DEP_ESTADO: dep.DEP_ESTADO });
-    setEditId(dep.DEP_ID);
+  useEffect(() => { cargarDepartamentos(); }, []);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const { name, value } = e.target;
+    setForm(prev => ({ ...prev, [name]: value }));
   };
 
-  const desactivar = async (id: number) => {
-    if (!confirm('¿Desactivar este departamento?')) return;
-    await api.put(`/departamentos/desactivar/${id}`);
-    setMensaje('Departamento desactivado');
-    cargar();
-    setTimeout(() => setMensaje(''), 3000);
+  const limpiarFormulario = () => {
+    setForm(initialForm);
+    setModoEdicion(false);
+    setDepId(null);
+    setError('');
   };
+
+  const validarFormulario = () => {
+    if (!form.nombre.trim() || !form.descripcion.trim() || !form.estado.trim()) {
+      setError('Todos los campos son obligatorios');
+      return false;
+    }
+    return true;
+  };
+
+  const guardarDepartamento = async () => {
+    try {
+      setError(''); setMensaje('');
+      if (!validarFormulario()) return;
+      if (modoEdicion && depId !== null) {
+        await actualizarDepartamento(depId, form);
+        setMensaje('Departamento actualizado correctamente');
+      } else {
+        await crearDepartamento(form);
+        setMensaje('Departamento creado correctamente');
+      }
+      limpiarFormulario();
+      await cargarDepartamentos();
+    } catch (err: any) {
+      setError('Error guardando departamento: ' + (err.response?.data?.error || err.message));
+    }
+  };
+
+  const handleEliminar = async (id: number) => {
+    if (!window.confirm('¿Deseas eliminar este departamento?')) return;
+    try {
+      setError(''); setMensaje('');
+      await eliminarDepartamento(id);
+      setMensaje('Departamento eliminado correctamente');
+      if (depId === id) limpiarFormulario();
+      await cargarDepartamentos();
+    } catch (err: any) {
+      setError('Error eliminando departamento: ' + (err.response?.data?.error || err.message));
+    }
+  };
+
+  const handleEditar = (dep: Departamento) => {
+    setModoEdicion(true);
+    setDepId(dep.DEP_ID);
+    setMensaje(''); setError('');
+    setForm({
+      nombre: dep.DEP_NOMBRE || '',
+      descripcion: dep.DEP_DESCRIPCION || '',
+      estado: dep.DEP_ESTADO || ''
+    });
+  };
+
+  if (cargando) return <p>Cargando...</p>;
 
   return (
-    <div style={{ padding: '1rem 2rem', fontFamily: 'sans-serif' }}>
-      <h2 style={{ textAlign: 'center' }}>CRUD de Departamentos</h2>
+    <div style={{ padding: '20px', fontFamily: 'Arial' }}>
+      <h2>CRUD de Departamentos</h2>
 
-      {mensaje && <p style={{ color: 'green', textAlign: 'center' }}>{mensaje}</p>}
+      {error   && <p style={{ color: 'red',   fontWeight: 'bold' }}>{error}</p>}
+      {mensaje && <p style={{ color: 'green', fontWeight: 'bold' }}>{mensaje}</p>}
 
-      <fieldset style={{ marginBottom: '1.5rem' }}>
-        <legend>{editId ? 'Editar departamento' : 'Nuevo departamento'}</legend>
-        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: '10px' }}>
-          <div>
-            <label>Nombre<br />
-              <input value={form.DEP_NOMBRE} onChange={e => setForm({...form, DEP_NOMBRE: e.target.value})} />
-            </label>
-          </div>
-          <div>
-            <label>Descripción<br />
-              <input value={form.DEP_DESCRIPCION} onChange={e => setForm({...form, DEP_DESCRIPCION: e.target.value})} />
-            </label>
-          </div>
-          <div>
-            <label>Estado<br />
-              <select value={form.DEP_ESTADO} onChange={e => setForm({...form, DEP_ESTADO: e.target.value})}>
-                <option value="A">Activo</option>
-                <option value="I">Inactivo</option>
-              </select>
-            </label>
+      <div style={{ border: '1px solid #ccc', borderRadius: '8px', padding: '16px', marginBottom: '24px', maxWidth: '700px' }}>
+        <h3>{modoEdicion ? 'Editar departamento' : 'Nuevo departamento'}</h3>
+        <div style={{ display: 'grid', gap: '10px' }}>
+          <input type="text" name="nombre"      placeholder="Nombre"      value={form.nombre}      onChange={handleChange} />
+          <input type="text" name="descripcion" placeholder="Descripción" value={form.descripcion} onChange={handleChange} />
+          <select name="estado" value={form.estado} onChange={handleChange}>
+            <option value="">Seleccione estado</option>
+            <option value="A">Activo</option>
+            <option value="I">Inactivo</option>
+          </select>
+          <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
+            <button onClick={guardarDepartamento}>{modoEdicion ? 'Actualizar' : 'Guardar'}</button>
+            <button onClick={limpiarFormulario}>Limpiar</button>
           </div>
         </div>
-        <button onClick={guardar}>Guardar</button>
-        &nbsp;
-        <button onClick={() => { setForm(vacio); setEditId(null); }}>Limpiar</button>
-      </fieldset>
+      </div>
 
-      <p>Listado de departamentos: <strong>{datos.length}</strong></p>
-
-      <table border={1} cellPadding={8} style={{ width: '100%', borderCollapse: 'collapse' }}>
-        <thead style={{ background: '#f0f0f0' }}>
-          <tr>
-            <th>ID</th>
-            <th>Nombre</th>
-            <th>Descripción</th>
-            <th>Estado</th>
-            <th>Acciones</th>
-          </tr>
-        </thead>
-        <tbody>
-          {datos.map(dep => (
-            <tr key={dep.DEP_ID}>
-              <td>{dep.DEP_ID}</td>
-              <td>{dep.DEP_NOMBRE}</td>
-              <td>{dep.DEP_DESCRIPCION}</td>
-              <td>{dep.DEP_ESTADO === 'A' ? 'Activo' : 'Inactivo'}</td>
-              <td>
-                <button onClick={() => editar(dep)}>Editar</button>
-                &nbsp;
-                <button onClick={() => desactivar(dep.DEP_ID)}>Desactivar</button>
-              </td>
+      <h3>Listado de departamentos: {datos.length}</h3>
+      <div style={{ overflowX: 'auto' }}>
+        <table border={1} cellPadding={8} cellSpacing={0} style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <thead>
+            <tr>
+              <th>ID</th><th>Nombre</th><th>Descripción</th><th>Estado</th><th>Acciones</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {datos.length > 0 ? datos.map(dep => (
+              <tr key={dep.DEP_ID}>
+                <td>{dep.DEP_ID}</td>
+                <td>{dep.DEP_NOMBRE}</td>
+                <td>{dep.DEP_DESCRIPCION}</td>
+                <td>{dep.DEP_ESTADO}</td>
+                <td>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button onClick={() => handleEditar(dep)}>Editar</button>
+                    <button onClick={() => handleEliminar(dep.DEP_ID)}>Eliminar</button>
+                  </div>
+                </td>
+              </tr>
+            )) : (
+              <tr><td colSpan={5} style={{ textAlign: 'center' }}>No hay departamentos registrados</td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
+
+export default Departamentos;

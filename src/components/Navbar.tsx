@@ -18,6 +18,8 @@ function Navbar() {
     }}>
       <NavLink to="/" style={style}>Inicio</NavLink>
       <NavLink to="/empleados" style={style}>Empleados</NavLink>
+      <NavLink to="/departamentos" style={style}>Departamentos</NavLink>
+      <NavLink to="/puestos" style={style}>Puestos</NavLink>
     </nav>
   );
 }

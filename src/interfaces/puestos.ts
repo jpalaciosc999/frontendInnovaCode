@@ -9,10 +9,10 @@ export interface Puesto {
 }
 
 export interface PuestoForm {
-  Nombre: string;
-  SalarioBase: string;
-  Descripcion: string;
-  Estado: string;
-  FechaCreacion: string;
-  Modificacion: string;
+  codigo: string;
+  nombre: string;
+  salario_base: string;
+  descripcion: string;
+  estado: string;
+  dep_id: string;
 }
