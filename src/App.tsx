@@ -1,11 +1,25 @@
+import { Routes, Route } from 'react-router-dom';
+import Navbar from './components/Navbar';
+import Home from './pages/Home';
 import PruebaAxios from './components/PruebaAxios';
+import Departamentos from './components/Departamentos';
+import Puestos from './components/Puestos';
+import Roles from './components/Roles';
+import TipoIngreso from './components/tipoIngreso';
 
 function App() {
   return (
-    <div>
-      <h1>Sistema de Nóminas</h1>
-      <PruebaAxios />
-    </div>
+<>
+      <Navbar />
+      <Routes>
+        <Route path="/" element={<Home />} />
+        <Route path="/empleados" element={<PruebaAxios />} />
+        <Route path="/departamentos" element={<Departamentos />} />
+        <Route path="/puestos" element={<Puestos />} />
+        <Route path="/roles" element={<Roles />} />
+        <Route path="/tipoIngreso" element={<TipoIngreso />} />
+      </Routes>
+    </>
   );
 }
 
