@@ -5,6 +5,7 @@ import PruebaAxios from './components/PruebaAxios';
 import Departamentos from './components/Departamentos';
 import Puestos from './components/Puestos';
 import Roles from './components/Roles';
+import TipoIngreso from './components/tipoIngreso';
 
 function App() {
   return (
@@ -16,6 +17,7 @@ function App() {
         <Route path="/departamentos" element={<Departamentos />} />
         <Route path="/puestos" element={<Puestos />} />
         <Route path="/roles" element={<Roles />} />
+        <Route path="/tipoIngreso" element={<TipoIngreso />} />
       </Routes>
     </>
   );
