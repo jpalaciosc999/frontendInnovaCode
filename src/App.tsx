@@ -1,11 +1,17 @@
+import { Routes, Route } from 'react-router-dom';
+import Navbar from './components/Navbar';
+import Home from './pages/Home';
 import PruebaAxios from './components/PruebaAxios';
 
 function App() {
   return (
-    <div>
-      <h1>Sistema de Nóminas</h1>
-      <PruebaAxios />
-    </div>
+<>
+      <Navbar />
+      <Routes>
+        <Route path="/" element={<Home />} />
+        <Route path="/empleados" element={<PruebaAxios />} />
+      </Routes>
+    </>
   );
 }
 
