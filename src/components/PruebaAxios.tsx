@@ -7,7 +7,7 @@ function PruebaAxios() {
   const [error, setError]       = useState('');
 
   useEffect(() => {
-    api.get('/')
+    api.get('empleados')
       .then(response => {
         setDatos(response.data);
         setCargando(false);
