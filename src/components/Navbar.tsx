@@ -20,7 +20,11 @@ function Navbar() {
       <NavLink to="/empleados" style={style}>Empleados</NavLink>
       <NavLink to="/departamentos" style={style}>Departamentos</NavLink>
       <NavLink to="/puestos" style={style}>Puestos</NavLink>
-        <NavLink to="/roles" style={style}>Roles</NavLink>
+      <NavLink to="/permisos" style={style}>permisos</NavLink>
+      <NavLink to="/rol-permisos" style={style}>rolPermisos</NavLink>
+      <NavLink to="/roles" style={style}>Roles</NavLink>
+      <NavLink to="/prestamos" style={style}>prestamos</NavLink>
+      <NavLink to="/prestamo-detalle" style={style}>prestamo-detalle</NavLink>
     </nav>
   );
 }

@@ -7,6 +7,8 @@ import Puestos from './components/Puestos';
 import Roles from './components/Roles';
 import Prestamos from './components/Prestamos';
 import PrestamoDetalleView from './components/PrestamoDetalle';
+import Permisos from './components/permisos';
+import RolPermisosView from './components/RolPermisos';
 
 function App() {
   return (
@@ -17,9 +19,11 @@ function App() {
         <Route path="/empleados" element={<PruebaAxios />} />
         <Route path="/departamentos" element={<Departamentos />} />
         <Route path="/puestos" element={<Puestos />} />
-        <Route path="/roles" element={<Roles />} />
         <Route path="/prestamos" element={<Prestamos />} />
         <Route path="/prestamo-detalle" element={<PrestamoDetalleView />} />
+        <Route path="/permisos" element={<Permisos />} />
+        <Route path="/rol-permisos" element={<RolPermisosView />} />
+        <Route path="/roles" element={<Roles />} />
       </Routes>
     </>
   );

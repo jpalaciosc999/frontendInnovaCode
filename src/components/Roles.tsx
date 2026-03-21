@@ -8,20 +8,21 @@ import {
 } from '../services/roles.service';
 
 const initialForm: RolForm = {
-  nombre: '',
-  descripcion: '',
-  nivel_acceso: '',
-  estado: ''
+  rol_nombre: '',
+  rol_descripcion: '',
+  rol_nivel_acceso: '',
+  rol_estado: '',
+  rol_fecha_creacion: ''
 };
 
 function Roles() {
-  const [datos, setDatos]             = useState<Rol[]>([]);
-  const [cargando, setCargando]       = useState(true);
-  const [error, setError]             = useState('');
-  const [mensaje, setMensaje]         = useState('');
+  const [datos, setDatos] = useState<Rol[]>([]);
+  const [cargando, setCargando] = useState(true);
+  const [error, setError] = useState('');
+  const [mensaje, setMensaje] = useState('');
   const [modoEdicion, setModoEdicion] = useState(false);
-  const [rolId, setRolId]             = useState<number | null>(null);
-  const [form, setForm]               = useState<RolForm>(initialForm);
+  const [rolId, setRolId] = useState<number | null>(null);
+  const [form, setForm] = useState<RolForm>(initialForm);
 
   const cargarRoles = async () => {
     try {
@@ -36,11 +37,15 @@ function Roles() {
     }
   };
 
-  useEffect(() => { cargarRoles(); }, []);
+  useEffect(() => {
+    cargarRoles();
+  }, []);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
+  ) => {
     const { name, value } = e.target;
-    setForm(prev => ({ ...prev, [name]: value }));
+    setForm((prev) => ({ ...prev, [name]: value }));
   };
 
   const limpiarFormulario = () => {
@@ -51,7 +56,13 @@ function Roles() {
   };
 
   const validarFormulario = () => {
-    if (!form.nombre.trim() || !form.descripcion.trim() || !form.nivel_acceso.trim() || !form.estado.trim()) {
+    if (
+      !form.rol_nombre.trim() ||
+      !form.rol_descripcion.trim() ||
+      !form.rol_nivel_acceso.trim() ||
+      !form.rol_estado.trim() ||
+      !form.rol_fecha_creacion.trim()
+    ) {
       setError('Todos los campos son obligatorios');
       return false;
     }
@@ -60,8 +71,11 @@ function Roles() {
 
   const guardarRol = async () => {
     try {
-      setError(''); setMensaje('');
+      setError('');
+      setMensaje('');
+
       if (!validarFormulario()) return;
+
       if (modoEdicion && rolId !== null) {
         await actualizarRol(rolId, form);
         setMensaje('Rol actualizado correctamente');
@@ -69,6 +83,7 @@ function Roles() {
         await crearRol(form);
         setMensaje('Rol creado correctamente');
       }
+
       limpiarFormulario();
       await cargarRoles();
     } catch (err: any) {
@@ -76,92 +91,126 @@ function Roles() {
     }
   };
 
+  const handleEditar = (rol: Rol) => {
+    setModoEdicion(true);
+    setRolId(rol.ROL_ID);
+    setForm({
+      rol_nombre: rol.ROL_NOMBRE || '',
+      rol_descripcion: rol.ROL_DESCRIPCION || '',
+      rol_nivel_acceso: rol.ROL_NIVEL_ACCESO || '',
+      rol_estado: rol.ROL_ESTADO || '',
+      rol_fecha_creacion: rol.ROL_FECHA_CREACION
+        ? String(rol.ROL_FECHA_CREACION).slice(0, 10)
+        : ''
+    });
+  };
+
   const handleEliminar = async (id: number) => {
     if (!window.confirm('¿Deseas eliminar este rol?')) return;
+
     try {
-      setError(''); setMensaje('');
       await eliminarRol(id);
       setMensaje('Rol eliminado correctamente');
-      if (rolId === id) limpiarFormulario();
       await cargarRoles();
     } catch (err: any) {
       setError('Error eliminando rol: ' + (err.response?.data?.error || err.message));
     }
   };
 
-  const handleEditar = (r: Rol) => {
-    setModoEdicion(true);
-    setRolId(r.ROL_ID);
-    setMensaje(''); setError('');
-    setForm({
-      nombre:       r.ROL_NOMBRE       || '',
-      descripcion:  r.ROL_DESCRIPCION  || '',
-      nivel_acceso: r.ROL_NIVEL_ACCESO || '',
-      estado:       r.ROL_ESTADO       || ''
-    });
-  };
-
   if (cargando) return <p>Cargando...</p>;
 
   return (
-    <div style={{ padding: '20px', fontFamily: 'Arial' }}>
+    <div style={{ padding: '20px' }}>
       <h2>CRUD de Roles</h2>
 
-      {error   && <p style={{ color: 'red',   fontWeight: 'bold' }}>{error}</p>}
-      {mensaje && <p style={{ color: 'green', fontWeight: 'bold' }}>{mensaje}</p>}
+      {error && <p style={{ color: 'red' }}>{error}</p>}
+      {mensaje && <p style={{ color: 'green' }}>{mensaje}</p>}
 
-      <div style={{ border: '1px solid #ccc', borderRadius: '8px', padding: '16px', marginBottom: '24px', maxWidth: '700px' }}>
+      <div style={{ border: '1px solid #ccc', padding: '16px', borderRadius: '8px', marginBottom: '24px', maxWidth: '700px' }}>
         <h3>{modoEdicion ? 'Editar rol' : 'Nuevo rol'}</h3>
+
         <div style={{ display: 'grid', gap: '10px' }}>
-          <input type="text" name="nombre"       placeholder="Nombre"        value={form.nombre}       onChange={handleChange} />
-          <input type="text" name="descripcion"  placeholder="Descripción"   value={form.descripcion}  onChange={handleChange} />
-          <input type="text" name="nivel_acceso" placeholder="Nivel de acceso" value={form.nivel_acceso} onChange={handleChange} />
-          <select name="estado" value={form.estado} onChange={handleChange}>
+          <input
+            type="text"
+            name="rol_nombre"
+            placeholder="Nombre rol"
+            value={form.rol_nombre}
+            onChange={handleChange}
+          />
+          <input
+            type="text"
+            name="rol_descripcion"
+            placeholder="Descripción"
+            value={form.rol_descripcion}
+            onChange={handleChange}
+          />
+          <input
+            type="text"
+            name="rol_nivel_acceso"
+            placeholder="Nivel acceso"
+            value={form.rol_nivel_acceso}
+            onChange={handleChange}
+          />
+          <select
+            name="rol_estado"
+            value={form.rol_estado}
+            onChange={handleChange}
+          >
             <option value="">Seleccione estado</option>
             <option value="A">Activo</option>
             <option value="I">Inactivo</option>
           </select>
-          <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
-            <button onClick={guardarRol}>{modoEdicion ? 'Actualizar' : 'Guardar'}</button>
+          <input
+            type="date"
+            name="rol_fecha_creacion"
+            value={form.rol_fecha_creacion}
+            onChange={handleChange}
+          />
+
+          <div style={{ display: 'flex', gap: '10px' }}>
+            <button onClick={guardarRol}>
+              {modoEdicion ? 'Actualizar' : 'Guardar'}
+            </button>
             <button onClick={limpiarFormulario}>Limpiar</button>
           </div>
         </div>
       </div>
 
-      <h3>Listado de roles: {datos.length}</h3>
-      <div style={{ overflowX: 'auto' }}>
-        <table border={1} cellPadding={8} cellSpacing={0} style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>Nombre</th>
-              <th>Descripción</th>
-              <th>Nivel acceso</th>
-              <th>Estado</th>
-              <th>Acciones</th>
-            </tr>
-          </thead>
-          <tbody>
-            {datos.length > 0 ? datos.map(r => (
-              <tr key={r.ROL_ID}>
-                <td>{r.ROL_ID}</td>
-                <td>{r.ROL_NOMBRE}</td>
-                <td>{r.ROL_DESCRIPCION}</td>
-                <td>{r.ROL_NIVEL_ACCESO}</td>
-                <td>{r.ROL_ESTADO}</td>
+      <table border={1} cellPadding={8} cellSpacing={0} style={{ width: '100%', borderCollapse: 'collapse' }}>
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Nombre</th>
+            <th>Descripción</th>
+            <th>Nivel acceso</th>
+            <th>Estado</th>
+            <th>Fecha creación</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          {datos.length > 0 ? (
+            datos.map((rol) => (
+              <tr key={rol.ROL_ID}>
+                <td>{rol.ROL_ID}</td>
+                <td>{rol.ROL_NOMBRE}</td>
+                <td>{rol.ROL_DESCRIPCION}</td>
+                <td>{rol.ROL_NIVEL_ACCESO}</td>
+                <td>{rol.ROL_ESTADO}</td>
+                <td>{rol.ROL_FECHA_CREACION ? String(rol.ROL_FECHA_CREACION).slice(0, 10) : ''}</td>
                 <td>
-                  <div style={{ display: 'flex', gap: '8px' }}>
-                    <button onClick={() => handleEditar(r)}>Editar</button>
-                    <button onClick={() => handleEliminar(r.ROL_ID)}>Eliminar</button>
-                  </div>
+                  <button onClick={() => handleEditar(rol)}>Editar</button>
+                  <button onClick={() => handleEliminar(rol.ROL_ID)}>Eliminar</button>
                 </td>
               </tr>
-            )) : (
-              <tr><td colSpan={6} style={{ textAlign: 'center' }}>No hay roles registrados</td></tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+            ))
+          ) : (
+            <tr>
+              <td colSpan={7}>No hay roles registrados</td>
+            </tr>
+          )}
+        </tbody>
+      </table>
     </div>
   );
 }
