@@ -1,26 +1,11 @@
 import { useEffect, useState } from 'react';
-import api from '../api/axios';
-
-interface Empleado {
-  EMP_ID: number;
-  EMP_NOMBRE: string;
-  EMP_APELLIDO: string;
-  EMP_DPI: number | string;
-  EMP_NIT: number | string;
-  EMP_TELEFONO: number | string;
-  EMP_FECHA_CONTRATACION: string;
-  EMP_ESTADO: string;
-}
-
-interface EmpleadoForm {
-  emp_nombre: string;
-  emp_apellido: string;
-  emp_dpi: string;
-  emp_nit: string;
-  emp_telefono: string;
-  emp_fecha_contratacion: string;
-  emp_estado: string;
-}
+import type { Empleado, EmpleadoForm } from '../interfaces/empleados';
+import {
+  obtenerEmpleados,
+  crearEmpleado,
+  actualizarEmpleado,
+  eliminarEmpleado
+} from '../services/empleados.service';
 
 const initialForm: EmpleadoForm = {
   emp_nombre: '',
@@ -45,9 +30,8 @@ function PruebaAxios() {
     try {
       setCargando(true);
       setError('');
-
-      const response = await api.get('empleados/');
-      setDatos(response.data);
+      const data = await obtenerEmpleados();
+      setDatos(data);
     } catch (err: any) {
       setError('Error cargando empleados: ' + err.message);
     } finally {
@@ -59,7 +43,9 @@ function PruebaAxios() {
     cargarEmpleados();
   }, []);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
+  ) => {
     const { name, value } = e.target;
 
     setForm((prev) => ({
@@ -72,6 +58,7 @@ function PruebaAxios() {
     setForm(initialForm);
     setModoEdicion(false);
     setEmpleadoId(null);
+    setError('');
   };
 
   const validarFormulario = () => {
@@ -91,55 +78,40 @@ function PruebaAxios() {
     return true;
   };
 
-  const crearEmpleado = async () => {
+  const guardarEmpleado = async () => {
     try {
       setError('');
       setMensaje('');
 
       if (!validarFormulario()) return;
 
-      await api.post('empleados/', form);
-
-      setMensaje('Empleado creado correctamente');
-      limpiarFormulario();
-      await cargarEmpleados();
-    } catch (err: any) {
-      setError('Error creando empleado: ' + (err.response?.data?.error || err.message));
-    }
-  };
-
-  const actualizarEmpleado = async () => {
-    try {
-      setError('');
-      setMensaje('');
-
-      if (!validarFormulario()) return;
-      if (empleadoId === null) {
-        setError('No se encontró el empleado a editar');
-        return;
+      if (modoEdicion && empleadoId !== null) {
+        await actualizarEmpleado(empleadoId, form);
+        setMensaje('Empleado actualizado correctamente');
+      } else {
+        await crearEmpleado(form);
+        setMensaje('Empleado creado correctamente');
       }
 
-      await api.put(`empleados/${empleadoId}`, form);
-
-      setMensaje('Empleado actualizado correctamente');
       limpiarFormulario();
       await cargarEmpleados();
     } catch (err: any) {
-      setError('Error actualizando empleado: ' + (err.response?.data?.error || err.message));
+      setError(
+        'Error guardando empleado: ' +
+          (err.response?.data?.error || err.message)
+      );
     }
   };
 
-  const eliminarEmpleado = async (id: number) => {
+  const handleEliminar = async (id: number) => {
     const confirmar = window.confirm('¿Deseas eliminar este empleado?');
-
     if (!confirmar) return;
 
     try {
       setError('');
       setMensaje('');
 
-      await api.delete(`empleados/${id}`);
-
+      await eliminarEmpleado(id);
       setMensaje('Empleado eliminado correctamente');
 
       if (empleadoId === id) {
@@ -148,11 +120,14 @@ function PruebaAxios() {
 
       await cargarEmpleados();
     } catch (err: any) {
-      setError('Error eliminando empleado: ' + (err.response?.data?.error || err.message));
+      setError(
+        'Error eliminando empleado: ' +
+          (err.response?.data?.error || err.message)
+      );
     }
   };
 
-  const editarEmpleado = (empleado: Empleado) => {
+  const handleEditar = (empleado: Empleado) => {
     setModoEdicion(true);
     setEmpleadoId(empleado.EMP_ID);
     setMensaje('');
@@ -250,11 +225,9 @@ function PruebaAxios() {
           </select>
 
           <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
-            {!modoEdicion ? (
-              <button onClick={crearEmpleado}>Guardar</button>
-            ) : (
-              <button onClick={actualizarEmpleado}>Actualizar</button>
-            )}
+            <button onClick={guardarEmpleado}>
+              {modoEdicion ? 'Actualizar' : 'Guardar'}
+            </button>
 
             <button onClick={limpiarFormulario}>Limpiar</button>
           </div>
@@ -301,10 +274,10 @@ function PruebaAxios() {
                   <td>{empleado.EMP_ESTADO}</td>
                   <td>
                     <div style={{ display: 'flex', gap: '8px' }}>
-                      <button onClick={() => editarEmpleado(empleado)}>
+                      <button onClick={() => handleEditar(empleado)}>
                         Editar
                       </button>
-                      <button onClick={() => eliminarEmpleado(empleado.EMP_ID)}>
+                      <button onClick={() => handleEliminar(empleado.EMP_ID)}>
                         Eliminar
                       </button>
                     </div>
