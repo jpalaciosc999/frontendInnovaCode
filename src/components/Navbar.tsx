@@ -22,9 +22,10 @@ function Navbar() {
       <NavLink to="/puestos" style={style}>Puestos</NavLink>
       <NavLink to="/permisos" style={style}>permisos</NavLink>
       <NavLink to="/rol-permisos" style={style}>rolPermisos</NavLink>
-      <NavLink to="/roles" style={style}>Roles</NavLink>
       <NavLink to="/prestamos" style={style}>prestamos</NavLink>
       <NavLink to="/prestamo-detalle" style={style}>prestamo-detalle</NavLink>
+      <NavLink to="/roles" style={style}>Roles</NavLink>
+      <NavLink to="/tipoIngreso" style={style}>Tipo de Ingreso</NavLink>
     </nav>
   );
 }

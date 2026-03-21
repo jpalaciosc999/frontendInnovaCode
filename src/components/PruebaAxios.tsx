@@ -1,4 +1,7 @@
 import { useEffect, useState } from 'react';
+<<<<<<< HEAD
+import api from '../api/axios';
+=======
 import type { Empleado, EmpleadoForm } from '../interfaces/empleados';
 import {
   obtenerEmpleados,
@@ -16,10 +19,14 @@ const initialForm: EmpleadoForm = {
   emp_fecha_contratacion: '',
   emp_estado: ''
 };
+>>>>>>> 79e0fe4a0ac756d1fefd2f5578a86d8f7616def0
 
 function PruebaAxios() {
-  const [datos, setDatos] = useState<Empleado[]>([]);
+  const [datos, setDatos]       = useState([]);
   const [cargando, setCargando] = useState(true);
+<<<<<<< HEAD
+  const [error, setError]       = useState('');
+=======
   const [error, setError] = useState('');
   const [mensaje, setMensaje] = useState('');
   const [modoEdicion, setModoEdicion] = useState(false);
@@ -38,11 +45,22 @@ function PruebaAxios() {
       setCargando(false);
     }
   };
+>>>>>>> 79e0fe4a0ac756d1fefd2f5578a86d8f7616def0
 
   useEffect(() => {
-    cargarEmpleados();
+    api.get('empleados')
+      .then(response => {
+        setDatos(response.data);
+        setCargando(false);
+      })
+      .catch(err => {
+        setError('Error: ' + err.message);
+        setCargando(false);
+      });
   }, []);
 
+<<<<<<< HEAD
+=======
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
   ) => {
@@ -146,9 +164,16 @@ function PruebaAxios() {
     });
   };
 
+>>>>>>> 79e0fe4a0ac756d1fefd2f5578a86d8f7616def0
   if (cargando) return <p>Cargando...</p>;
+  if (error)    return <p style={{color:'red'}}>{error}</p>;
 
   return (
+<<<<<<< HEAD
+    <div>
+      <h2>Empleados: {datos.length}</h2>
+      <pre>{JSON.stringify(datos, null, 2)}</pre>
+=======
     <div style={{ padding: '20px', fontFamily: 'Arial' }}>
       <h2>CRUD de Empleados</h2>
 
@@ -294,6 +319,7 @@ function PruebaAxios() {
           </tbody>
         </table>
       </div>
+>>>>>>> 79e0fe4a0ac756d1fefd2f5578a86d8f7616def0
     </div>
   );
 }

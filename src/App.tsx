@@ -5,10 +5,14 @@ import PruebaAxios from './components/PruebaAxios';
 import Departamentos from './components/Departamentos';
 import Puestos from './components/Puestos';
 import Roles from './components/Roles';
+
 import Prestamos from './components/Prestamos';
 import PrestamoDetalleView from './components/PrestamoDetalle';
 import Permisos from './components/permisos';
 import RolPermisosView from './components/RolPermisos';
+
+import TipoIngreso from './components/tipoIngreso';
+
 
 function App() {
   return (
@@ -24,6 +28,8 @@ function App() {
         <Route path="/permisos" element={<Permisos />} />
         <Route path="/rol-permisos" element={<RolPermisosView />} />
         <Route path="/roles" element={<Roles />} />
+        <Route path="/roles" element={<Roles />} />
+        <Route path="/tipoIngreso" element={<TipoIngreso />} />
       </Routes>
     </>
   );
