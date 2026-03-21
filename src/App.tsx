@@ -1,4 +1,4 @@
-import PruebaAxios from './components/PruebaAxios';
+import PruebaAxios from './components/Departamentos';
 
 function App() {
   return (
