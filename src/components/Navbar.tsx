@@ -20,6 +20,7 @@ function Navbar() {
       <NavLink to="/empleados" style={style}>Empleados</NavLink>
       <NavLink to="/departamentos" style={style}>Departamentos</NavLink>
       <NavLink to="/puestos" style={style}>Puestos</NavLink>
+        <NavLink to="/roles" style={style}>Roles</NavLink>
     </nav>
   );
 }
