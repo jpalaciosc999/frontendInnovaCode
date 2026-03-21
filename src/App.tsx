@@ -1,4 +1,4 @@
-import Departamentos from './components/Departamentos';
+import PruebaAxios from './components/PruebaAxios';
 
 function App() {
   return (
@@ -16,7 +16,7 @@ function App() {
       }}>
         Sistema de Nóminas
       </h1>
-      <Departamentos />
+      <PruebaAxios />
     </div>
   );
 }
