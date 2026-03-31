@@ -10,8 +10,7 @@ import PrestamoDetalleView from './components/PrestamoDetalle';
 import Permisos from './components/permisos';
 import RolPermisosView from './components/RolPermisos';
 import Descuentos from './components/descuentos';
-import tipoIngresos from './components/tipoIngresos';
-import IngresosCRUD from './components/tipoIngresos';
+import TipoIngresos from './components/tipoIngresos.tsx';
 
 
 function App() {
@@ -29,7 +28,7 @@ function App() {
         <Route path="/rol-permisos" element={<RolPermisosView />} />
         <Route path="/roles" element={<Roles />} />
         <Route path="/descuentos" element={<Descuentos />} />
-        <Route path="/tipoIngresos" element={<IngresosCRUD />} />
+        <Route path="/tipoIngresos.tsx" element={<TipoIngresos />} />
       </Routes>
     </>
   );

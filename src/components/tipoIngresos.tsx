@@ -16,7 +16,7 @@ const initialForm: IngresoForm = {
     fecha_modificacion: ''
 };
 
-function IngresosCRUD() {
+function TipoIngresos() {
     const [datos, setDatos] = useState<Ingreso[]>([]);
     const [cargando, setCargando] = useState(true);
     const [error, setError] = useState('');
@@ -275,4 +275,4 @@ function IngresosCRUD() {
     );
 }
 
-export default IngresosCRUD;
+export default TipoIngresos;
