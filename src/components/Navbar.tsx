@@ -25,6 +25,8 @@ function Navbar() {
       <NavLink to="/roles" style={style}>Roles</NavLink>
       <NavLink to="/prestamos" style={style}>prestamos</NavLink>
       <NavLink to="/prestamo-detalle" style={style}>prestamo-detalle</NavLink>
+      <NavLink to="/tipoIngresos" style={style}>Ingresos</NavLink>
+      <NavLink to="/descuentos" style={style}>Descuentos</NavLink>
     </nav>
   );
 }

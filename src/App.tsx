@@ -9,10 +9,14 @@ import Prestamos from './components/Prestamos';
 import PrestamoDetalleView from './components/PrestamoDetalle';
 import Permisos from './components/permisos';
 import RolPermisosView from './components/RolPermisos';
+import Descuentos from './components/descuentos';
+import tipoIngresos from './components/tipoIngresos';
+import IngresosCRUD from './components/tipoIngresos';
+
 
 function App() {
   return (
-<>
+    <>
       <Navbar />
       <Routes>
         <Route path="/" element={<Home />} />
@@ -24,6 +28,8 @@ function App() {
         <Route path="/permisos" element={<Permisos />} />
         <Route path="/rol-permisos" element={<RolPermisosView />} />
         <Route path="/roles" element={<Roles />} />
+        <Route path="/descuentos" element={<Descuentos />} />
+        <Route path="/tipoIngresos" element={<IngresosCRUD />} />
       </Routes>
     </>
   );
