@@ -25,6 +25,9 @@ function Navbar() {
       <NavLink to="/roles" style={style}>Roles</NavLink>
       <NavLink to="/prestamos" style={style}>prestamos</NavLink>
       <NavLink to="/prestamo-detalle" style={style}>prestamo-detalle</NavLink>
+      <NavLink to="/periodo" style={style}>periodo</NavLink>
+      <NavLink to="/Control-Laboral" style={style}>Control-Laboral</NavLink>
+      <NavLink to="/cuenta-bancaria" style={style}>Cuenta Bancaria</NavLink>
     </nav>
   );
 }

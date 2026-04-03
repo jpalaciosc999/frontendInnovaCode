@@ -9,6 +9,9 @@ import Prestamos from './components/Prestamos';
 import PrestamoDetalleView from './components/PrestamoDetalle';
 import Permisos from './components/permisos';
 import RolPermisosView from './components/RolPermisos';
+import Periodo from './components/Periodo';
+import ControlLaboral from './components/ControlLaboral';
+import CuentaBancaria from './components/CuentaBancaria';
 
 function App() {
   return (
@@ -24,6 +27,9 @@ function App() {
         <Route path="/permisos" element={<Permisos />} />
         <Route path="/rol-permisos" element={<RolPermisosView />} />
         <Route path="/roles" element={<Roles />} />
+        <Route path="/periodo" element={<Periodo />} />
+        <Route path="/Control-Laboral" element={<ControlLaboral />} />
+        <Route path="/cuenta-bancaria" element={<CuentaBancaria />} />
       </Routes>
     </>
   );
