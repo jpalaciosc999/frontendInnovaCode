@@ -28,6 +28,8 @@ function Navbar() {
       <NavLink to="/periodo" style={style}>periodo</NavLink>
       <NavLink to="/Control-Laboral" style={style}>Control-Laboral</NavLink>
       <NavLink to="/cuenta-bancaria" style={style}>Cuenta Bancaria</NavLink>
+      <NavLink to="/tipoIngresos" style={style}>Ingresos</NavLink>
+      <NavLink to="/descuentos" style={style}>Descuentos</NavLink>
     </nav>
   );
 }

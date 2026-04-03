@@ -12,10 +12,13 @@ import RolPermisosView from './components/RolPermisos';
 import Periodo from './components/Periodo';
 import ControlLaboral from './components/ControlLaboral';
 import CuentaBancaria from './components/CuentaBancaria';
+import Descuentos from './components/descuentos';
+import TipoIngresos from './components/tipoIngresos';
+
 
 function App() {
   return (
-<>
+    <>
       <Navbar />
       <Routes>
         <Route path="/" element={<Home />} />
@@ -30,6 +33,8 @@ function App() {
         <Route path="/periodo" element={<Periodo />} />
         <Route path="/Control-Laboral" element={<ControlLaboral />} />
         <Route path="/cuenta-bancaria" element={<CuentaBancaria />} />
+        <Route path="/descuentos" element={<Descuentos />} />
+        <Route path="/tipoIngresos" element={<TipoIngresos />} />
       </Routes>
     </>
   );

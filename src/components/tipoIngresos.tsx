@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
-import type { Ingreso, IngresoForm } from '../interfaces/tipoIngresos.ts';
+import type { Ingreso, IngresoForm } from '../interfaces/tipoIngresos';
 import {
     obtenerIngresos,
     crearIngreso,
     actualizarIngreso,
     eliminarIngreso
-} from '../services/tipoIngresos.service.ts';
+} from '../services/tipoIngresos.service';
 
 const initialForm: IngresoForm = {
     tis_codigo: '',
@@ -16,7 +16,7 @@ const initialForm: IngresoForm = {
     fecha_modificacion: ''
 };
 
-function IngresosCRUD() {
+function TipoIngresos() {
     const [datos, setDatos] = useState<Ingreso[]>([]);
     const [cargando, setCargando] = useState(true);
     const [error, setError] = useState('');
@@ -246,7 +246,11 @@ function IngresosCRUD() {
                                     <td>{ingreso.TIS_ID}</td>
                                     <td>{ingreso.TIS_CODIGO}</td>
                                     <td>{ingreso.TIS_NOMBRE}</td>
-                                    <td>Q. {ingreso.TIS_VALOR_BASE.toFixed(2)}</td>
+                                    <td>
+                                        Q. {ingreso.TIS_VALOR_BASE != null
+                                            ? Number(ingreso.TIS_VALOR_BASE).toFixed(2)
+                                            : '0.00'}
+                                    </td>
                                     <td>{ingreso.TIS_ES_RECURRENTE === 'S' ? 'Sí' : 'No'}</td>
                                     <td>
                                         {ingreso.FECHA_MODIFICACION
@@ -275,4 +279,4 @@ function IngresosCRUD() {
     );
 }
 
-export default IngresosCRUD;
+export default TipoIngresos;
