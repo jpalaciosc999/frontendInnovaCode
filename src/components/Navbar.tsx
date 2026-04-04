@@ -30,6 +30,7 @@ function Navbar() {
       <NavLink to="/cuenta-bancaria" style={style}>Cuenta Bancaria</NavLink>
       <NavLink to="/tipoIngresos" style={style}>Ingresos</NavLink>
       <NavLink to="/descuentos" style={style}>Descuentos</NavLink>
+      <NavLink to="/nomina-detalle" style={style}>Nomina Detalle</NavLink>
     </nav>
   );
 }

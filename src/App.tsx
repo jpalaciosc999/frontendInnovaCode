@@ -14,6 +14,7 @@ import ControlLaboral from './components/ControlLaboral';
 import CuentaBancaria from './components/CuentaBancaria';
 import Descuentos from './components/descuentos';
 import TipoIngresos from './components/tipoIngresos';
+import NominaDetallePage from './components/NominaDetallePage';
 
 
 function App() {
@@ -35,6 +36,7 @@ function App() {
         <Route path="/cuenta-bancaria" element={<CuentaBancaria />} />
         <Route path="/descuentos" element={<Descuentos />} />
         <Route path="/tipoIngresos" element={<TipoIngresos />} />
+        <Route path="/nomina-detalle" element={<NominaDetallePage />} />
       </Routes>
     </>
   );
