@@ -14,7 +14,8 @@ function Navbar() {
       display: 'flex',
       gap: '10px',
       padding: '15px',
-      background: '#111'
+      background: '#111',
+      flexWrap: 'wrap' // Tip: Agregué esto por si tienes muchos botones y no caben en una línea
     }}>
       <NavLink to="/" style={style}>Inicio</NavLink>
       <NavLink to="/empleados" style={style}>Empleados</NavLink>
@@ -31,7 +32,11 @@ function Navbar() {
       <NavLink to="/tipoIngresos" style={style}>Ingresos</NavLink>
       <NavLink to="/descuentos" style={style}>Descuentos</NavLink>
       <NavLink to="/nomina-detalle" style={style}>Nomina Detalle</NavLink>
-      <NavLink to="/kpis">KPIs</NavLink>
+
+      {/* SECCIÓN DE KPIs */}
+      <NavLink to="/kpis" style={style}>KPIs</NavLink>
+      <NavLink to="/kpi-resultado" style={style}>Resultados KPI</NavLink>
+
     </nav>
   );
 }
