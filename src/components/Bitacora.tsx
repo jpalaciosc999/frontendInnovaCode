@@ -7,6 +7,7 @@ import {
     eliminarBitacora
 } from '../services/bitacora.service';
 
+
 const initialForm: BitacoraForm = {
     bit_accion: '',
     bit_tabla_afectada: '',
