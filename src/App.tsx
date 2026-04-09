@@ -17,6 +17,7 @@ import TipoIngresos from './components/tipoIngresos';
 import NominaDetallePage from './components/NominaDetallePage';
 import KPIPage from './components/KPIPage';
 import KPIResultadoPage from "./components/KPIResultadoPage";
+import MarcajePage from "./components/MarcajePage";
 
 function App() {
   return (
@@ -40,6 +41,7 @@ function App() {
         <Route path="/nomina-detalle" element={<NominaDetallePage />} />
         <Route path="/kpis" element={<KPIPage />} />
         <Route path="/kpi-resultado" element={<KPIResultadoPage />} />
+        <Route path="/marcajes" element={<MarcajePage />} />
       </Routes>
     </>
   );
