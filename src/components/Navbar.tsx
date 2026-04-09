@@ -32,6 +32,7 @@ function Navbar() {
       <NavLink to="/tipoIngresos" style={style}>Ingresos</NavLink>
       <NavLink to="/descuentos" style={style}>Descuentos</NavLink>
       <NavLink to="/nomina-detalle" style={style}>Nomina Detalle</NavLink>
+      <NavLink to="/bitacora" style={style}>Bitácora</NavLink>
       <NavLink to="/liquidacion" style={style}>Liquidación</NavLink>
 
       {/* SECCIÓN DE KPIs */}
