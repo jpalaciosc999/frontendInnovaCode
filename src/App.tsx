@@ -18,6 +18,7 @@ import NominaDetallePage from './components/NominaDetallePage';
 import KPIPage from './components/KPIPage';
 import KPIResultadoPage from "./components/KPIResultadoPage";
 import Bitacora from "./components/Bitacora";
+import Liquidacion from "./components/Liquidacion";
 
 function App() {
   return (
@@ -42,6 +43,7 @@ function App() {
         <Route path="/kpis" element={<KPIPage />} />
         <Route path="/kpi-resultado" element={<KPIResultadoPage />} />
         <Route path="/bitacora" element={<Bitacora />} />
+        <Route path="/liquidacion" element={<Liquidacion />} />
       </Routes>
     </>
   );
