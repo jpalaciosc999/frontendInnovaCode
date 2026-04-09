@@ -17,6 +17,7 @@ import TipoIngresos from './components/tipoIngresos';
 import NominaDetallePage from './components/NominaDetallePage';
 import KPIPage from './components/KPIPage';
 import KPIResultadoPage from "./components/KPIResultadoPage";
+import MarcajePage from "./components/MarcajePage";
 import EmpleadoContrato from "./components/EmpleadoContrato";
 import Sede from "./components/Sede";
 import Bitacora from "./components/Bitacora";
@@ -44,6 +45,7 @@ function App() {
         <Route path="/nomina-detalle" element={<NominaDetallePage />} />
         <Route path="/kpis" element={<KPIPage />} />
         <Route path="/kpi-resultado" element={<KPIResultadoPage />} />
+        <Route path="/marcajes" element={<MarcajePage />} />
         <Route path="/Empleado_contrato" element={<EmpleadoContrato />} />
         <Route path="/sede" element={<Sede/>} />
         <Route path="/bitacora" element={<Bitacora />} />
