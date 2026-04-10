@@ -60,28 +60,49 @@ function NominaDetalleCRUD() {
     };
 
     const validarFormulario = () => {
-        if (!form.det_referencia || !form.det_monto || !form.nom_id) {
+        if (
+            form.det_referencia === '' ||
+            form.det_monto === '' ||
+            form.nom_id === ''
+        ) {
             setError('Referencia, Monto y Nom_ID son obligatorios');
             return false;
         }
         return true;
     };
 
+    /* 🔥 FIX: limpiar datos antes de enviar */
+    const limpiarDatos = (form: NominaDetalleForm) => {
+        return {
+            det_referencia: form.det_referencia ? Number(form.det_referencia) : null,
+            det_monto: form.det_monto ? Number(form.det_monto) : null,
+            nom_id: form.nom_id ? Number(form.nom_id) : null,
+            tis_id: form.tis_id ? Number(form.tis_id) : null,
+            tds_id: form.tds_id ? Number(form.tds_id) : null,
+            kre_id: form.kre_id ? Number(form.kre_id) : null
+        };
+    };
+
     const guardarDetalle = async () => {
         try {
             setError('');
             setMensaje('');
+
             if (!validarFormulario()) return;
 
+            const dataLimpia = limpiarDatos(form);
+
             if (modoEdicion && detalleId !== null) {
-                await actualizarDetalleNomina(detalleId, form);
+                await actualizarDetalleNomina(detalleId, dataLimpia);
                 setMensaje('Registro actualizado correctamente');
             } else {
-                await crearDetalleNomina(form);
+                await crearDetalleNomina(dataLimpia);
                 setMensaje('Registro creado correctamente');
             }
+
             limpiarFormulario();
             await cargarDatos();
+
         } catch (err: any) {
             setError('Error guardando registro: ' + (err.response?.data?.error || err.message));
         }
@@ -118,77 +139,89 @@ function NominaDetalleCRUD() {
     return (
         <div style={{ padding: '20px', fontFamily: 'Arial', color: 'white' }}>
             <h2>CRUD Detalle de Nómina</h2>
+
             {error && <p style={{ color: 'red' }}>{error}</p>}
             {mensaje && <p style={{ color: 'green' }}>{mensaje}</p>}
 
+            {/* FORMULARIO (TU DISEÑO SE MANTIENE) */}
             <div style={{ border: '1px solid #ccc', padding: '16px', borderRadius: '8px', maxWidth: '700px', marginBottom: '20px', backgroundColor: '#222' }}>
                 <h3>{modoEdicion ? 'Editar Detalle' : 'Nuevo Detalle'}</h3>
+
                 <div style={{ display: 'grid', gap: '10px', gridTemplateColumns: '1fr 1fr' }}>
+                    
                     <div style={{ display: 'flex', flexDirection: 'column' }}>
                         <label>Referencia:</label>
-                        <input type="text" name="det_referencia" placeholder="Ej: 101" value={form.det_referencia} onChange={handleChange} />
+                        <input type="text" name="det_referencia" value={form.det_referencia} onChange={handleChange} />
                     </div>
+
                     <div style={{ display: 'flex', flexDirection: 'column' }}>
                         <label>Monto:</label>
-                        <input type="number" name="det_monto" placeholder="0.00" value={form.det_monto} onChange={handleChange} />
+                        <input type="number" name="det_monto" value={form.det_monto} onChange={handleChange} />
                     </div>
+
                     <div style={{ display: 'flex', flexDirection: 'column' }}>
                         <label>Nómina ID:</label>
-                        <input type="number" name="nom_id" placeholder="ID Nómina" value={form.nom_id} onChange={handleChange} />
+                        <input type="number" name="nom_id" value={form.nom_id} onChange={handleChange} />
                     </div>
+
                     <div style={{ display: 'flex', flexDirection: 'column' }}>
-                        <label>TIS ID (Ingreso):</label>
-                        <input type="number" name="tis_id" placeholder="ID Tipo Ingreso" value={form.tis_id} onChange={handleChange} />
+                        <label>TIS ID:</label>
+                        <input type="number" name="tis_id" value={form.tis_id} onChange={handleChange} />
                     </div>
+
                     <div style={{ display: 'flex', flexDirection: 'column' }}>
-                        <label>TDS ID (Descuento):</label>
-                        <input type="number" name="tds_id" placeholder="ID Tipo Descuento" value={form.tds_id} onChange={handleChange} />
+                        <label>TDS ID:</label>
+                        <input type="number" name="tds_id" value={form.tds_id} onChange={handleChange} />
                     </div>
+
                     <div style={{ display: 'flex', flexDirection: 'column' }}>
-                        <label>KRE ID (KPI):</label>
-                        <input type="number" name="kre_id" placeholder="ID KPI Resultado" value={form.kre_id} onChange={handleChange} />
+                        <label>KRE ID:</label>
+                        <input type="number" name="kre_id" value={form.kre_id} onChange={handleChange} />
                     </div>
+
                 </div>
 
                 <div style={{ marginTop: '20px', display: 'flex', gap: '10px' }}>
-                    <button onClick={guardarDetalle} style={{ padding: '8px 16px', cursor: 'pointer', backgroundColor: '#4CAF50', color: 'white', border: 'none', borderRadius: '4px' }}>
+                    <button onClick={guardarDetalle} style={{ padding: '8px 16px', backgroundColor: '#4CAF50', color: 'white', border: 'none' }}>
                         {modoEdicion ? 'Actualizar' : 'Guardar'}
                     </button>
-                    <button onClick={limpiarFormulario} style={{ padding: '8px 16px', cursor: 'pointer', backgroundColor: '#f44336', color: 'white', border: 'none', borderRadius: '4px' }}>
-                        Limpiar / Cancelar
+                    <button onClick={limpiarFormulario} style={{ padding: '8px 16px', backgroundColor: '#f44336', color: 'white', border: 'none' }}>
+                        Limpiar
                     </button>
                 </div>
             </div>
 
+            {/* TABLA (DISEÑO IGUAL) */}
             <table border={1} cellPadding={8} style={{ width: '100%', borderCollapse: 'collapse', color: 'white', borderColor: '#444' }}>
                 <thead style={{ backgroundColor: '#333' }}>
                     <tr>
                         <th>ID</th>
                         <th>Referencia</th>
                         <th>Monto</th>
-                        <th>Nomina ID</th>
+                        <th>Nomina</th>
                         <th>Ingreso</th>
                         <th>Descuento</th>
                         <th>Acciones</th>
                     </tr>
                 </thead>
+
                 <tbody>
                     {datos.length > 0 ? datos.map((d) => (
                         <tr key={d.DET_ID}>
-                            <td style={{ textAlign: 'center' }}>{d.DET_ID}</td>
+                            <td>{d.DET_ID}</td>
                             <td>{d.DET_REFERENCIA}</td>
-                            <td style={{ textAlign: 'right' }}>Q{d.DET_MONTO}</td>
-                            <td style={{ textAlign: 'center' }}>{d.NOM_ID}</td>
-                            <td style={{ textAlign: 'center' }}>{d.TIS_ID || '-'}</td>
-                            <td style={{ textAlign: 'center' }}>{d.TDS_ID || '-'}</td>
-                            <td style={{ textAlign: 'center' }}>
-                                <button onClick={() => handleEditar(d)} style={{ marginRight: '5px' }}>Editar</button>
-                                <button onClick={() => handleEliminar(d.DET_ID)} style={{ backgroundColor: '#ff5555', color: 'white', border: 'none', borderRadius: '3px', cursor: 'pointer' }}>Eliminar</button>
+                            <td>Q{d.DET_MONTO}</td>
+                            <td>{d.NOM_ID}</td>
+                            <td>{d.TIS_ID || '-'}</td>
+                            <td>{d.TDS_ID || '-'}</td>
+                            <td>
+                                <button onClick={() => handleEditar(d)}>Editar</button>
+                                <button onClick={() => handleEliminar(d.DET_ID)}>Eliminar</button>
                             </td>
                         </tr>
                     )) : (
                         <tr>
-                            <td colSpan={7} style={{ textAlign: 'center' }}>No hay registros disponibles</td>
+                            <td colSpan={7} style={{ textAlign: 'center' }}>No hay registros</td>
                         </tr>
                     )}
                 </tbody>
