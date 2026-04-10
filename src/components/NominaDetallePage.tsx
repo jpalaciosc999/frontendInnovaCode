@@ -8,12 +8,12 @@ import {
 } from '../services/nomina-detalle.service.ts';
 
 const initialForm: NominaDetalleForm = {
-    det_referencia: '',
-    det_monto: '',
-    nom_id: '',
-    tis_id: '',
-    tds_id: '',
-    kre_id: ''
+    det_referencia: 0,
+    det_monto: 0,
+    nom_id: 0,
+    tis_id: 0,
+    tds_id: 0,
+    kre_id: 0
 };
 
 function NominaDetalleCRUD() {
@@ -61,9 +61,9 @@ function NominaDetalleCRUD() {
 
     const validarFormulario = () => {
         if (
-            form.det_referencia === '' ||
-            form.det_monto === '' ||
-            form.nom_id === ''
+            form.det_referencia === 0 ||
+            form.det_monto === 0 ||
+            form.nom_id === 0
         ) {
             setError('Referencia, Monto y Nom_ID son obligatorios');
             return false;
@@ -71,7 +71,7 @@ function NominaDetalleCRUD() {
         return true;
     };
 
-    /* 🔥 FIX: limpiar datos antes de enviar */
+
     const limpiarDatos = (form: NominaDetalleForm) => {
         return {
             det_referencia: form.det_referencia ? Number(form.det_referencia) : null,
@@ -125,12 +125,12 @@ function NominaDetalleCRUD() {
         setModoEdicion(true);
         setDetalleId(d.DET_ID);
         setForm({
-            det_referencia: d.DET_REFERENCIA?.toString() || '',
-            det_monto: d.DET_MONTO?.toString() || '',
-            nom_id: d.NOM_ID?.toString() || '',
-            tis_id: d.TIS_ID?.toString() || '',
-            tds_id: d.TDS_ID?.toString() || '',
-            kre_id: d.KRE_ID?.toString() || ''
+            det_referencia: d.DET_REFERENCIA ?? 0,
+            det_monto: d.DET_MONTO ?? 0,
+            nom_id: d.NOM_ID ?? 0,
+            tis_id: d.TIS_ID ?? 0,
+            tds_id: d.TDS_ID ?? 0,
+            kre_id: d.KRE_ID ?? 0
         });
     };
 
@@ -151,32 +151,32 @@ function NominaDetalleCRUD() {
                     
                     <div style={{ display: 'flex', flexDirection: 'column' }}>
                         <label>Referencia:</label>
-                        <input type="text" name="det_referencia" value={form.det_referencia} onChange={handleChange} />
+                        <input type="text" name="det_referencia" value={form.det_referencia ?? 0 } onChange={handleChange} />
                     </div>
 
                     <div style={{ display: 'flex', flexDirection: 'column' }}>
                         <label>Monto:</label>
-                        <input type="number" name="det_monto" value={form.det_monto} onChange={handleChange} />
+                        <input type="number" name="det_monto" value={form.det_monto ?? 0 } onChange={handleChange} />
                     </div>
 
                     <div style={{ display: 'flex', flexDirection: 'column' }}>
                         <label>Nómina ID:</label>
-                        <input type="number" name="nom_id" value={form.nom_id} onChange={handleChange} />
+                        <input type="number" name="nom_id" value={form.nom_id ?? 0 } onChange={handleChange} />
                     </div>
 
                     <div style={{ display: 'flex', flexDirection: 'column' }}>
                         <label>TIS ID:</label>
-                        <input type="number" name="tis_id" value={form.tis_id} onChange={handleChange} />
+                        <input type="number" name="tis_id" value={form.tis_id ?? 0 } onChange={handleChange} />
                     </div>
 
                     <div style={{ display: 'flex', flexDirection: 'column' }}>
                         <label>TDS ID:</label>
-                        <input type="number" name="tds_id" value={form.tds_id} onChange={handleChange} />
+                        <input type="number" name="tds_id" value={form.tds_id ?? 0 } onChange={handleChange} />
                     </div>
 
                     <div style={{ display: 'flex', flexDirection: 'column' }}>
                         <label>KRE ID:</label>
-                        <input type="number" name="kre_id" value={form.kre_id} onChange={handleChange} />
+                        <input type="number" name="kre_id" value={form.kre_id ?? 0 } onChange={handleChange} />
                     </div>
 
                 </div>
