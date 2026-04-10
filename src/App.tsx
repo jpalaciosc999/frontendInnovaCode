@@ -23,6 +23,7 @@ import Sede from "./components/Sede";
 import Bitacora from "./components/Bitacora";
 import Liquidacion from "./components/Liquidacion";
 import Nomina from "./components/Nomina";
+import Usuario from "./components/Usuario";
 
 function App() {
   return (
@@ -52,6 +53,7 @@ function App() {
         <Route path="/bitacora" element={<Bitacora />} />
         <Route path="/liquidacion" element={<Liquidacion />} />
         <Route path="/nomina" element={<Nomina/>} />
+        <Route path="/usuarios" element={<Usuario/>} />
       </Routes>
     </>
   );
