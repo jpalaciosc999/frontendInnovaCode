@@ -25,6 +25,7 @@ import Liquidacion from "./components/Liquidacion";
 import Nomina from "./components/Nomina";
 import Usuario from "./components/Usuario";
 import TipoContrato from './components/TipoContrato';
+import UsuarioBitacora from './components/UsuarioBitacora';
 
 function App() {
   return (
@@ -56,6 +57,7 @@ function App() {
         <Route path="/nomina" element={<Nomina/>} />
         <Route path="/usuarios" element={<Usuario/>} />
         <Route path="/tipo-contrato" element={<TipoContrato />} />
+        <Route path="/usuario-bitacora" element={<UsuarioBitacora />} />
       </Routes>
     </>
   );

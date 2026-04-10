@@ -40,6 +40,7 @@ function Navbar() {
       <NavLink to="/nomina" style={style}>Nomina</NavLink>
       <NavLink to="/usuarios" style={style}>Usuarios</NavLink>
       <NavLink to="/tipo-contrato" style={style}>Tipo Contrato</NavLink>
+      <NavLink to="/usuario-bitacora" style={style}>Usuario Bitácora</NavLink>
       {/* SECCIÓN DE KPIs */}
       <NavLink to="/kpis" style={style}>KPIs</NavLink>
       <NavLink to="/kpi-resultado" style={style}>Resultados KPI</NavLink>
