@@ -28,6 +28,7 @@ import Nomina from './components/Nomina';
 import Usuario from './components/Usuario';
 import TipoContrato from './components/TipoContrato';
 import UsuarioBitacora from './components/UsuarioBitacora';
+import HorarioCRUD from './components/HorarioCRUD';
 
 function App() {
   return (
@@ -65,6 +66,7 @@ function App() {
             <Route path="/usuarios" element={<Usuario />} />
             <Route path="/tipo-contrato" element={<TipoContrato />} />
             <Route path="/usuario-bitacora" element={<UsuarioBitacora />} />
+            <Route path="/horarios" element={<HorarioCRUD />} />
           </Routes>
         </Container>
       </Box>
