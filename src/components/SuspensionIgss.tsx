@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Alert,
   Box,
@@ -28,62 +28,32 @@ import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import MedicalServicesIcon from '@mui/icons-material/MedicalServices';
 
-// ─── Reglas IGSS Guatemala ────────────────────────────────────────────────────
-// Días 1-3:    El empleador paga el 100% del salario
-// Días 4-30:   IGSS paga el 66.67% (2/3), empleador NO paga
-// Días 31+:    IGSS paga el 66.67%, empleador NO paga (hasta 26 semanas)
-const calcularImpactoSuspension = (
-  salarioDiario: number,
-  diasSuspension: number
-): {
-  dias_empleador: number;
-  dias_igss: number;
-  pago_empleador: number;
-  pago_igss: number;
-  descuento_salario: number;
-  detalle: string;
-} => {
-  let dias_empleador = 0;
-  let dias_igss = 0;
-  let pago_empleador = 0;
-  let pago_igss = 0;
+import { obtenerEmpleados } from '../services/empleados.service';
+import type { Empleado } from '../interfaces/empleados';
 
-  if (diasSuspension <= 3) {
-    // Empleador paga todo
-    dias_empleador = diasSuspension;
-    pago_empleador = salarioDiario * diasSuspension;
-    dias_igss = 0;
-    pago_igss = 0;
-  } else {
-    // Primeros 3 días: empleador
-    dias_empleador = 3;
-    pago_empleador = salarioDiario * 3;
-    // Del día 4 en adelante: IGSS paga 66.67%
-    dias_igss = diasSuspension - 3;
-    pago_igss = salarioDiario * dias_igss * 0.6667;
-  }
-
-  // Descuento al salario = lo que NO cobra el empleado del empleador después del día 3
-  const salario_periodo = salarioDiario * diasSuspension;
-  const descuento_salario = salario_periodo - pago_empleador;
-
-  const detalle = diasSuspension <= 3
-    ? `Empleador cubre los ${diasSuspension} días al 100%`
-    : `Empleador cubre días 1-3 (Q${pago_empleador.toFixed(2)}), IGSS cubre días 4-${diasSuspension} al 66.67% (Q${pago_igss.toFixed(2)})`;
-
+// Regla IGSS: días 1-3 empleador paga 100%, días 4+ IGSS paga 66.67%
+const calcularImpacto = (salarioDiario: number, dias: number) => {
+  const dias_empleador = Math.min(dias, 3);
+  const dias_igss = Math.max(0, dias - 3);
+  const pago_empleador = salarioDiario * dias_empleador;
+  const pago_igss = salarioDiario * dias_igss * 0.6667;
+  const descuento_salario = salarioDiario * dias - pago_empleador;
+  const detalle = dias <= 3
+    ? `Empleador cubre los ${dias} días al 100%`
+    : `Empleador: días 1-3 (Q${pago_empleador.toFixed(2)}) | IGSS: días 4-${dias} al 66.67% (Q${pago_igss.toFixed(2)})`;
   return { dias_empleador, dias_igss, pago_empleador, pago_igss, descuento_salario, detalle };
 };
 
-// ─── Interfaces ───────────────────────────────────────────────────────────────
 interface Suspension {
   SUS_ID: number;
   EMP_ID: number;
+  EMP_NOMBRE: string;
   SUS_NO_CERTIFICADO: string;
   SUS_FECHA_INICIO: string;
   SUS_FECHA_FIN: string;
   SUS_DIAS: number;
   SUS_SALARIO_DIARIO: number;
-  SUS_TIPO: string; // 'ENFERMEDAD' | 'MATERNIDAD' | 'ACCIDENTE'
+  SUS_TIPO: string;
   SUS_ESTADO: string;
   SUS_OBSERVACION: string;
 }
@@ -100,44 +70,39 @@ interface SuspensionForm {
 }
 
 const initialForm: SuspensionForm = {
-  emp_id: '',
-  sus_no_certificado: '',
-  sus_fecha_inicio: '',
-  sus_fecha_fin: '',
-  sus_salario_diario: '',
-  sus_tipo: 'ENFERMEDAD',
-  sus_estado: 'A',
-  sus_observacion: ''
+  emp_id: '', sus_no_certificado: '', sus_fecha_inicio: '',
+  sus_fecha_fin: '', sus_salario_diario: '',
+  sus_tipo: 'ENFERMEDAD', sus_estado: 'A', sus_observacion: ''
 };
 
-const datosEjemplo: Suspension[] = [
-  {
-    SUS_ID: 1, EMP_ID: 1, SUS_NO_CERTIFICADO: 'IGSS-2024-001',
-    SUS_FECHA_INICIO: '2024-03-01', SUS_FECHA_FIN: '2024-03-10',
-    SUS_DIAS: 10, SUS_SALARIO_DIARIO: 133.33,
-    SUS_TIPO: 'ENFERMEDAD', SUS_ESTADO: 'A', SUS_OBSERVACION: 'Gripe'
-  }
-];
-
 function SuspensionIGSS() {
-  const [datos, setDatos] = useState<Suspension[]>(datosEjemplo);
+  const [datos, setDatos] = useState<Suspension[]>([]);
+  const [empleados, setEmpleados] = useState<Empleado[]>([]);
   const [error, setError] = useState('');
   const [mensaje, setMensaje] = useState('');
   const [modoEdicion, setModoEdicion] = useState(false);
   const [id, setId] = useState<number | null>(null);
   const [form, setForm] = useState<SuspensionForm>(initialForm);
 
-  // Calcular días automáticamente al cambiar fechas
+  // Cargar empleados activos al montar
+  useEffect(() => {
+    obtenerEmpleados()
+      .then((data) => setEmpleados(data.filter((e: Empleado) => e.EMP_ESTADO === 'A')))
+      .catch((err) => setError('Error cargando empleados: ' + err.message));
+  }, []);
+
+  // Días calculados automáticamente
   const diasSuspension = (() => {
     if (!form.sus_fecha_inicio || !form.sus_fecha_fin) return 0;
-    const inicio = new Date(form.sus_fecha_inicio);
-    const fin = new Date(form.sus_fecha_fin);
-    const diff = Math.ceil((fin.getTime() - inicio.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+    const diff = Math.ceil(
+      (new Date(form.sus_fecha_fin).getTime() - new Date(form.sus_fecha_inicio).getTime())
+      / (1000 * 60 * 60 * 24)
+    ) + 1;
     return Math.max(0, diff);
   })();
 
   const impacto = diasSuspension > 0 && form.sus_salario_diario
-    ? calcularImpactoSuspension(Number(form.sus_salario_diario), diasSuspension)
+    ? calcularImpacto(Number(form.sus_salario_diario), diasSuspension)
     : null;
 
   const handleChange = (
@@ -155,18 +120,14 @@ function SuspensionIGSS() {
   };
 
   const validar = () => {
-    if (
-      !String(form.emp_id).trim() ||
-      !form.sus_no_certificado.trim() ||
-      !form.sus_fecha_inicio.trim() ||
-      !form.sus_fecha_fin.trim() ||
-      !String(form.sus_salario_diario).trim()
-    ) {
+    if (!form.emp_id || !form.sus_no_certificado.trim() ||
+      !form.sus_fecha_inicio || !form.sus_fecha_fin ||
+      !String(form.sus_salario_diario).trim()) {
       setError('Todos los campos marcados son obligatorios');
       return false;
     }
     if (new Date(form.sus_fecha_fin) < new Date(form.sus_fecha_inicio)) {
-      setError('La fecha de fin no puede ser anterior a la fecha de inicio');
+      setError('La fecha fin no puede ser anterior a la fecha inicio');
       return false;
     }
     return true;
@@ -177,26 +138,14 @@ function SuspensionIGSS() {
     setMensaje('');
     if (!validar()) return;
 
+    const emp = empleados.find((e) => e.EMP_ID === Number(form.emp_id));
+    const nombreEmp = emp ? `${emp.EMP_NOMBRE} ${emp.EMP_APELLIDO}` : `Emp. ${form.emp_id}`;
+
     if (modoEdicion && id !== null) {
-      setDatos((prev) => prev.map((s) =>
-        s.SUS_ID === id ? {
-          ...s,
-          EMP_ID: Number(form.emp_id),
-          SUS_NO_CERTIFICADO: form.sus_no_certificado,
-          SUS_FECHA_INICIO: form.sus_fecha_inicio,
-          SUS_FECHA_FIN: form.sus_fecha_fin,
-          SUS_DIAS: diasSuspension,
-          SUS_SALARIO_DIARIO: Number(form.sus_salario_diario),
-          SUS_TIPO: form.sus_tipo,
-          SUS_ESTADO: form.sus_estado,
-          SUS_OBSERVACION: form.sus_observacion
-        } : s
-      ));
-      setMensaje('Suspensión actualizada correctamente');
-    } else {
-      const nueva: Suspension = {
-        SUS_ID: datos.length + 1,
+      setDatos((prev) => prev.map((s) => s.SUS_ID === id ? {
+        ...s,
         EMP_ID: Number(form.emp_id),
+        EMP_NOMBRE: nombreEmp,
         SUS_NO_CERTIFICADO: form.sus_no_certificado,
         SUS_FECHA_INICIO: form.sus_fecha_inicio,
         SUS_FECHA_FIN: form.sus_fecha_fin,
@@ -205,8 +154,22 @@ function SuspensionIGSS() {
         SUS_TIPO: form.sus_tipo,
         SUS_ESTADO: form.sus_estado,
         SUS_OBSERVACION: form.sus_observacion
-      };
-      setDatos((prev) => [...prev, nueva]);
+      } : s));
+      setMensaje('Suspensión actualizada correctamente');
+    } else {
+      setDatos((prev) => [...prev, {
+        SUS_ID: prev.length + 1,
+        EMP_ID: Number(form.emp_id),
+        EMP_NOMBRE: nombreEmp,
+        SUS_NO_CERTIFICADO: form.sus_no_certificado,
+        SUS_FECHA_INICIO: form.sus_fecha_inicio,
+        SUS_FECHA_FIN: form.sus_fecha_fin,
+        SUS_DIAS: diasSuspension,
+        SUS_SALARIO_DIARIO: Number(form.sus_salario_diario),
+        SUS_TIPO: form.sus_tipo,
+        SUS_ESTADO: form.sus_estado,
+        SUS_OBSERVACION: form.sus_observacion
+      }]);
       setMensaje('Suspensión registrada correctamente');
     }
     limpiarFormulario();
@@ -236,7 +199,7 @@ function SuspensionIGSS() {
     });
   };
 
-  const obtenerChipTipo = (tipo: string) => {
+  const chipTipo = (tipo: string) => {
     const map: Record<string, 'warning' | 'error' | 'info'> = {
       ENFERMEDAD: 'warning', MATERNIDAD: 'info', ACCIDENTE: 'error'
     };
@@ -251,14 +214,12 @@ function SuspensionIGSS() {
       <Paper elevation={3} sx={{ p: 3, mb: 3 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 3 }}>
           <MedicalServicesIcon color="primary" />
-          <Typography variant="h4" sx={{ fontWeight: 'bold' }}>
-            Suspensiones IGSS
-          </Typography>
+          <Typography variant="h4" sx={{ fontWeight: 'bold' }}>Suspensiones IGSS</Typography>
         </Box>
 
         <Alert severity="info" sx={{ mb: 3 }}>
           <strong>Regla IGSS:</strong> Días 1-3 → empleador paga 100% &nbsp;|&nbsp;
-          Días 4 en adelante → IGSS paga 66.67% del salario diario
+          Días 4 en adelante → IGSS paga 66.67%
         </Alert>
 
         <Typography variant="h6" sx={{ mb: 2 }}>
@@ -266,15 +227,26 @@ function SuspensionIGSS() {
         </Typography>
 
         <Grid container spacing={2}>
+          {/* Select de empleados desde la API */}
           <Grid size={{ xs: 12, md: 4 }}>
-            <TextField fullWidth label="Empleado ID" name="emp_id"
-              type="number" value={form.emp_id} onChange={handleChange} />
+            <FormControl fullWidth>
+              <InputLabel>Empleado</InputLabel>
+              <Select name="emp_id" value={form.emp_id}
+                label="Empleado" onChange={handleChange}>
+                <MenuItem value="">Seleccione empleado</MenuItem>
+                {empleados.map((e) => (
+                  <MenuItem key={e.EMP_ID} value={String(e.EMP_ID)}>
+                    {e.EMP_NOMBRE} {e.EMP_APELLIDO}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
           </Grid>
 
           <Grid size={{ xs: 12, md: 4 }}>
-            <TextField fullWidth label="No. Certificado IGSS"
-              name="sus_no_certificado" value={form.sus_no_certificado}
-              onChange={handleChange} placeholder="IGSS-2024-001" />
+            <TextField fullWidth label="No. Certificado IGSS" name="sus_no_certificado"
+              value={form.sus_no_certificado} onChange={handleChange}
+              placeholder="IGSS-2024-001" />
           </Grid>
 
           <Grid size={{ xs: 12, md: 4 }}>
@@ -309,10 +281,9 @@ function SuspensionIGSS() {
           </Grid>
 
           <Grid size={{ xs: 12, md: 4 }}>
-            <TextField fullWidth label="Salario diario (Q)"
-              name="sus_salario_diario" type="number"
-              value={form.sus_salario_diario} onChange={handleChange}
-              placeholder="Salario mensual / 30" />
+            <TextField fullWidth label="Salario diario (Q)" name="sus_salario_diario"
+              type="number" value={form.sus_salario_diario} onChange={handleChange}
+              placeholder="Salario mensual ÷ 30" />
           </Grid>
 
           <Grid size={{ xs: 12, md: 4 }}>
@@ -331,10 +302,10 @@ function SuspensionIGSS() {
               value={form.sus_observacion} onChange={handleChange} />
           </Grid>
 
-          {/* Preview del impacto en tiempo real */}
+          {/* Preview impacto en tiempo real */}
           {impacto && (
             <Grid size={{ xs: 12 }}>
-              <Paper variant="outlined" sx={{ p: 2, borderColor: '#1976d2', mt: 1 }}>
+              <Paper variant="outlined" sx={{ p: 2, borderColor: '#1976d2' }}>
                 <Typography variant="subtitle2" color="primary" sx={{ mb: 1 }}>
                   Vista previa del impacto salarial
                 </Typography>
@@ -356,6 +327,9 @@ function SuspensionIGSS() {
                   <Grid size={{ xs: 12, md: 6 }}>
                     <Typography variant="caption" color="text.secondary">Detalle</Typography>
                     <Typography variant="body2">{impacto.detalle}</Typography>
+                    <Typography variant="caption" color="error.main">
+                      Descuento nómina: -{fmt(impacto.descuento_salario)}
+                    </Typography>
                   </Grid>
                 </Grid>
               </Paper>
@@ -363,7 +337,7 @@ function SuspensionIGSS() {
           )}
 
           <Grid size={{ xs: 12 }}>
-            <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mt: 1 }}>
+            <Box sx={{ display: 'flex', gap: 2, mt: 1 }}>
               <Button variant="contained" startIcon={<SaveIcon />} onClick={guardar}>
                 {modoEdicion ? 'Actualizar' : 'Guardar'}
               </Button>
@@ -384,35 +358,35 @@ function SuspensionIGSS() {
         <TableContainer>
           <Table>
             <TableHead>
-              <TableRow>
-                <TableCell><strong>No. Certificado</strong></TableCell>
+              <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
+                <TableCell><strong>Certificado</strong></TableCell>
                 <TableCell><strong>Empleado</strong></TableCell>
                 <TableCell><strong>Tipo</strong></TableCell>
                 <TableCell><strong>Fecha Inicio</strong></TableCell>
                 <TableCell><strong>Fecha Fin</strong></TableCell>
-                <TableCell><strong>Días</strong></TableCell>
-                <TableCell><strong>Salario Diario</strong></TableCell>
-                <TableCell><strong>Descuento Nómina</strong></TableCell>
+                <TableCell align="right"><strong>Días</strong></TableCell>
+                <TableCell align="right"><strong>Salario Diario</strong></TableCell>
+                <TableCell align="right"><strong>Descuento Nómina</strong></TableCell>
                 <TableCell><strong>Acciones</strong></TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {datos.length > 0 ? datos.map((s) => {
-                const imp = calcularImpactoSuspension(s.SUS_SALARIO_DIARIO, s.SUS_DIAS);
+                const imp = calcularImpacto(s.SUS_SALARIO_DIARIO, s.SUS_DIAS);
                 return (
                   <TableRow key={s.SUS_ID} hover>
                     <TableCell>{s.SUS_NO_CERTIFICADO}</TableCell>
-                    <TableCell>Emp. {s.EMP_ID}</TableCell>
-                    <TableCell>{obtenerChipTipo(s.SUS_TIPO)}</TableCell>
+                    <TableCell>{s.EMP_NOMBRE}</TableCell>
+                    <TableCell>{chipTipo(s.SUS_TIPO)}</TableCell>
                     <TableCell>{new Date(s.SUS_FECHA_INICIO).toLocaleDateString('es-GT')}</TableCell>
                     <TableCell>{new Date(s.SUS_FECHA_FIN).toLocaleDateString('es-GT')}</TableCell>
-                    <TableCell>{s.SUS_DIAS}</TableCell>
-                    <TableCell>{fmt(s.SUS_SALARIO_DIARIO)}</TableCell>
-                    <TableCell sx={{ color: 'error.main', fontWeight: 'bold' }}>
+                    <TableCell align="right">{s.SUS_DIAS}</TableCell>
+                    <TableCell align="right">{fmt(s.SUS_SALARIO_DIARIO)}</TableCell>
+                    <TableCell align="right" sx={{ color: 'error.main', fontWeight: 'bold' }}>
                       -{fmt(imp.descuento_salario)}
                     </TableCell>
                     <TableCell>
-                      <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                      <Box sx={{ display: 'flex', gap: 1 }}>
                         <Button size="small" variant="outlined" startIcon={<EditIcon />}
                           onClick={() => handleEditar(s)}>Editar</Button>
                         <Button size="small" variant="contained" color="error"
