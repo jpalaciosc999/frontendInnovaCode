@@ -12,6 +12,7 @@ import {
   ListItemText,
   Box,
   Divider,
+  Collapse,
 } from '@mui/material';
 
 import MenuIcon from '@mui/icons-material/Menu';
@@ -46,73 +47,164 @@ import GavelIcon from '@mui/icons-material/Gavel';
 import MedicalServicesIcon from '@mui/icons-material/MedicalServices';
 import PercentIcon from '@mui/icons-material/Percent';
 import DownloadIcon from '@mui/icons-material/Download';
+import FolderIcon from '@mui/icons-material/Folder';
+import ExpandLess from '@mui/icons-material/ExpandLess';
+import ExpandMore from '@mui/icons-material/ExpandMore';
 
 type MenuItemType = {
   text: string;
   path: string;
   icon: React.ReactNode;
-  dividerBefore?: boolean;
 };
 
-const menuItems: MenuItemType[] = [
-  // ── General ──────────────────────────────────────────────────────────────
-  { text: 'Inicio', path: '/', icon: <HomeIcon /> },
+type MenuSectionType = {
+  key: string;
+  text: string;
+  icon: React.ReactNode;
+  items: MenuItemType[];
+};
 
-  // ── Empleados ─────────────────────────────────────────────────────────────
-  { text: 'Empleados', path: '/empleados', icon: <PeopleIcon />, dividerBefore: true },
-  { text: 'Departamentos', path: '/departamentos', icon: <BusinessIcon /> },
-  { text: 'Puestos', path: '/puestos', icon: <WorkIcon /> },
-  { text: 'Tipo Contrato', path: '/tipo-contrato', icon: <PersonIcon /> },
-  { text: 'Empleado Contrato', path: '/empleado-contrato', icon: <BadgeIcon /> },
-  { text: 'Sede', path: '/sede', icon: <ApartmentIcon /> },
-
-  // ── Accesos ───────────────────────────────────────────────────────────────
-  { text: 'Usuarios', path: '/usuarios', icon: <GroupIcon />, dividerBefore: true },
-  { text: 'Roles', path: '/roles', icon: <AccountTreeIcon /> },
-  { text: 'Permisos', path: '/permisos', icon: <SecurityIcon /> },
-  { text: 'Rol Permisos', path: '/rol-permisos', icon: <AdminPanelSettingsIcon /> },
-
-  // ── Nómina ────────────────────────────────────────────────────────────────
-  { text: 'Nómina', path: '/nomina', icon: <DescriptionIcon />, dividerBefore: true },
-  { text: 'Nómina Detalle', path: '/nomina-detalle', icon: <AssignmentIcon /> },
-  { text: 'Periodo', path: '/periodo', icon: <CalendarMonthIcon /> },
-  { text: 'Ingresos', path: '/tipo-ingresos', icon: <TrendingUpIcon /> },
-  { text: 'Descuentos', path: '/descuentos', icon: <MoneyOffIcon /> },
-  { text: 'Liquidación', path: '/liquidacion', icon: <DescriptionIcon /> },
-
-  // ── Calculadoras ──────────────────────────────────────────────────────────
-  { text: 'Calculadora IGSS', path: '/calculadora-igss', icon: <HealthAndSafetyIcon />, dividerBefore: true },
-  { text: 'Calculadora ISR', path: '/calculadora-isr', icon: <GavelIcon /> },
-  { text: 'Suspensiones IGSS', path: '/suspensiones-igss', icon: <MedicalServicesIcon /> },
-  { text: 'Tipos Descuento', path: '/tipos-descuento', icon: <PercentIcon /> },
-  { text: 'Generar CSV Depósito', path: '/generar-csv', icon: <DownloadIcon /> },
-
-  // ── Préstamos ─────────────────────────────────────────────────────────────
-  { text: 'Préstamos', path: '/prestamos', icon: <PaymentsIcon />, dividerBefore: true },
-  { text: 'Detalle Préstamo', path: '/prestamo-detalle', icon: <ReceiptLongIcon /> },
-  { text: 'Préstamos Banco', path: '/prestamos-banco', icon: <AccountBalanceIcon /> },
-
-  // ── Control laboral ───────────────────────────────────────────────────────
-  { text: 'Marcajes', path: '/marcajes', icon: <FactCheckIcon />, dividerBefore: true },
-  { text: 'Control Laboral', path: '/control-laboral', icon: <AccessTimeIcon /> },
-  { text: 'Horarios', path: '/horarios', icon: <ScheduleIcon /> },
-  { text: 'Cuenta Bancaria', path: '/cuenta-bancaria', icon: <AccountBalanceIcon /> },
-
-  // ── KPIs ──────────────────────────────────────────────────────────────────
-  { text: 'KPIs', path: '/kpis', icon: <InsightsIcon />, dividerBefore: true },
-  { text: 'Resultados KPI', path: '/kpi-resultado', icon: <QueryStatsIcon /> },
-
-  // ── Auditoría ─────────────────────────────────────────────────────────────
-  { text: 'Bitácora', path: '/bitacora', icon: <HistoryIcon />, dividerBefore: true },
-  { text: 'Usuario Bitácora', path: '/usuario-bitacora', icon: <EditNoteIcon /> },
+const menuSections: MenuSectionType[] = [
+  {
+    key: 'configuracion',
+    text: 'Configuración Inicial',
+    icon: <FolderIcon />,
+    items: [
+      { text: 'Empleados', path: '/empleados', icon: <PeopleIcon /> },
+      { text: 'Usuarios', path: '/usuarios', icon: <GroupIcon /> },
+      { text: 'Roles', path: '/roles', icon: <AccountTreeIcon /> },
+      { text: 'Permisos', path: '/permisos', icon: <SecurityIcon /> },
+      { text: 'Rol Permisos', path: '/rol-permisos', icon: <AdminPanelSettingsIcon /> },
+      { text: 'Departamentos', path: '/departamentos', icon: <BusinessIcon /> },
+      { text: 'Puestos', path: '/puestos', icon: <WorkIcon /> },
+      { text: 'Sede', path: '/sede', icon: <ApartmentIcon /> },
+      { text: 'Horarios', path: '/horarios', icon: <ScheduleIcon /> },
+      { text: 'Tipo Contrato', path: '/tipo-contrato', icon: <PersonIcon /> },
+      { text: 'Empleado Contrato', path: '/empleado-contrato', icon: <BadgeIcon /> },
+      { text: 'Cuenta Bancaria', path: '/cuenta-bancaria', icon: <AccountBalanceIcon /> },
+      { text: 'Tipos Descuento', path: '/tipos-descuento', icon: <PercentIcon /> },
+    ],
+  },
+  {
+    key: 'nomina',
+    text: 'Nómina',
+    icon: <FolderIcon />,
+    items: [
+      { text: 'Nómina', path: '/nomina', icon: <DescriptionIcon /> },
+      { text: 'Nómina Detalle', path: '/nomina-detalle', icon: <AssignmentIcon /> },
+      { text: 'Periodo', path: '/periodo', icon: <CalendarMonthIcon /> },
+      { text: 'Ingresos', path: '/tipo-ingresos', icon: <TrendingUpIcon /> },
+      { text: 'Descuentos', path: '/descuentos', icon: <MoneyOffIcon /> },
+      { text: 'Liquidación', path: '/liquidacion', icon: <DescriptionIcon /> },
+    ],
+  },
+  {
+    key: 'operaciones',
+    text: 'Operaciones',
+    icon: <FolderIcon />,
+    items: [
+      { text: 'Marcajes', path: '/marcajes', icon: <FactCheckIcon /> },
+      { text: 'Control Laboral', path: '/control-laboral', icon: <AccessTimeIcon /> },
+      { text: 'Préstamos', path: '/prestamos', icon: <PaymentsIcon /> },
+      { text: 'Detalle Préstamo', path: '/prestamo-detalle', icon: <ReceiptLongIcon /> },
+      { text: 'Préstamos Banco', path: '/prestamos-banco', icon: <AccountBalanceIcon /> },
+    ],
+  },
+  {
+    key: 'calculos',
+    text: 'Cálculos y Procesos',
+    icon: <FolderIcon />,
+    items: [
+      { text: 'Calculadora IGSS', path: '/calculadora-igss', icon: <HealthAndSafetyIcon /> },
+      { text: 'Calculadora ISR', path: '/calculadora-isr', icon: <GavelIcon /> },
+      { text: 'Suspensiones IGSS', path: '/suspensiones-igss', icon: <MedicalServicesIcon /> },
+      { text: 'Generar CSV Depósito', path: '/generar-csv', icon: <DownloadIcon /> },
+    ],
+  },
+  {
+    key: 'reportes',
+    text: 'Indicadores y Reportes',
+    icon: <FolderIcon />,
+    items: [
+      { text: 'KPIs', path: '/kpis', icon: <InsightsIcon /> },
+      { text: 'Resultados KPI', path: '/kpi-resultado', icon: <QueryStatsIcon /> },
+    ],
+  },
+  {
+    key: 'auditoria',
+    text: 'Auditoría',
+    icon: <FolderIcon />,
+    items: [
+      { text: 'Bitácora', path: '/bitacora', icon: <HistoryIcon /> },
+      { text: 'Usuario Bitácora', path: '/usuario-bitacora', icon: <EditNoteIcon /> },
+    ],
+  },
 ];
 
 function Navbar() {
   const [open, setOpen] = useState(false);
+  const [openSections, setOpenSections] = useState<Record<string, boolean>>({
+    configuracion: true,
+    nomina: true,
+    operaciones: true,
+    calculos: false,
+    reportes: false,
+    auditoria: false,
+  });
+
   const location = useLocation();
 
   const toggleDrawer = (state: boolean) => () => {
     setOpen(state);
+  };
+
+  const toggleSection = (key: string) => {
+    setOpenSections((prev) => ({
+      ...prev,
+      [key]: !prev[key],
+    }));
+  };
+
+  const getMenuItemSx = (isActive: boolean, extraSx = {}) => ({
+    mx: 1,
+    my: 0.5,
+    borderRadius: 2,
+    '&.Mui-selected': {
+      backgroundColor: 'primary.main',
+      color: 'white',
+    },
+    '&.Mui-selected .MuiListItemIcon-root': {
+      color: 'white',
+    },
+    '&:hover': {
+      backgroundColor: isActive ? 'primary.dark' : 'action.hover',
+    },
+    ...extraSx,
+  });
+
+  const renderSubItem = (item: MenuItemType) => {
+    const isActive = location.pathname === item.path;
+
+    return (
+      <ListItemButton
+        key={item.path}
+        component={NavLink}
+        to={item.path}
+        selected={isActive}
+        onClick={toggleDrawer(false)}
+        sx={getMenuItemSx(isActive, { pl: 4 })}
+      >
+        <ListItemIcon
+          sx={{
+            color: isActive ? 'white' : 'inherit',
+            minWidth: 40,
+          }}
+        >
+          {item.icon}
+        </ListItemIcon>
+        <ListItemText primary={item.text} />
+      </ListItemButton>
+    );
   };
 
   return (
@@ -135,7 +227,7 @@ function Navbar() {
       </AppBar>
 
       <Drawer anchor="left" open={open} onClose={toggleDrawer(false)}>
-        <Box sx={{ width: 290 }} role="presentation" onClick={toggleDrawer(false)}>
+        <Box sx={{ width: 310 }} role="presentation">
           <Box sx={{ p: 2 }}>
             <Typography variant="h6" sx={{ fontWeight: 700 }}>
               Menú principal
@@ -148,42 +240,57 @@ function Navbar() {
           <Divider />
 
           <List>
-            {menuItems.map((item) => {
-              const isActive = location.pathname === item.path;
+            <ListItemButton
+              component={NavLink}
+              to="/"
+              selected={location.pathname === '/'}
+              onClick={toggleDrawer(false)}
+              sx={getMenuItemSx(location.pathname === '/')}
+            >
+              <ListItemIcon
+                sx={{
+                  color: location.pathname === '/' ? 'white' : 'inherit',
+                  minWidth: 40,
+                }}
+              >
+                <HomeIcon />
+              </ListItemIcon>
+              <ListItemText primary="Inicio" />
+            </ListItemButton>
+
+            <Divider sx={{ my: 0.5 }} />
+
+            {menuSections.map((section) => {
+              const isSectionActive = section.items.some(
+                (item) => item.path === location.pathname
+              );
 
               return (
-                <Box key={item.path}>
-                  {item.dividerBefore && <Divider sx={{ my: 0.5 }} />}
+                <Box key={section.key}>
                   <ListItemButton
-                    component={NavLink}
-                    to={item.path}
-                    selected={isActive}
-                    sx={{
-                      mx: 1,
-                      my: 0.5,
-                      borderRadius: 2,
-                      '&.Mui-selected': {
-                        backgroundColor: 'primary.main',
-                        color: 'white',
-                      },
-                      '&.Mui-selected .MuiListItemIcon-root': {
-                        color: 'white',
-                      },
-                      '&:hover': {
-                        backgroundColor: isActive ? 'primary.dark' : 'action.hover',
-                      },
-                    }}
+                    onClick={() => toggleSection(section.key)}
+                    selected={isSectionActive}
+                    sx={getMenuItemSx(isSectionActive)}
                   >
                     <ListItemIcon
                       sx={{
-                        color: isActive ? 'white' : 'inherit',
+                        color: isSectionActive ? 'white' : 'inherit',
                         minWidth: 40,
                       }}
                     >
-                      {item.icon}
+                      {section.icon}
                     </ListItemIcon>
-                    <ListItemText primary={item.text} />
+                    <ListItemText primary={section.text} />
+                    {openSections[section.key] ? <ExpandLess /> : <ExpandMore />}
                   </ListItemButton>
+
+                  <Collapse in={openSections[section.key]} timeout="auto" unmountOnExit>
+                    <List component="div" disablePadding>
+                      {section.items.map(renderSubItem)}
+                    </List>
+                  </Collapse>
+
+                  <Divider sx={{ my: 0.5 }} />
                 </Box>
               );
             })}
