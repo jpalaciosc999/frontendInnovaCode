@@ -1,11 +1,71 @@
 import { useEffect, useState } from 'react';
 import type { CuentaBancaria, CuentaBancariaForm } from '../interfaces/cuentaBancaria';
+import type { Empleado } from '../interfaces/empleados';
 import {
   obtenerCuentas,
   crearCuenta,
   actualizarCuenta,
   eliminarCuenta
 } from '../services/cuentaBancaria.service';
+import { obtenerEmpleados } from '../services/empleados.service';
+
+import {
+  Alert,
+  Box,
+  Button,
+  Chip,
+  Dialog,
+  DialogContent,
+  DialogTitle,
+  Grid,
+  IconButton,
+  InputAdornment,
+  MenuItem,
+  Paper,
+  Snackbar,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  TextField,
+  Typography
+} from '@mui/material';
+
+import SaveIcon             from '@mui/icons-material/Save';
+import CleaningServicesIcon from '@mui/icons-material/CleaningServices';
+import EditIcon             from '@mui/icons-material/Edit';
+import DeleteIcon           from '@mui/icons-material/Delete';
+import AccountBalanceIcon   from '@mui/icons-material/AccountBalance';
+import SearchIcon           from '@mui/icons-material/Search';
+import CloseIcon            from '@mui/icons-material/Close';
+import PersonSearchIcon     from '@mui/icons-material/PersonSearch';
+
+// ─── Bancos de Guatemala ──────────────────────────────────────────────────────
+const BANCOS_GUATEMALA = [
+  'Banco Industrial (BI)',
+  'Banco de Desarrollo Rural (Banrural)',
+  'Banco Agromercantil (BAM)',
+  'Banco G&T Continental',
+  'Banco de los Trabajadores (Bantrab)',
+  'Banco Inmobiliario',
+  'Banco Internacional',
+  'Banco Promerica',
+  'Banco Azteca',
+  'Banco de América Central (BAC)',
+  'Citibank Guatemala',
+  'Vivibanco',
+  'Acceso Financiero',
+  'Crédito Hipotecario Nacional (CHN)',
+  'Bancomext Guatemala',
+];
+
+const TIPOS_CUENTA = [
+  { value: 'MON', label: 'Monetaria' },
+  { value: 'AHO', label: 'Ahorros' },
+  { value: 'COR', label: 'Corriente' },
+];
 
 const initialForm: CuentaBancariaForm = {
   ban_nombre: '',
@@ -15,13 +75,18 @@ const initialForm: CuentaBancariaForm = {
 };
 
 function CuentaBancariaPage() {
-  const [datos, setDatos]             = useState<CuentaBancaria[]>([]);
-  const [cargando, setCargando]       = useState(true);
-  const [error, setError]             = useState('');
-  const [mensaje, setMensaje]         = useState('');
-  const [modoEdicion, setModoEdicion] = useState(false);
-  const [cueId, setCueId]             = useState<number | null>(null);
-  const [form, setForm]               = useState<CuentaBancariaForm>(initialForm);
+  const [datos, setDatos]               = useState<CuentaBancaria[]>([]);
+  const [cargando, setCargando]         = useState(true);
+  const [error, setError]               = useState('');
+  const [mensaje, setMensaje]           = useState('');
+  const [modoEdicion, setModoEdicion]   = useState(false);
+  const [cueId, setCueId]               = useState<number | null>(null);
+  const [form, setForm]                 = useState<CuentaBancariaForm>(initialForm);
+  const [empNombre, setEmpNombre]       = useState('');
+  const [modalAbierto, setModalAbierto] = useState(false);
+  const [empleados, setEmpleados]       = useState<Empleado[]>([]);
+  const [cargandoEmps, setCargandoEmps] = useState(false);
+  const [filtroEmp, setFiltroEmp]       = useState('');
 
   const cargarCuentas = async () => {
     try {
@@ -38,13 +103,43 @@ function CuentaBancariaPage() {
 
   useEffect(() => { cargarCuentas(); }, []);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+  const abrirModalEmpleados = async () => {
+    setModalAbierto(true);
+    setFiltroEmp('');
+    if (empleados.length === 0) {
+      try {
+        setCargandoEmps(true);
+        const data = await obtenerEmpleados();
+        setEmpleados(data);
+      } catch (err: any) {
+        setError('Error cargando empleados: ' + err.message);
+      } finally {
+        setCargandoEmps(false);
+      }
+    }
+  };
+
+  const seleccionarEmpleado = (emp: Empleado) => {
+    setForm(prev => ({ ...prev, emp_id: String(emp.EMP_ID) }));
+    const nombre = [emp.EMP_NOMBRE, emp.EMP_APELLIDO].filter(Boolean).join(' ');
+    setEmpNombre(nombre || `Empleado #${emp.EMP_ID}`);
+    setModalAbierto(false);
+  };
+
+  const empleadosFiltrados = empleados.filter(emp => {
+    const texto  = filtroEmp.toLowerCase();
+    const nombre = [emp.EMP_NOMBRE, emp.EMP_APELLIDO].filter(Boolean).join(' ').toLowerCase();
+    return nombre.includes(texto) || String(emp.EMP_ID).includes(texto);
+  });
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setForm(prev => ({ ...prev, [name]: value }));
   };
 
   const limpiarFormulario = () => {
     setForm(initialForm);
+    setEmpNombre('');
     setModoEdicion(false);
     setCueId(null);
     setError('');
@@ -53,6 +148,10 @@ function CuentaBancariaPage() {
   const validarFormulario = () => {
     if (!form.ban_nombre.trim() || !form.cue_numero.trim() || !form.cue_tipo || !form.emp_id) {
       setError('Todos los campos son obligatorios');
+      return false;
+    }
+    if (!/^\d+$/.test(form.cue_numero)) {
+      setError('El número de cuenta debe contener solo dígitos');
       return false;
     }
     if (form.cue_numero.length > 50) {
@@ -97,6 +196,7 @@ function CuentaBancariaPage() {
     setModoEdicion(true);
     setCueId(cue.CUE_ID);
     setMensaje(''); setError('');
+    setEmpNombre(`Empleado #${cue.EMP_ID}`);
     setForm({
       ban_nombre: cue.CUE_NOMBRE || '',
       cue_numero: cue.CUE_NUMERO || '',
@@ -105,92 +205,245 @@ function CuentaBancariaPage() {
     });
   };
 
-  if (cargando) return <p>Cargando...</p>;
+  const obtenerEtiquetaTipo = (tipo: string) => {
+    const colores: Record<string, 'primary' | 'success' | 'info'> = {
+      MON: 'primary', AHO: 'success', COR: 'info'
+    };
+    const etiquetas: Record<string, string> = {
+      MON: 'Monetaria', AHO: 'Ahorros', COR: 'Corriente'
+    };
+    return (
+      <Chip label={etiquetas[tipo] ?? tipo} color={colores[tipo] ?? 'default'} size="small" />
+    );
+  };
+
+  if (cargando) {
+    return <Box sx={{ p: 3 }}><Typography variant="h6">Cargando cuentas bancarias...</Typography></Box>;
+  }
 
   return (
-    <div style={{ padding: '20px', fontFamily: 'Arial' }}>
-      <h2>CRUD de Cuentas Bancarias</h2>
+    <Box sx={{ py: 2 }}>
 
-      {error   && <p style={{ color: 'red',   fontWeight: 'bold' }}>{error}</p>}
-      {mensaje && <p style={{ color: 'green', fontWeight: 'bold' }}>{mensaje}</p>}
+      {/* ── Formulario ─────────────────────────────────────────────────────── */}
+      <Paper elevation={3} sx={{ p: 3, mb: 3 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 3 }}>
+          <AccountBalanceIcon color="primary" />
+          <Typography variant="h4" sx={{ fontWeight: 'bold' }}>
+            Cuentas Bancarias
+          </Typography>
+        </Box>
 
-      <div style={{ border: '1px solid #ccc', borderRadius: '8px', padding: '16px', marginBottom: '24px', maxWidth: '700px' }}>
-        <h3>{modoEdicion ? 'Editar cuenta bancaria' : 'Nueva cuenta bancaria'}</h3>
-        <div style={{ display: 'grid', gap: '10px' }}>
+        <Typography variant="h6" sx={{ mb: 2 }}>
+          {modoEdicion ? 'Editar cuenta bancaria' : 'Nueva cuenta bancaria'}
+        </Typography>
 
-          <label>
-            ID Empleado
-            <input type="number" name="emp_id" value={form.emp_id} onChange={handleChange}
-              placeholder="ID del empleado" style={{ display: 'block', width: '100%' }} />
-          </label>
+        <Grid container spacing={2}>
 
-          <label>
-            Nombre del Banco
-            <input type="text" name="ban_nombre" value={form.ban_nombre} onChange={handleChange}
-              placeholder="Ej: Banco Industrial" maxLength={100}
-              style={{ display: 'block', width: '100%' }} />
-          </label>
+          <Grid size={{ xs: 12, md: 6 }}>
+            <TextField
+              fullWidth
+              label="Empleado"
+              value={empNombre ? `#${form.emp_id} — ${empNombre}` : ''}
+              placeholder="Haz clic para seleccionar un empleado"
+              onClick={abrirModalEmpleados}
+              slotProps={{
+                input: {
+                  readOnly: true,
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      <IconButton onClick={abrirModalEmpleados} edge="end">
+                        <PersonSearchIcon color="primary" />
+                      </IconButton>
+                    </InputAdornment>
+                  ),
+                  sx: { cursor: 'pointer' }
+                }
+              }}
+              required
+            />
+          </Grid>
 
-          <label>
-            Número de Cuenta
-            <input type="text" name="cue_numero" value={form.cue_numero} onChange={handleChange}
-              placeholder="Ej: 0123456789" maxLength={50}
-              style={{ display: 'block', width: '100%' }} />
-          </label>
+          <Grid size={{ xs: 12, md: 6 }}>
+            <TextField select fullWidth label="Nombre del Banco" name="ban_nombre"
+              value={form.ban_nombre} onChange={handleChange} required>
+              <MenuItem value=""><em>Seleccione un banco</em></MenuItem>
+              {BANCOS_GUATEMALA.map(banco => (
+                <MenuItem key={banco} value={banco}>{banco}</MenuItem>
+              ))}
+            </TextField>
+          </Grid>
 
-          <label>
-            Tipo de Cuenta
-            <select name="cue_tipo" value={form.cue_tipo} onChange={handleChange}
-              style={{ display: 'block', width: '100%' }}>
-              <option value="">Seleccione tipo</option>
-              <option value="MON">Monetaria</option>
-              <option value="AHO">Ahorros</option>
-              <option value="COR">Corriente</option>
-            </select>
-          </label>
+          <Grid size={{ xs: 12, md: 6 }}>
+            <TextField
+              fullWidth label="Número de Cuenta" name="cue_numero" type="text"
+              value={form.cue_numero} onChange={handleChange}
+              placeholder="Ej: 0123456789"
+              slotProps={{ htmlInput: { maxLength: 50, inputMode: 'numeric', pattern: '[0-9]*' } }}
+              required
+            />
+          </Grid>
 
-          <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
-            <button onClick={guardarCuenta}>{modoEdicion ? 'Actualizar' : 'Guardar'}</button>
-            <button onClick={limpiarFormulario}>Limpiar</button>
-          </div>
-        </div>
-      </div>
+          <Grid size={{ xs: 12, md: 6 }}>
+            <TextField select fullWidth label="Tipo de Cuenta" name="cue_tipo"
+              value={form.cue_tipo} onChange={handleChange} required>
+              <MenuItem value=""><em>Seleccione tipo</em></MenuItem>
+              {TIPOS_CUENTA.map(t => (
+                <MenuItem key={t.value} value={t.value}>{t.label}</MenuItem>
+              ))}
+            </TextField>
+          </Grid>
 
-      <h3>Listado de cuentas: {datos.length}</h3>
-      <div style={{ overflowX: 'auto' }}>
-        <table border={1} cellPadding={8} cellSpacing={0} style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>Emp. ID</th>
-              <th>Nombre Banco</th>
-              <th>Número</th>
-              <th>Tipo</th>
-              <th>Acciones</th>
-            </tr>
-          </thead>
-          <tbody>
-            {datos.length > 0 ? datos.map(cue => (
-              <tr key={cue.CUE_ID}>
-                <td>{cue.CUE_ID}</td>
-                <td>{cue.EMP_ID}</td>
-                <td>{cue.CUE_NOMBRE}</td>
-                <td>{cue.CUE_NUMERO}</td>
-                <td>{cue.CUE_TIPO}</td>
-                <td>
-                  <div style={{ display: 'flex', gap: '8px' }}>
-                    <button onClick={() => handleEditar(cue)}>Editar</button>
-                    <button onClick={() => handleEliminar(cue.CUE_ID)}>Eliminar</button>
-                  </div>
-                </td>
-              </tr>
-            )) : (
-              <tr><td colSpan={6} style={{ textAlign: 'center' }}>No hay cuentas registradas</td></tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-    </div>
+          <Grid size={{ xs: 12 }}>
+            <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mt: 1 }}>
+              <Button variant="contained" startIcon={<SaveIcon />} onClick={guardarCuenta}>
+                {modoEdicion ? 'Actualizar' : 'Guardar'}
+              </Button>
+              <Button variant="outlined" color="secondary" startIcon={<CleaningServicesIcon />} onClick={limpiarFormulario}>
+                Limpiar
+              </Button>
+            </Box>
+          </Grid>
+        </Grid>
+      </Paper>
+
+      {/* ── Tabla ───────────────────────────────────────────────────────────── */}
+      <Paper elevation={3} sx={{ p: 3 }}>
+        <Typography variant="h6" sx={{ mb: 2 }}>
+          Listado de cuentas: {datos.length}
+        </Typography>
+
+        <TableContainer>
+          <Table>
+            <TableHead>
+              <TableRow>
+                <TableCell><strong>ID</strong></TableCell>
+                <TableCell><strong>Emp. ID</strong></TableCell>
+                <TableCell><strong>Banco</strong></TableCell>
+                <TableCell><strong>Número de Cuenta</strong></TableCell>
+                <TableCell><strong>Tipo</strong></TableCell>
+                <TableCell><strong>Acciones</strong></TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {datos.length > 0 ? datos.map(cue => (
+                <TableRow key={cue.CUE_ID} hover>
+                  <TableCell>{cue.CUE_ID}</TableCell>
+                  <TableCell>{cue.EMP_ID}</TableCell>
+                  <TableCell>{cue.CUE_NOMBRE}</TableCell>
+                  <TableCell>{cue.CUE_NUMERO}</TableCell>
+                  <TableCell>{obtenerEtiquetaTipo(cue.CUE_TIPO)}</TableCell>
+                  <TableCell>
+                    <Box sx={{ display: 'flex', gap: 1 }}>
+                      <Button size="small" variant="outlined" startIcon={<EditIcon />} onClick={() => handleEditar(cue)}>
+                        Editar
+                      </Button>
+                      <Button size="small" variant="contained" color="error" startIcon={<DeleteIcon />} onClick={() => handleEliminar(cue.CUE_ID)}>
+                        Eliminar
+                      </Button>
+                    </Box>
+                  </TableCell>
+                </TableRow>
+              )) : (
+                <TableRow>
+                  <TableCell colSpan={6} align="center">No hay cuentas registradas</TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      </Paper>
+
+      {/* ── Modal de selección de empleado ─────────────────────────────────── */}
+      {/* ✅ FIX: slotProps={{ paper: { sx: ... } }} reemplaza PaperProps */}
+      <Dialog
+        open={modalAbierto}
+        onClose={() => setModalAbierto(false)}
+        fullWidth
+        maxWidth="sm"
+        slotProps={{ paper: { sx: { borderRadius: 3 } } }}
+      >
+        <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', pb: 1 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <PersonSearchIcon color="primary" />
+            {/* ✅ FIX: fontWeight dentro de sx, no como prop directa */}
+            <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
+              Seleccionar Empleado
+            </Typography>
+          </Box>
+          <IconButton onClick={() => setModalAbierto(false)} size="small">
+            <CloseIcon />
+          </IconButton>
+        </DialogTitle>
+
+        <DialogContent sx={{ pt: 1 }}>
+          <TextField
+            fullWidth
+            autoFocus
+            placeholder="Buscar por nombre o ID..."
+            value={filtroEmp}
+            onChange={e => setFiltroEmp(e.target.value)}
+            sx={{ mb: 2 }}
+            slotProps={{
+              input: {
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchIcon color="action" />
+                  </InputAdornment>
+                )
+              }
+            }}
+          />
+
+          {cargandoEmps ? (
+            <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', py: 3 }}>
+              Cargando empleados...
+            </Typography>
+          ) : (
+            <TableContainer sx={{ maxHeight: 360 }}>
+              <Table size="small" stickyHeader>
+                <TableHead>
+                  <TableRow>
+                    <TableCell><strong>ID</strong></TableCell>
+                    <TableCell><strong>Nombre</strong></TableCell>
+                    <TableCell><strong>Apellido</strong></TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {empleadosFiltrados.length > 0 ? (
+                    empleadosFiltrados.map(emp => (
+                      <TableRow
+                        key={emp.EMP_ID}
+                        hover
+                        onClick={() => seleccionarEmpleado(emp)}
+                        sx={{ cursor: 'pointer' }}
+                      >
+                        <TableCell>{emp.EMP_ID}</TableCell>
+                        <TableCell>{emp.EMP_NOMBRE}</TableCell>
+                        <TableCell>{emp.EMP_APELLIDO}</TableCell>
+                      </TableRow>
+                    ))
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={3} align="center">No se encontraron empleados</TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Snackbars ───────────────────────────────────────────────────────── */}
+      <Snackbar open={!!mensaje} autoHideDuration={3000} onClose={() => setMensaje('')}
+        anchorOrigin={{ vertical: 'top', horizontal: 'right' }}>
+        <Alert severity="success" onClose={() => setMensaje('')} sx={{ width: '100%' }}>{mensaje}</Alert>
+      </Snackbar>
+      <Snackbar open={!!error} autoHideDuration={4000} onClose={() => setError('')}
+        anchorOrigin={{ vertical: 'top', horizontal: 'right' }}>
+        <Alert severity="error" onClose={() => setError('')} sx={{ width: '100%' }}>{error}</Alert>
+      </Snackbar>
+    </Box>
   );
 }
 
