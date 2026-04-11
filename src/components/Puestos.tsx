@@ -7,6 +7,36 @@ import {
   eliminarPuesto
 } from '../services/puestos.service';
 
+import {
+  Alert,
+  Box,
+  Button,
+  Chip,
+  FormControl,
+  Grid,
+  InputLabel,
+  MenuItem,
+  Paper,
+  Select,
+  Snackbar,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  TextField,
+  Typography
+} from '@mui/material';
+
+import type { SelectChangeEvent } from '@mui/material/Select';
+
+import SaveIcon from '@mui/icons-material/Save';
+import CleaningServicesIcon from '@mui/icons-material/CleaningServices';
+import EditIcon from '@mui/icons-material/Edit';
+import DeleteIcon from '@mui/icons-material/Delete';
+import WorkIcon from '@mui/icons-material/Work';
+
 const initialForm: PuestoForm = {
   codigo: '',
   nombre: '',
@@ -17,13 +47,13 @@ const initialForm: PuestoForm = {
 };
 
 function Puestos() {
-  const [datos, setDatos]             = useState<Puesto[]>([]);
-  const [cargando, setCargando]       = useState(true);
-  const [error, setError]             = useState('');
-  const [mensaje, setMensaje]         = useState('');
+  const [datos, setDatos] = useState<Puesto[]>([]);
+  const [cargando, setCargando] = useState(true);
+  const [error, setError] = useState('');
+  const [mensaje, setMensaje] = useState('');
   const [modoEdicion, setModoEdicion] = useState(false);
-  const [puestoId, setPuestoId]       = useState<number | null>(null);
-  const [form, setForm]               = useState<PuestoForm>(initialForm);
+  const [puestoId, setPuestoId] = useState<number | null>(null);
+  const [form, setForm] = useState<PuestoForm>(initialForm);
 
   const cargarPuestos = async () => {
     try {
@@ -38,11 +68,18 @@ function Puestos() {
     }
   };
 
-  useEffect(() => { cargarPuestos(); }, []);
+  useEffect(() => {
+    cargarPuestos();
+  }, []);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement> | SelectChangeEvent
+  ) => {
     const { name, value } = e.target;
-    setForm(prev => ({ ...prev, [name]: value }));
+    setForm((prev) => ({
+      ...prev,
+      [name as string]: value
+    }));
   };
 
   const limpiarFormulario = () => {
@@ -62,8 +99,11 @@ function Puestos() {
 
   const guardarPuesto = async () => {
     try {
-      setError(''); setMensaje('');
+      setError('');
+      setMensaje('');
+
       if (!validarFormulario()) return;
+
       if (modoEdicion && puestoId !== null) {
         await actualizarPuesto(puestoId, form);
         setMensaje('Puesto actualizado correctamente');
@@ -71,106 +111,191 @@ function Puestos() {
         await crearPuesto(form);
         setMensaje('Puesto creado correctamente');
       }
+
       limpiarFormulario();
       await cargarPuestos();
     } catch (err: any) {
-      setError('Error guardando puesto: ' + (err.response?.data?.error || err.message));
+      setError(
+        'Error guardando puesto: ' + (err.response?.data?.error || err.message)
+      );
     }
   };
 
   const handleEliminar = async (id: number) => {
     if (!window.confirm('¿Deseas eliminar este puesto?')) return;
+
     try {
-      setError(''); setMensaje('');
+      setError('');
+      setMensaje('');
       await eliminarPuesto(id);
       setMensaje('Puesto eliminado correctamente');
+
       if (puestoId === id) limpiarFormulario();
       await cargarPuestos();
     } catch (err: any) {
-      setError('Error eliminando puesto: ' + (err.response?.data?.error || err.message));
+      setError(
+        'Error eliminando puesto: ' + (err.response?.data?.error || err.message)
+      );
     }
   };
 
   const handleEditar = (p: Puesto) => {
     setModoEdicion(true);
     setPuestoId(p.PUE_ID);
-    setMensaje(''); setError('');
+    setMensaje('');
+    setError('');
+
     setForm({
-      codigo:       (p as any).PUE_CODIGO      || '',
-      nombre:       p.PUE_NOMBRE               || '',
-      salario_base: String(p.PUE_SALARIO_BASE  || ''),
-      descripcion:  p.PUE_DESCRIPCION          || '',
-      estado:       p.PUE_ESTADO               || '',
-      dep_id:       String((p as any).DEP_ID   || '')
+      codigo: (p as any).PUE_CODIGO || '',
+      nombre: p.PUE_NOMBRE || '',
+      salario_base: String(p.PUE_SALARIO_BASE || ''),
+      descripcion: p.PUE_DESCRIPCION || '',
+      estado: p.PUE_ESTADO || '',
+      dep_id: String((p as any).DEP_ID || '')
     });
   };
 
-  if (cargando) return <p>Cargando...</p>;
+  const obtenerChipEstado = (estado: string) => {
+    if (estado === 'A') return <Chip label="Activo" color="success" size="small" />;
+    if (estado === 'I') return <Chip label="Inactivo" color="default" size="small" />;
+    return <Chip label={estado || 'N/A'} size="small" />;
+  };
+
+  if (cargando) {
+    return (
+      <Box sx={{ p: 3, textAlign: 'center' }}>
+        <Typography variant="h6">Cargando puestos...</Typography>
+      </Box>
+    );
+  }
 
   return (
-    <div style={{ padding: '20px', fontFamily: 'Arial' }}>
-      <h2>CRUD de Puestos</h2>
+    <Box sx={{ py: 2 }}>
+      <Paper elevation={3} sx={{ p: 3, mb: 3 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 3 }}>
+          <WorkIcon color="primary" fontSize="large" />
+          <Typography variant="h4" sx={{ fontWeight: 'bold' }}>
+            CRUD de Puestos
+          </Typography>
+        </Box>
 
-      {error   && <p style={{ color: 'red',   fontWeight: 'bold' }}>{error}</p>}
-      {mensaje && <p style={{ color: 'green', fontWeight: 'bold' }}>{mensaje}</p>}
+        <Typography variant="h6" sx={{ mb: 2 }}>
+          {modoEdicion ? 'Editar puesto' : 'Nuevo puesto'}
+        </Typography>
 
-      <div style={{ border: '1px solid #ccc', borderRadius: '8px', padding: '16px', marginBottom: '24px', maxWidth: '700px' }}>
-        <h3>{modoEdicion ? 'Editar puesto' : 'Nuevo puesto'}</h3>
-        <div style={{ display: 'grid', gap: '10px' }}>
-          <input type="text"   name="codigo"       placeholder="Código"       value={form.codigo}       onChange={handleChange} />
-          <input type="text"   name="nombre"       placeholder="Nombre"       value={form.nombre}       onChange={handleChange} />
-          <input type="number" name="salario_base" placeholder="Salario base" value={form.salario_base} onChange={handleChange} />
-          <input type="text"   name="descripcion"  placeholder="Descripción"  value={form.descripcion}  onChange={handleChange} />
-          <input type="text"   name="dep_id"       placeholder="ID Departamento" value={form.dep_id}    onChange={handleChange} />
-          <select name="estado" value={form.estado} onChange={handleChange}>
-            <option value="">Seleccione estado</option>
-            <option value="A">Activo</option>
-            <option value="I">Inactivo</option>
-          </select>
-          <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
-            <button onClick={guardarPuesto}>{modoEdicion ? 'Actualizar' : 'Guardar'}</button>
-            <button onClick={limpiarFormulario}>Limpiar</button>
-          </div>
-        </div>
-      </div>
+        <Grid container spacing={2}>
+          <Grid size={{ xs: 12, md: 3 }}>
+            <TextField fullWidth label="Código" name="codigo" value={form.codigo} onChange={handleChange} />
+          </Grid>
 
-      <h3>Listado de puestos: {datos.length}</h3>
-      <div style={{ overflowX: 'auto' }}>
-        <table border={1} cellPadding={8} cellSpacing={0} style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>Código</th>
-              <th>Nombre</th>
-              <th>Salario base</th>
-              <th>Descripción</th>
-              <th>Estado</th>
-              <th>Acciones</th>
-            </tr>
-          </thead>
-          <tbody>
-            {datos.length > 0 ? datos.map(p => (
-              <tr key={p.PUE_ID}>
-                <td>{p.PUE_ID}</td>
-                <td>{(p as any).PUE_CODIGO}</td>
-                <td>{p.PUE_NOMBRE}</td>
-                <td>{p.PUE_SALARIO_BASE}</td>
-                <td>{p.PUE_DESCRIPCION}</td>
-                <td>{p.PUE_ESTADO}</td>
-                <td>
-                  <div style={{ display: 'flex', gap: '8px' }}>
-                    <button onClick={() => handleEditar(p)}>Editar</button>
-                    <button onClick={() => handleEliminar(p.PUE_ID)}>Eliminar</button>
-                  </div>
-                </td>
-              </tr>
-            )) : (
-              <tr><td colSpan={7} style={{ textAlign: 'center' }}>No hay puestos registrados</td></tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-    </div>
+          <Grid size={{ xs: 12, md: 6 }}>
+            <TextField fullWidth label="Nombre del Puesto" name="nombre" value={form.nombre} onChange={handleChange} />
+          </Grid>
+
+          <Grid size={{ xs: 12, md: 3 }}>
+            <TextField
+              fullWidth
+              label="Salario Base"
+              name="salario_base"
+              type="number"
+              value={form.salario_base}
+              onChange={handleChange}
+            />
+          </Grid>
+
+          <Grid size={{ xs: 12, md: 8 }}>
+            <TextField fullWidth label="Descripción" name="descripcion" value={form.descripcion} onChange={handleChange} />
+          </Grid>
+
+          <Grid size={{ xs: 12, md: 2 }}>
+            <TextField fullWidth label="ID Dep." name="dep_id" value={form.dep_id} onChange={handleChange} />
+          </Grid>
+
+          <Grid size={{ xs: 12, md: 2 }}>
+            <FormControl fullWidth>
+              <InputLabel>Estado</InputLabel>
+              <Select name="estado" value={form.estado} label="Estado" onChange={handleChange}>
+                <MenuItem value="">Seleccione</MenuItem>
+                <MenuItem value="A">Activo</MenuItem>
+                <MenuItem value="I">Inactivo</MenuItem>
+              </Select>
+            </FormControl>
+          </Grid>
+
+          <Grid size={{ xs: 12 }}>
+            <Box sx={{ display: 'flex', gap: 2, mt: 1 }}>
+              <Button variant="contained" startIcon={<SaveIcon />} onClick={guardarPuesto}>
+                {modoEdicion ? 'Actualizar' : 'Guardar'}
+              </Button>
+              <Button variant="outlined" color="secondary" startIcon={<CleaningServicesIcon />} onClick={limpiarFormulario}>
+                Limpiar
+              </Button>
+            </Box>
+          </Grid>
+        </Grid>
+      </Paper>
+
+      <Paper elevation={3} sx={{ p: 3 }}>
+        <Typography variant="h6" sx={{ mb: 2 }}>
+          Listado de puestos: {datos.length}
+        </Typography>
+
+        <TableContainer>
+          <Table>
+            <TableHead>
+              <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
+                <TableCell><strong>ID / Código</strong></TableCell>
+                <TableCell><strong>Nombre</strong></TableCell>
+                <TableCell><strong>Salario</strong></TableCell>
+                <TableCell><strong>Estado</strong></TableCell>
+                <TableCell align="center"><strong>Acciones</strong></TableCell>
+              </TableRow>
+            </TableHead>
+
+            <TableBody>
+              {datos.length > 0 ? (
+                datos.map((p) => (
+                  <TableRow key={p.PUE_ID} hover>
+                    <TableCell>
+                      <Typography variant="body2">{p.PUE_ID}</Typography>
+                      <Typography variant="caption" color="text.secondary">{(p as any).PUE_CODIGO}</Typography>
+                    </TableCell>
+                    <TableCell>
+                      <Typography sx={{ fontWeight: 'medium' }}>{p.PUE_NOMBRE}</Typography>
+                      <Typography variant="caption" sx={{ display: 'block' }}>{p.PUE_DESCRIPCION}</Typography>
+                    </TableCell>
+                    <TableCell>Q. {Number(p.PUE_SALARIO_BASE).toLocaleString()}</TableCell>
+                    <TableCell>{obtenerChipEstado(p.PUE_ESTADO)}</TableCell>
+                    <TableCell align="center">
+                      <Box sx={{ display: 'flex', gap: 1, justifyContent: 'center' }}>
+                        <Button size="small" variant="outlined" startIcon={<EditIcon />} onClick={() => handleEditar(p)}>
+                          Editar
+                        </Button>
+                        <Button size="small" variant="contained" color="error" startIcon={<DeleteIcon />} onClick={() => handleEliminar(p.PUE_ID)}>
+                          Eliminar
+                        </Button>
+                      </Box>
+                    </TableCell>
+                  </TableRow>
+                ))
+              ) : (
+                <TableRow>
+                  <TableCell colSpan={5} align="center">No hay puestos registrados</TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      </Paper>
+
+      <Snackbar open={!!mensaje} autoHideDuration={3000} onClose={() => setMensaje('')} anchorOrigin={{ vertical: 'top', horizontal: 'right' }}>
+        <Alert severity="success" variant="filled" onClose={() => setMensaje('')}>{mensaje}</Alert>
+      </Snackbar>
+
+      <Snackbar open={!!error} autoHideDuration={4000} onClose={() => setError('')} anchorOrigin={{ vertical: 'top', horizontal: 'right' }}>
+        <Alert severity="error" variant="filled" onClose={() => setError('')}>{error}</Alert>
+      </Snackbar>
+    </Box>
   );
 }
 

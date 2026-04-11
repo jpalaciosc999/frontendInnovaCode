@@ -7,6 +7,36 @@ import {
   eliminarPrestamo
 } from '../services/prestamos.service';
 
+import {
+  Alert,
+  Box,
+  Button,
+  Chip,
+  FormControl,
+  Grid,
+  InputLabel,
+  MenuItem,
+  Paper,
+  Select,
+  Snackbar,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  TextField,
+  Typography
+} from '@mui/material';
+
+import type { SelectChangeEvent } from '@mui/material/Select';
+
+import SaveIcon from '@mui/icons-material/Save';
+import CleaningServicesIcon from '@mui/icons-material/CleaningServices';
+import EditIcon from '@mui/icons-material/Edit';
+import DeleteIcon from '@mui/icons-material/Delete';
+import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
+
 const initialForm: PrestamoForm = {
   pre_monto_total: '',
   pre_interes: '',
@@ -44,12 +74,12 @@ function Prestamos() {
   }, []);
 
   const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement> | SelectChangeEvent
   ) => {
     const { name, value } = e.target;
     setForm((prev) => ({
       ...prev,
-      [name]: value
+      [name as string]: value
     }));
   };
 
@@ -61,19 +91,11 @@ function Prestamos() {
   };
 
   const validarFormulario = () => {
-    if (
-      !form.pre_monto_total.trim() ||
-      !form.pre_interes.trim() ||
-      !form.pre_plazo.trim() ||
-      !form.pre_cuota_mensual.trim() ||
-      !form.pre_saldo_pendiente.trim() ||
-      !form.pre_fecha_inicio.trim() ||
-      !form.pre_estado.trim()
-    ) {
+    const fields = Object.values(form);
+    if (fields.some(field => !field.toString().trim())) {
       setError('Todos los campos son obligatorios');
       return false;
     }
-
     return true;
   };
 
@@ -102,196 +124,170 @@ function Prestamos() {
   };
 
   const handleEliminar = async (id: number) => {
-    const confirmar = window.confirm('¿Deseas eliminar este préstamo?');
-    if (!confirmar) return;
+    if (!window.confirm('¿Deseas eliminar este préstamo?')) return;
 
     try {
       setError('');
       setMensaje('');
-
       await eliminarPrestamo(id);
       setMensaje('Préstamo eliminado correctamente');
-
-      if (prestamoId === id) {
-        limpiarFormulario();
-      }
-
+      if (prestamoId === id) limpiarFormulario();
       await cargarPrestamos();
     } catch (err: any) {
       setError(
-        'Error eliminando préstamo: ' +
-          (err.response?.data?.error || err.message)
+        'Error eliminando préstamo: ' + (err.response?.data?.error || err.message)
       );
     }
   };
 
-  const handleEditar = (prestamo: Prestamo) => {
+  const handleEditar = (p: Prestamo) => {
     setModoEdicion(true);
-    setPrestamoId(prestamo.PRE_ID);
+    setPrestamoId(p.PRE_ID);
     setMensaje('');
     setError('');
 
     setForm({
-      pre_monto_total: String(prestamo.PRE_MONTO_TOTAL || ''),
-      pre_interes: String(prestamo.PRE_INTERES || ''),
-      pre_plazo: prestamo.PRE_PLAZO || '',
-      pre_cuota_mensual: String(prestamo.PRE_CUOTA_MENSUAL || ''),
-      pre_saldo_pendiente: String(prestamo.PRE_SALDO_PENDIENTE || ''),
-      pre_fecha_inicio: prestamo.PRE_FECHA_INICIO
-        ? String(prestamo.PRE_FECHA_INICIO).slice(0, 10)
-        : '',
-      pre_estado: prestamo.PRE_ESTADO || ''
+      pre_monto_total: String(p.PRE_MONTO_TOTAL || ''),
+      pre_interes: String(p.PRE_INTERES || ''),
+      pre_plazo: p.PRE_PLAZO || '',
+      pre_cuota_mensual: String(p.PRE_CUOTA_MENSUAL || ''),
+      pre_saldo_pendiente: String(p.PRE_SALDO_PENDIENTE || ''),
+      pre_fecha_inicio: p.PRE_FECHA_INICIO ? String(p.PRE_FECHA_INICIO).slice(0, 10) : '',
+      pre_estado: p.PRE_ESTADO || ''
     });
   };
 
-  if (cargando) return <p>Cargando...</p>;
+  const obtenerChipEstado = (estado: string) => {
+    return estado === 'A'
+      ? <Chip label="Activo" color="success" size="small" />
+      : <Chip label="Inactivo" color="default" size="small" />;
+  };
+
+  if (cargando) {
+    return (
+      <Box sx={{ p: 3, textAlign: 'center' }}>
+        <Typography variant="h6">Cargando préstamos...</Typography>
+      </Box>
+    );
+  }
 
   return (
-    <div style={{ padding: '20px', fontFamily: 'Arial' }}>
-      <h2>CRUD de Préstamos</h2>
+    <Box sx={{ py: 2 }}>
+      <Paper elevation={3} sx={{ p: 3, mb: 3 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 3 }}>
+          <AccountBalanceWalletIcon color="primary" fontSize="large" />
+          <Typography variant="h4" sx={{ fontWeight: 'bold' }}>
+            Gestión de Préstamos
+          </Typography>
+        </Box>
 
-      {error && <p style={{ color: 'red', fontWeight: 'bold' }}>{error}</p>}
-      {mensaje && <p style={{ color: 'green', fontWeight: 'bold' }}>{mensaje}</p>}
+        <Typography variant="h6" sx={{ mb: 2 }}>
+          {modoEdicion ? 'Editar Préstamo' : 'Nuevo Préstamo'}
+        </Typography>
 
-      <div
-        style={{
-          border: '1px solid #ccc',
-          borderRadius: '8px',
-          padding: '16px',
-          marginBottom: '24px',
-          maxWidth: '700px'
-        }}
-      >
-        <h3>{modoEdicion ? 'Editar préstamo' : 'Nuevo préstamo'}</h3>
+        <Grid container spacing={2}>
+          <Grid size={{ xs: 12, md: 4 }}>
+            <TextField fullWidth type="number" label="Monto Total" name="pre_monto_total" value={form.pre_monto_total} onChange={handleChange} />
+          </Grid>
+          <Grid size={{ xs: 12, md: 4 }}>
+            <TextField fullWidth type="number" label="Interés (%)" name="pre_interes" value={form.pre_interes} onChange={handleChange} />
+          </Grid>
+          <Grid size={{ xs: 12, md: 4 }}>
+            <TextField fullWidth label="Plazo (Meses/Años)" name="pre_plazo" value={form.pre_plazo} onChange={handleChange} />
+          </Grid>
+          <Grid size={{ xs: 12, md: 4 }}>
+            <TextField fullWidth type="number" label="Cuota Mensual" name="pre_cuota_mensual" value={form.pre_cuota_mensual} onChange={handleChange} />
+          </Grid>
+          <Grid size={{ xs: 12, md: 4 }}>
+            <TextField fullWidth type="number" label="Saldo Pendiente" name="pre_saldo_pendiente" value={form.pre_saldo_pendiente} onChange={handleChange} />
+          </Grid>
+          <Grid size={{ xs: 12, md: 2 }}>
+            <TextField fullWidth type="date" label="Fecha Inicio" name="pre_fecha_inicio" slotProps={{ inputLabel: { shrink: true } }} value={form.pre_fecha_inicio} onChange={handleChange} />
+          </Grid>
+          <Grid size={{ xs: 12, md: 2 }}>
+            <FormControl fullWidth>
+              <InputLabel>Estado</InputLabel>
+              <Select name="pre_estado" value={form.pre_estado} label="Estado" onChange={handleChange}>
+                <MenuItem value="">Seleccione</MenuItem>
+                <MenuItem value="A">Activo</MenuItem>
+                <MenuItem value="I">Inactivo</MenuItem>
+              </Select>
+            </FormControl>
+          </Grid>
 
-        <div style={{ display: 'grid', gap: '10px' }}>
-          <input
-            type="number"
-            name="pre_monto_total"
-            placeholder="Monto total"
-            value={form.pre_monto_total}
-            onChange={handleChange}
-          />
+          <Grid size={{ xs: 12 }}>
+            <Box sx={{ display: 'flex', gap: 2, mt: 1 }}>
+              <Button variant="contained" startIcon={<SaveIcon />} onClick={guardarPrestamo}>
+                {modoEdicion ? 'Actualizar' : 'Guardar'}
+              </Button>
+              <Button variant="outlined" color="secondary" startIcon={<CleaningServicesIcon />} onClick={limpiarFormulario}>
+                Limpiar
+              </Button>
+            </Box>
+          </Grid>
+        </Grid>
+      </Paper>
 
-          <input
-            type="number"
-            name="pre_interes"
-            placeholder="Interés"
-            value={form.pre_interes}
-            onChange={handleChange}
-          />
+      <Paper elevation={3} sx={{ p: 3 }}>
+        <Typography variant="h6" sx={{ mb: 2 }}>
+          Listado de Préstamos: {datos.length}
+        </Typography>
 
-          <input
-            type="text"
-            name="pre_plazo"
-            placeholder="Plazo"
-            value={form.pre_plazo}
-            onChange={handleChange}
-          />
+        <TableContainer>
+          <Table>
+            <TableHead>
+              <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
+                <TableCell><strong>ID</strong></TableCell>
+                <TableCell><strong>Monto / Saldo</strong></TableCell>
+                <TableCell><strong>Interés / Plazo</strong></TableCell>
+                <TableCell><strong>Cuota</strong></TableCell>
+                <TableCell><strong>Fecha</strong></TableCell>
+                <TableCell><strong>Estado</strong></TableCell>
+                <TableCell align="center"><strong>Acciones</strong></TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {datos.length > 0 ? (
+                datos.map((p) => (
+                  <TableRow key={p.PRE_ID} hover>
+                    <TableCell>{p.PRE_ID}</TableCell>
+                    <TableCell>
+                      <Typography variant="body2" sx={{ fontWeight: 'bold' }}>Q. {Number(p.PRE_MONTO_TOTAL).toLocaleString()}</Typography>
+                      <Typography variant="caption" color="error">Pend: Q. {Number(p.PRE_SALDO_PENDIENTE).toLocaleString()}</Typography>
+                    </TableCell>
+                    <TableCell>
+                      <Typography variant="body2">{p.PRE_INTERES}%</Typography>
+                      <Typography variant="caption" sx={{ color: 'text.secondary' }}>{p.PRE_PLAZO}</Typography>
+                    </TableCell>
+                    <TableCell>Q. {Number(p.PRE_CUOTA_MENSUAL).toLocaleString()}</TableCell>
+                    <TableCell>{p.PRE_FECHA_INICIO ? String(p.PRE_FECHA_INICIO).slice(0, 10) : ''}</TableCell>
+                    <TableCell>{obtenerChipEstado(p.PRE_ESTADO)}</TableCell>
+                    <TableCell align="center">
+                      <Box sx={{ display: 'flex', gap: 1, justifyContent: 'center' }}>
+                        <Button size="small" variant="outlined" startIcon={<EditIcon />} onClick={() => handleEditar(p)}>Editar</Button>
+                        <Button size="small" variant="contained" color="error" startIcon={<DeleteIcon />} onClick={() => handleEliminar(p.PRE_ID)}>Eliminar</Button>
+                      </Box>
+                    </TableCell>
+                  </TableRow>
+                ))
+              ) : (
+                <TableRow>
+                  <TableCell colSpan={7} align="center">No hay préstamos registrados</TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      </Paper>
 
-          <input
-            type="number"
-            name="pre_cuota_mensual"
-            placeholder="Cuota mensual"
-            value={form.pre_cuota_mensual}
-            onChange={handleChange}
-          />
+      <Snackbar open={!!mensaje} autoHideDuration={3000} onClose={() => setMensaje('')} anchorOrigin={{ vertical: 'top', horizontal: 'right' }}>
+        <Alert severity="success" variant="filled" onClose={() => setMensaje('')}>{mensaje}</Alert>
+      </Snackbar>
 
-          <input
-            type="number"
-            name="pre_saldo_pendiente"
-            placeholder="Saldo pendiente"
-            value={form.pre_saldo_pendiente}
-            onChange={handleChange}
-          />
-
-          <input
-            type="date"
-            name="pre_fecha_inicio"
-            value={form.pre_fecha_inicio}
-            onChange={handleChange}
-          />
-
-          <select
-            name="pre_estado"
-            value={form.pre_estado}
-            onChange={handleChange}
-          >
-            <option value="">Seleccione estado</option>
-            <option value="A">Activo</option>
-            <option value="I">Inactivo</option>
-          </select>
-
-          <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
-            <button onClick={guardarPrestamo}>
-              {modoEdicion ? 'Actualizar' : 'Guardar'}
-            </button>
-            <button onClick={limpiarFormulario}>Limpiar</button>
-          </div>
-        </div>
-      </div>
-
-      <h3>Listado de préstamos: {datos.length}</h3>
-
-      <div style={{ overflowX: 'auto' }}>
-        <table
-          border={1}
-          cellPadding={8}
-          cellSpacing={0}
-          style={{ width: '100%', borderCollapse: 'collapse' }}
-        >
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>Monto total</th>
-              <th>Interés</th>
-              <th>Plazo</th>
-              <th>Cuota mensual</th>
-              <th>Saldo pendiente</th>
-              <th>Fecha inicio</th>
-              <th>Estado</th>
-              <th>Acciones</th>
-            </tr>
-          </thead>
-          <tbody>
-            {datos.length > 0 ? (
-              datos.map((prestamo) => (
-                <tr key={prestamo.PRE_ID}>
-                  <td>{prestamo.PRE_ID}</td>
-                  <td>{prestamo.PRE_MONTO_TOTAL}</td>
-                  <td>{prestamo.PRE_INTERES}</td>
-                  <td>{prestamo.PRE_PLAZO}</td>
-                  <td>{prestamo.PRE_CUOTA_MENSUAL}</td>
-                  <td>{prestamo.PRE_SALDO_PENDIENTE}</td>
-                  <td>
-                    {prestamo.PRE_FECHA_INICIO
-                      ? String(prestamo.PRE_FECHA_INICIO).slice(0, 10)
-                      : ''}
-                  </td>
-                  <td>{prestamo.PRE_ESTADO}</td>
-                  <td>
-                    <div style={{ display: 'flex', gap: '8px' }}>
-                      <button onClick={() => handleEditar(prestamo)}>
-                        Editar
-                      </button>
-                      <button onClick={() => handleEliminar(prestamo.PRE_ID)}>
-                        Eliminar
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))
-            ) : (
-              <tr>
-                <td colSpan={9} style={{ textAlign: 'center' }}>
-                  No hay préstamos registrados
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-    </div>
+      <Snackbar open={!!error} autoHideDuration={4000} onClose={() => setError('')} anchorOrigin={{ vertical: 'top', horizontal: 'right' }}>
+        <Alert severity="error" variant="filled" onClose={() => setError('')}>{error}</Alert>
+      </Snackbar>
+    </Box>
   );
 }
 

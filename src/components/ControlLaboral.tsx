@@ -7,25 +7,56 @@ import {
   eliminarControl
 } from '../services/controlLaboral.service';
 
+import {
+  Alert,
+  Box,
+  Button,
+  Chip,
+  FormControl,
+  Grid,
+  InputLabel,
+  MenuItem,
+  Paper,
+  Select,
+  Snackbar,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  TextField,
+  Typography,
+  Tooltip
+} from '@mui/material';
+
+import type { SelectChangeEvent } from '@mui/material/Select';
+
+import SaveIcon from '@mui/icons-material/Save';
+import CleaningServicesIcon from '@mui/icons-material/CleaningServices';
+import EditIcon from '@mui/icons-material/Edit';
+import DeleteIcon from '@mui/icons-material/Delete';
+import AssignmentIndIcon from '@mui/icons-material/AssignmentInd';
+
 const initialForm: ControlLaboralForm = {
-  ctl_fecha_inicio:   '',
-  ctl_fecha_regreso:  '',
-  ctl_motivo:         '',
-  ctl_horas:          '',
-  ctl_descripcion:    '',
-  ctl_estado:         '',
+  ctl_fecha_inicio: '',
+  ctl_fecha_regreso: '',
+  ctl_motivo: '',
+  ctl_horas: '',
+  ctl_descripcion: '',
+  ctl_estado: '',
   ctl_fecha_registro: '',
-  emp_id:             ''
+  emp_id: ''
 };
 
 function ControlLaboralPage() {
-  const [datos, setDatos]             = useState<ControlLaboral[]>([]);
-  const [cargando, setCargando]       = useState(true);
-  const [error, setError]             = useState('');
-  const [mensaje, setMensaje]         = useState('');
+  const [datos, setDatos] = useState<ControlLaboral[]>([]);
+  const [cargando, setCargando] = useState(true);
+  const [error, setError] = useState('');
+  const [mensaje, setMensaje] = useState('');
   const [modoEdicion, setModoEdicion] = useState(false);
-  const [ctlId, setCtlId]             = useState<number | null>(null);
-  const [form, setForm]               = useState<ControlLaboralForm>(initialForm);
+  const [ctlId, setCtlId] = useState<number | null>(null);
+  const [form, setForm] = useState<ControlLaboralForm>(initialForm);
 
   const cargarControles = async () => {
     try {
@@ -42,9 +73,11 @@ function ControlLaboralPage() {
 
   useEffect(() => { cargarControles(); }, []);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement> | SelectChangeEvent
+  ) => {
     const { name, value } = e.target;
-    setForm(prev => ({ ...prev, [name]: value }));
+    setForm(prev => ({ ...prev, [name as string]: value }));
   };
 
   const limpiarFormulario = () => {
@@ -57,12 +90,12 @@ function ControlLaboralPage() {
   const validarFormulario = () => {
     const { ctl_fecha_inicio, ctl_fecha_regreso, ctl_motivo, ctl_horas, ctl_descripcion, ctl_estado, ctl_fecha_registro, emp_id } = form;
     if (!ctl_fecha_inicio || !ctl_fecha_regreso || !ctl_motivo || !ctl_horas ||
-        !ctl_descripcion.trim() || !ctl_estado || !ctl_fecha_registro || !emp_id) {
+      !ctl_descripcion.trim() || !ctl_estado || !ctl_fecha_registro || !emp_id) {
       setError('Todos los campos son obligatorios');
       return false;
     }
-    if (ctl_fecha_regreso < ctl_fecha_inicio) {
-      setError('La fecha de regreso no puede ser menor a la fecha de inicio');
+    if (new Date(ctl_fecha_regreso) < new Date(ctl_fecha_inicio)) {
+      setError('La fecha de regreso no puede ser anterior a la de inicio');
       return false;
     }
     if (Number(ctl_horas) <= 0) {
@@ -76,6 +109,7 @@ function ControlLaboralPage() {
     try {
       setError(''); setMensaje('');
       if (!validarFormulario()) return;
+
       if (modoEdicion && ctlId !== null) {
         await actualizarControl(ctlId, form);
         setMensaje('Control actualizado correctamente');
@@ -91,15 +125,15 @@ function ControlLaboralPage() {
   };
 
   const handleEliminar = async (id: number) => {
-    if (!window.confirm('¿Deseas eliminar este control laboral?')) return;
+    if (!window.confirm('¿Deseas eliminar este registro?')) return;
     try {
       setError(''); setMensaje('');
       await eliminarControl(id);
-      setMensaje('Control eliminado correctamente');
+      setMensaje('Registro eliminado correctamente');
       if (ctlId === id) limpiarFormulario();
       await cargarControles();
     } catch (err: any) {
-      setError('Error eliminando control: ' + (err.response?.data?.error || err.message));
+      setError('Error eliminando: ' + (err.response?.data?.error || err.message));
     }
   };
 
@@ -108,139 +142,154 @@ function ControlLaboralPage() {
     setCtlId(ctl.CTL_ID);
     setMensaje(''); setError('');
     setForm({
-      ctl_fecha_inicio:   ctl.CTL_FECHA_INICIO?.slice(0, 10)   || '',
-      ctl_fecha_regreso:  ctl.CTL_FECHA_REGRESO?.slice(0, 10)  || '',
-      ctl_motivo:         ctl.CTL_MOTIVO         || '',
-      ctl_horas:          String(ctl.CTL_HORAS)  || '',
-      ctl_descripcion:    ctl.CTL_DESCRIPCION    || '',
-      ctl_estado:         ctl.CTL_ESTADO         || '',
+      ctl_fecha_inicio: ctl.CTL_FECHA_INICIO?.slice(0, 10) || '',
+      ctl_fecha_regreso: ctl.CTL_FECHA_REGRESO?.slice(0, 10) || '',
+      ctl_motivo: ctl.CTL_MOTIVO || '',
+      ctl_horas: String(ctl.CTL_HORAS) || '',
+      ctl_descripcion: ctl.CTL_DESCRIPCION || '',
+      ctl_estado: ctl.CTL_ESTADO || '',
       ctl_fecha_registro: ctl.CTL_FECHA_REGISTRO?.slice(0, 10) || '',
-      emp_id:             String(ctl.EMP_ID)     || ''
+      emp_id: String(ctl.EMP_ID) || ''
     });
   };
 
-  if (cargando) return <p>Cargando...</p>;
+  const getStatusChip = (estado: string) => {
+    const configs: Record<string, { label: string, color: any }> = {
+      'A': { label: 'Aprobado', color: 'success' },
+      'P': { label: 'Pendiente', color: 'warning' },
+      'R': { label: 'Rechazado', color: 'error' }
+    };
+    const config = configs[estado] || { label: estado, color: 'default' };
+    return <Chip label={config.label} color={config.color} size="small" variant="filled" />;
+  };
+
+  if (cargando) return <Box sx={{ p: 5, textAlign: 'center' }}><Typography>Cargando registros...</Typography></Box>;
 
   return (
-    <div style={{ padding: '20px', fontFamily: 'Arial' }}>
-      <h2>CRUD de Control Laboral</h2>
+    <Box sx={{ py: 2 }}>
+      <Paper elevation={3} sx={{ p: 3, mb: 3 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 3 }}>
+          <AssignmentIndIcon color="primary" fontSize="large" />
+          <Typography variant="h4" sx={{ fontWeight: 'bold' }}>Control Laboral</Typography>
+        </Box>
 
-      {error   && <p style={{ color: 'red',   fontWeight: 'bold' }}>{error}</p>}
-      {mensaje && <p style={{ color: 'green', fontWeight: 'bold' }}>{mensaje}</p>}
+        <Typography variant="h6" sx={{ mb: 2 }}>{modoEdicion ? 'Editar Registro' : 'Nuevo Registro'}</Typography>
 
-      <div style={{ border: '1px solid #ccc', borderRadius: '8px', padding: '16px', marginBottom: '24px', maxWidth: '700px' }}>
-        <h3>{modoEdicion ? 'Editar control laboral' : 'Nuevo control laboral'}</h3>
-        <div style={{ display: 'grid', gap: '10px' }}>
+        <Grid container spacing={2}>
+          <Grid size={{ xs: 12, md: 3 }}>
+            <TextField fullWidth type="number" label="ID Empleado" name="emp_id" value={form.emp_id} onChange={handleChange} />
+          </Grid>
+          <Grid size={{ xs: 12, md: 3 }}>
+            <TextField fullWidth type="date" label="F. Inicio" name="ctl_fecha_inicio" slotProps={{ inputLabel: { shrink: true } }} value={form.ctl_fecha_inicio} onChange={handleChange} />
+          </Grid>
+          <Grid size={{ xs: 12, md: 3 }}>
+            <TextField fullWidth type="date" label="F. Regreso" name="ctl_fecha_regreso" slotProps={{ inputLabel: { shrink: true } }} value={form.ctl_fecha_regreso} onChange={handleChange} />
+          </Grid>
+          <Grid size={{ xs: 12, md: 3 }}>
+            <TextField fullWidth type="date" label="F. Registro" name="ctl_fecha_registro" slotProps={{ inputLabel: { shrink: true } }} value={form.ctl_fecha_registro} onChange={handleChange} />
+          </Grid>
 
-          <label>
-            ID Empleado
-            <input type="number" name="emp_id" value={form.emp_id} onChange={handleChange}
-              placeholder="ID del empleado" style={{ display: 'block', width: '100%' }} />
-          </label>
+          <Grid size={{ xs: 12, md: 4 }}>
+            <FormControl fullWidth>
+              <InputLabel>Motivo</InputLabel>
+              <Select name="ctl_motivo" value={form.ctl_motivo} label="Motivo" onChange={handleChange}>
+                <MenuItem value="VAC">Vacaciones</MenuItem>
+                <MenuItem value="PER">Permiso</MenuItem>
+                <MenuItem value="ENF">Enfermedad</MenuItem>
+                <MenuItem value="SUS">Suspensión</MenuItem>
+                <MenuItem value="OTR">Otro</MenuItem>
+              </Select>
+            </FormControl>
+          </Grid>
+          <Grid size={{ xs: 12, md: 4 }}>
+            <TextField fullWidth type="number" label="Horas" name="ctl_horas" value={form.ctl_horas} onChange={handleChange} placeholder="0.0000" />
+          </Grid>
+          <Grid size={{ xs: 12, md: 4 }}>
+            <FormControl fullWidth>
+              <InputLabel>Estado</InputLabel>
+              <Select name="ctl_estado" value={form.ctl_estado} label="Estado" onChange={handleChange}>
+                <MenuItem value="P">Pendiente</MenuItem>
+                <MenuItem value="A">Aprobado</MenuItem>
+                <MenuItem value="R">Rechazado</MenuItem>
+              </Select>
+            </FormControl>
+          </Grid>
 
-          <label>
-            Fecha Inicio
-            <input type="date" name="ctl_fecha_inicio" value={form.ctl_fecha_inicio} onChange={handleChange}
-              style={{ display: 'block', width: '100%' }} />
-          </label>
+          <Grid size={{ xs: 12 }}>
+            <TextField fullWidth multiline rows={2} label="Descripción" name="ctl_descripcion" value={form.ctl_descripcion} onChange={handleChange} />
+          </Grid>
 
-          <label>
-            Fecha Regreso
-            <input type="date" name="ctl_fecha_regreso" value={form.ctl_fecha_regreso} onChange={handleChange}
-              style={{ display: 'block', width: '100%' }} />
-          </label>
+          <Grid size={{ xs: 12 }}>
+            <Box sx={{ display: 'flex', gap: 2, mt: 1 }}>
+              <Button variant="contained" startIcon={<SaveIcon />} onClick={guardarControl}>
+                {modoEdicion ? 'Actualizar' : 'Guardar'}
+              </Button>
+              <Button variant="outlined" color="secondary" startIcon={<CleaningServicesIcon />} onClick={limpiarFormulario}>
+                Limpiar
+              </Button>
+            </Box>
+          </Grid>
+        </Grid>
+      </Paper>
 
-          <label>
-            Fecha Registro
-            <input type="date" name="ctl_fecha_registro" value={form.ctl_fecha_registro} onChange={handleChange}
-              style={{ display: 'block', width: '100%' }} />
-          </label>
+      <Paper elevation={3} sx={{ p: 3 }}>
+        <Typography variant="h6" sx={{ mb: 2 }}>Listado de Registros: {datos.length}</Typography>
+        <TableContainer>
+          <Table size="small">
+            <TableHead>
+              <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
+                <TableCell><strong>ID</strong></TableCell>
+                <TableCell><strong>Emp.</strong></TableCell>
+                <TableCell><strong>Fechas</strong></TableCell>
+                <TableCell><strong>Motivo</strong></TableCell>
+                <TableCell><strong>Horas</strong></TableCell>
+                <TableCell><strong>Descripción</strong></TableCell>
+                <TableCell><strong>Estado</strong></TableCell>
+                <TableCell align="center"><strong>Acciones</strong></TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {datos.length > 0 ? datos.map(ctl => (
+                <TableRow key={ctl.CTL_ID} hover>
+                  <TableCell>{ctl.CTL_ID}</TableCell>
+                  <TableCell>#{ctl.EMP_ID}</TableCell>
+                  <TableCell>
+                    <Typography variant="caption" sx={{ display: 'block' }}>I: {ctl.CTL_FECHA_INICIO?.slice(0, 10)}</Typography>
+                    <Typography variant="caption" sx={{ display: 'block' }}>R: {ctl.CTL_FECHA_REGRESO?.slice(0, 10)}</Typography>
+                  </TableCell>
+                  <TableCell>{ctl.CTL_MOTIVO}</TableCell>
+                  <TableCell>{ctl.CTL_HORAS}</TableCell>
+                  <TableCell>
+                    <Tooltip title={ctl.CTL_DESCRIPCION}>
+                      <Typography variant="body2" sx={{ maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {ctl.CTL_DESCRIPCION}
+                      </Typography>
+                    </Tooltip>
+                  </TableCell>
+                  <TableCell>{getStatusChip(ctl.CTL_ESTADO)}</TableCell>
+                  <TableCell align="center">
+                    <Box sx={{ display: 'flex', gap: 1, justifyContent: 'center' }}>
+                      <Button size="small" variant="outlined" onClick={() => handleEditar(ctl)}><EditIcon fontSize="small" /></Button>
+                      <Button size="small" variant="contained" color="error" onClick={() => handleEliminar(ctl.CTL_ID)}><DeleteIcon fontSize="small" /></Button>
+                    </Box>
+                  </TableCell>
+                </TableRow>
+              )) : (
+                <TableRow><TableCell colSpan={8} align="center">No hay registros</TableCell></TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      </Paper>
 
-          <label>
-            Motivo
-            <select name="ctl_motivo" value={form.ctl_motivo} onChange={handleChange} style={{ display: 'block', width: '100%' }}>
-              <option value="">Seleccione motivo</option>
-              <option value="VAC">Vacaciones</option>
-              <option value="PER">Permiso</option>
-              <option value="ENF">Enfermedad</option>
-              <option value="SUS">Suspensión</option>
-              <option value="OTR">Otro</option>
-            </select>
-          </label>
+      <Snackbar open={!!mensaje} autoHideDuration={3000} onClose={() => setMensaje('')} anchorOrigin={{ vertical: 'top', horizontal: 'right' }}>
+        <Alert severity="success" variant="filled">{mensaje}</Alert>
+      </Snackbar>
 
-          <label>
-            Horas
-            <input type="number" name="ctl_horas" value={form.ctl_horas} onChange={handleChange}
-              placeholder="0.0000" step="0.0001" min="0" style={{ display: 'block', width: '100%' }} />
-          </label>
-
-          <label>
-            Descripción
-            <textarea name="ctl_descripcion" value={form.ctl_descripcion} onChange={handleChange}
-              placeholder="Descripción del control" rows={3}
-              style={{ display: 'block', width: '100%', resize: 'vertical' }} />
-          </label>
-
-          <label>
-            Estado
-            <select name="ctl_estado" value={form.ctl_estado} onChange={handleChange} style={{ display: 'block', width: '100%' }}>
-              <option value="">Seleccione estado</option>
-              <option value="P">Pendiente</option>
-              <option value="A">Aprobado</option>
-              <option value="R">Rechazado</option>
-            </select>
-          </label>
-
-          <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
-            <button onClick={guardarControl}>{modoEdicion ? 'Actualizar' : 'Guardar'}</button>
-            <button onClick={limpiarFormulario}>Limpiar</button>
-          </div>
-        </div>
-      </div>
-
-      <h3>Listado de controles: {datos.length}</h3>
-      <div style={{ overflowX: 'auto' }}>
-        <table border={1} cellPadding={8} cellSpacing={0} style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>Emp. ID</th>
-              <th>F. Inicio</th>
-              <th>F. Regreso</th>
-              <th>Motivo</th>
-              <th>Horas</th>
-              <th>Descripción</th>
-              <th>Estado</th>
-              <th>F. Registro</th>
-              <th>Acciones</th>
-            </tr>
-          </thead>
-          <tbody>
-            {datos.length > 0 ? datos.map(ctl => (
-              <tr key={ctl.CTL_ID}>
-                <td>{ctl.CTL_ID}</td>
-                <td>{ctl.EMP_ID}</td>
-                <td>{ctl.CTL_FECHA_INICIO?.slice(0, 10)}</td>
-                <td>{ctl.CTL_FECHA_REGRESO?.slice(0, 10)}</td>
-                <td>{ctl.CTL_MOTIVO}</td>
-                <td>{ctl.CTL_HORAS}</td>
-                <td>{ctl.CTL_DESCRIPCION}</td>
-                <td>{ctl.CTL_ESTADO}</td>
-                <td>{ctl.CTL_FECHA_REGISTRO?.slice(0, 10)}</td>
-                <td>
-                  <div style={{ display: 'flex', gap: '8px' }}>
-                    <button onClick={() => handleEditar(ctl)}>Editar</button>
-                    <button onClick={() => handleEliminar(ctl.CTL_ID)}>Eliminar</button>
-                  </div>
-                </td>
-              </tr>
-            )) : (
-              <tr><td colSpan={10} style={{ textAlign: 'center' }}>No hay controles registrados</td></tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-    </div>
+      <Snackbar open={!!error} autoHideDuration={4000} onClose={() => setError('')} anchorOrigin={{ vertical: 'top', horizontal: 'right' }}>
+        <Alert severity="error" variant="filled">{error}</Alert>
+      </Snackbar>
+    </Box>
   );
 }
 
