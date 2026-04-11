@@ -41,41 +41,70 @@ import EditNoteIcon from '@mui/icons-material/EditNote';
 import InsightsIcon from '@mui/icons-material/Insights';
 import QueryStatsIcon from '@mui/icons-material/QueryStats';
 import ScheduleIcon from '@mui/icons-material/Schedule';
+import HealthAndSafetyIcon from '@mui/icons-material/HealthAndSafety';
+import GavelIcon from '@mui/icons-material/Gavel';
+import MedicalServicesIcon from '@mui/icons-material/MedicalServices';
+import PercentIcon from '@mui/icons-material/Percent';
+import DownloadIcon from '@mui/icons-material/Download';
 
 type MenuItemType = {
   text: string;
   path: string;
   icon: React.ReactNode;
+  dividerBefore?: boolean;
 };
 
 const menuItems: MenuItemType[] = [
+  // ── General ──────────────────────────────────────────────────────────────
   { text: 'Inicio', path: '/', icon: <HomeIcon /> },
-  { text: 'Empleados', path: '/empleados', icon: <PeopleIcon /> },
+
+  // ── Empleados ─────────────────────────────────────────────────────────────
+  { text: 'Empleados', path: '/empleados', icon: <PeopleIcon />, dividerBefore: true },
   { text: 'Departamentos', path: '/departamentos', icon: <BusinessIcon /> },
   { text: 'Puestos', path: '/puestos', icon: <WorkIcon /> },
-  { text: 'Permisos', path: '/permisos', icon: <SecurityIcon /> },
-  { text: 'Rol Permisos', path: '/rol-permisos', icon: <AdminPanelSettingsIcon /> },
-  { text: 'Roles', path: '/roles', icon: <AccountTreeIcon /> },
-  { text: 'Préstamos', path: '/prestamos', icon: <PaymentsIcon /> },
-  { text: 'Detalle Préstamo', path: '/prestamo-detalle', icon: <ReceiptLongIcon /> },
-  { text: 'Periodo', path: '/periodo', icon: <CalendarMonthIcon /> },
-  { text: 'Control Laboral', path: '/control-laboral', icon: <AccessTimeIcon /> },
-  { text: 'Cuenta Bancaria', path: '/cuenta-bancaria', icon: <AccountBalanceIcon /> },
-  { text: 'Ingresos', path: '/tipo-ingresos', icon: <TrendingUpIcon /> },
-  { text: 'Descuentos', path: '/descuentos', icon: <MoneyOffIcon /> },
-  { text: 'Nómina Detalle', path: '/nomina-detalle', icon: <AssignmentIcon /> },
-  { text: 'Marcajes', path: '/marcajes', icon: <FactCheckIcon /> },
+  { text: 'Tipo Contrato', path: '/tipo-contrato', icon: <PersonIcon /> },
   { text: 'Empleado Contrato', path: '/empleado-contrato', icon: <BadgeIcon /> },
   { text: 'Sede', path: '/sede', icon: <ApartmentIcon /> },
-  { text: 'Bitácora', path: '/bitacora', icon: <HistoryIcon /> },
+
+  // ── Accesos ───────────────────────────────────────────────────────────────
+  { text: 'Usuarios', path: '/usuarios', icon: <GroupIcon />, dividerBefore: true },
+  { text: 'Roles', path: '/roles', icon: <AccountTreeIcon /> },
+  { text: 'Permisos', path: '/permisos', icon: <SecurityIcon /> },
+  { text: 'Rol Permisos', path: '/rol-permisos', icon: <AdminPanelSettingsIcon /> },
+
+  // ── Nómina ────────────────────────────────────────────────────────────────
+  { text: 'Nómina', path: '/nomina', icon: <DescriptionIcon />, dividerBefore: true },
+  { text: 'Nómina Detalle', path: '/nomina-detalle', icon: <AssignmentIcon /> },
+  { text: 'Periodo', path: '/periodo', icon: <CalendarMonthIcon /> },
+  { text: 'Ingresos', path: '/tipo-ingresos', icon: <TrendingUpIcon /> },
+  { text: 'Descuentos', path: '/descuentos', icon: <MoneyOffIcon /> },
   { text: 'Liquidación', path: '/liquidacion', icon: <DescriptionIcon /> },
-  { text: 'Nómina', path: '/nomina', icon: <DescriptionIcon /> },
-  { text: 'Usuarios', path: '/usuarios', icon: <GroupIcon /> },
-  { text: 'Tipo Contrato', path: '/tipo-contrato', icon: <PersonIcon /> },
-  { text: 'Usuario Bitácora', path: '/usuario-bitacora', icon: <EditNoteIcon /> },
-  { text: 'KPIs', path: '/kpis', icon: <InsightsIcon /> },
-  { text: 'Resultados KPI', path: '/kpi-resultado', icon: <QueryStatsIcon /> },
+
+  // ── Calculadoras ──────────────────────────────────────────────────────────
+  { text: 'Calculadora IGSS', path: '/calculadora-igss', icon: <HealthAndSafetyIcon />, dividerBefore: true },
+  { text: 'Calculadora ISR', path: '/calculadora-isr', icon: <GavelIcon /> },
+  { text: 'Suspensiones IGSS', path: '/suspensiones-igss', icon: <MedicalServicesIcon /> },
+  { text: 'Tipos Descuento', path: '/tipos-descuento', icon: <PercentIcon /> },
+  { text: 'Generar CSV Depósito', path: '/generar-csv', icon: <DownloadIcon /> },
+
+  // ── Préstamos ─────────────────────────────────────────────────────────────
+  { text: 'Préstamos', path: '/prestamos', icon: <PaymentsIcon />, dividerBefore: true },
+  { text: 'Detalle Préstamo', path: '/prestamo-detalle', icon: <ReceiptLongIcon /> },
+  { text: 'Préstamos Banco', path: '/prestamos-banco', icon: <AccountBalanceIcon /> },
+
+  // ── Control laboral ───────────────────────────────────────────────────────
+  { text: 'Marcajes', path: '/marcajes', icon: <FactCheckIcon />, dividerBefore: true },
+  { text: 'Control Laboral', path: '/control-laboral', icon: <AccessTimeIcon /> },
   { text: 'Horarios', path: '/horarios', icon: <ScheduleIcon /> },
+  { text: 'Cuenta Bancaria', path: '/cuenta-bancaria', icon: <AccountBalanceIcon /> },
+
+  // ── KPIs ──────────────────────────────────────────────────────────────────
+  { text: 'KPIs', path: '/kpis', icon: <InsightsIcon />, dividerBefore: true },
+  { text: 'Resultados KPI', path: '/kpi-resultado', icon: <QueryStatsIcon /> },
+
+  // ── Auditoría ─────────────────────────────────────────────────────────────
+  { text: 'Bitácora', path: '/bitacora', icon: <HistoryIcon />, dividerBefore: true },
+  { text: 'Usuario Bitácora', path: '/usuario-bitacora', icon: <EditNoteIcon /> },
 ];
 
 function Navbar() {
@@ -123,38 +152,39 @@ function Navbar() {
               const isActive = location.pathname === item.path;
 
               return (
-                <ListItemButton
-                  key={item.path}
-                  component={NavLink}
-                  to={item.path}
-                  selected={isActive}
-                  sx={{
-                    mx: 1,
-                    my: 0.5,
-                    borderRadius: 2,
-                    '&.Mui-selected': {
-                      backgroundColor: 'primary.main',
-                      color: 'white',
-                    },
-                    '&.Mui-selected .MuiListItemIcon-root': {
-                      color: 'white',
-                    },
-                    '&:hover': {
-                      backgroundColor: isActive ? 'primary.dark' : 'action.hover',
-                    },
-                  }}
-                >
-                  <ListItemIcon
+                <Box key={item.path}>
+                  {item.dividerBefore && <Divider sx={{ my: 0.5 }} />}
+                  <ListItemButton
+                    component={NavLink}
+                    to={item.path}
+                    selected={isActive}
                     sx={{
-                      color: isActive ? 'white' : 'inherit',
-                      minWidth: 40,
+                      mx: 1,
+                      my: 0.5,
+                      borderRadius: 2,
+                      '&.Mui-selected': {
+                        backgroundColor: 'primary.main',
+                        color: 'white',
+                      },
+                      '&.Mui-selected .MuiListItemIcon-root': {
+                        color: 'white',
+                      },
+                      '&:hover': {
+                        backgroundColor: isActive ? 'primary.dark' : 'action.hover',
+                      },
                     }}
                   >
-                    {item.icon}
-                  </ListItemIcon>
-
-                  <ListItemText primary={item.text} />
-                </ListItemButton>
+                    <ListItemIcon
+                      sx={{
+                        color: isActive ? 'white' : 'inherit',
+                        minWidth: 40,
+                      }}
+                    >
+                      {item.icon}
+                    </ListItemIcon>
+                    <ListItemText primary={item.text} />
+                  </ListItemButton>
+                </Box>
               );
             })}
           </List>

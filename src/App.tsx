@@ -29,6 +29,10 @@ import Usuario from './components/Usuario';
 import TipoContrato from './components/TipoContrato';
 import UsuarioBitacora from './components/UsuarioBitacora';
 import HorarioCRUD from './components/HorarioCRUD';
+import CalculadoraIgss from './components/CalculadoraIgss';
+import CalculadoraISR from './components/CalculadoraISR'; 
+import GenerarCSV from './components/Generarcsv';   
+import SuspensionIgss from './components/SuspensionIgss';
 
 function App() {
   return (
@@ -67,6 +71,12 @@ function App() {
             <Route path="/tipo-contrato" element={<TipoContrato />} />
             <Route path="/usuario-bitacora" element={<UsuarioBitacora />} />
             <Route path="/horarios" element={<HorarioCRUD />} />
+            <Route path="/calculadora-igss" element={<CalculadoraIgss />} />
+            <Route path="/calculadora-isr" element={<CalculadoraISR />} />
+            <Route path="/suspensiones-igss" element={<SuspensionIgss />} />
+            <Route path="/tipos-descuento" element={<Descuentos/>} />
+            <Route path="/prestamos-banco" element={<Prestamos />} />
+            <Route path="/generar-csv" element={<GenerarCSV />} />
           </Routes>
         </Container>
       </Box>
