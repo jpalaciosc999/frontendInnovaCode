@@ -1,7 +1,7 @@
 import api from '../api/axios';
 import type { Sede, SedeForm } from '../interfaces/sede';
 
-const ENDPOINT = 'sede';
+const ENDPOINT = 'sedes';
 
 export const obtenerSedes = async (): Promise<Sede[]> => {
     const response = await api.get<Sede[]>(`${ENDPOINT}/`);

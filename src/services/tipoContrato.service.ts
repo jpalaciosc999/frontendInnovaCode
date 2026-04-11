@@ -1,7 +1,7 @@
 import api from '../api/axios';
 import type { TipoContrato, TipoContratoForm } from '../interfaces/tipoContrato';
 
-const ENDPOINT = 'tipo-contrato';
+const ENDPOINT = 'tipoContrato';
 
 export const obtenerTiposContrato = async (): Promise<TipoContrato[]> => {
     const response = await api.get<TipoContrato[]>(`${ENDPOINT}/`);

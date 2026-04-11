@@ -1,27 +1,26 @@
-// services/periodos.service.ts
-import axios from 'axios';
+import api from '../api/axios';
 import type { Periodo, PeriodoForm } from '../interfaces/periodo';
 
-const BASE_URL = 'http://localhost:3000/api/periodos'; // ajusta según tu config
+const ENDPOINT = 'periodo';
 
 export const obtenerPeriodos = async (): Promise<Periodo[]> => {
-  const res = await axios.get<Periodo[]>(BASE_URL);
+  const res = await api.get<Periodo[]>(`${ENDPOINT}/`);
   return res.data;
 };
 
 export const obtenerPeriodoPorId = async (id: number): Promise<Periodo> => {
-  const res = await axios.get<Periodo>(`${BASE_URL}/${id}`);
+  const res = await api.get<Periodo>(`${ENDPOINT}/${id}`);
   return res.data;
 };
 
 export const crearPeriodo = async (data: PeriodoForm): Promise<void> => {
-  await axios.post(BASE_URL, data);
+  await api.post(`${ENDPOINT}/`, data);
 };
 
 export const actualizarPeriodo = async (id: number, data: PeriodoForm): Promise<void> => {
-  await axios.put(`${BASE_URL}/${id}`, data);
+  await api.put(`${ENDPOINT}/${id}`, data);
 };
 
 export const eliminarPeriodo = async (id: number): Promise<void> => {
-  await axios.delete(`${BASE_URL}/${id}`);
+  await api.delete(`${ENDPOINT}/${id}`);
 };
