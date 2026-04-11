@@ -1,226 +1,329 @@
 import { useEffect, useState } from 'react';
 import type { Sede, SedeForm } from '../interfaces/sede';
 import {
-    obtenerSedes,
-    crearSede,
-    actualizarSede,
-    eliminarSede
+  obtenerSedes,
+  crearSede,
+  actualizarSede,
+  eliminarSede
 } from '../services/sede.service';
 
+import {
+  Alert,
+  Box,
+  Button,
+  Grid,
+  Paper,
+  Snackbar,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  TextField,
+  Typography
+} from '@mui/material';
+
+import SaveIcon from '@mui/icons-material/Save';
+import CleaningServicesIcon from '@mui/icons-material/CleaningServices';
+import EditIcon from '@mui/icons-material/Edit';
+import DeleteIcon from '@mui/icons-material/Delete';
+import LocationOnIcon from '@mui/icons-material/LocationOn';
+
 const initialForm: SedeForm = {
-    sed_nombre: '',
-    sed_telefono: '',
-    sed_departamento: '',
-    sed_municipio: '',
-    sed_zona: ''
+  sed_nombre: '',
+  sed_telefono: '',
+  sed_departamento: '',
+  sed_municipio: '',
+  sed_zona: ''
 };
 
 function SedeCRUD() {
-    const [datos, setDatos] = useState<Sede[]>([]);
-    const [cargando, setCargando] = useState(true);
-    const [error, setError] = useState('');
-    const [mensaje, setMensaje] = useState('');
-    const [modoEdicion, setModoEdicion] = useState(false);
-    const [id, setId] = useState<number | null>(null);
-    const [form, setForm] = useState<SedeForm>(initialForm);
+  const [datos, setDatos] = useState<Sede[]>([]);
+  const [cargando, setCargando] = useState(true);
+  const [error, setError] = useState('');
+  const [mensaje, setMensaje] = useState('');
+  const [modoEdicion, setModoEdicion] = useState(false);
+  const [id, setId] = useState<number | null>(null);
+  const [form, setForm] = useState<SedeForm>(initialForm);
 
-    const inputStyle = {
-        padding: '5px 8px',
-        fontSize: '12px',
-        width: '150px',
-        borderRadius: '6px',
-        border: '1px solid #444',
-        backgroundColor: '#111',
-        color: 'white'
-    };
+  const cargarDatos = async () => {
+    try {
+      setCargando(true);
+      setError('');
+      const data = await obtenerSedes();
+      setDatos(data);
+    } catch (err: any) {
+      setError('Error cargando sedes: ' + err.message);
+    } finally {
+      setCargando(false);
+    }
+  };
 
-    const cargarDatos = async () => {
-        try {
-            setCargando(true);
-            setError('');
-            const data = await obtenerSedes();
-            setDatos(data);
-        } catch (err: any) {
-            setError('Error cargando sedes: ' + err.message);
-        } finally {
-            setCargando(false);
-        }
-    };
+  useEffect(() => {
+    cargarDatos();
+  }, []);
 
-    useEffect(() => {
-        cargarDatos();
-    }, []);
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setForm((prev) => ({ ...prev, [name]: value }));
+  };
 
-    const handleChange = (e: any) => {
-        const { name, value } = e.target;
-        setForm((prev) => ({
-            ...prev,
-            [name]: value
-        }));
-    };
+  const limpiarFormulario = () => {
+    setForm(initialForm);
+    setModoEdicion(false);
+    setId(null);
+    setError('');
+  };
 
-    const limpiarFormulario = () => {
-        setForm(initialForm);
-        setModoEdicion(false);
-        setId(null);
-        setError('');
-    };
+  const validar = () => {
+    if (!form.sed_nombre.trim() || !form.sed_departamento.trim()) {
+      setError('Nombre y departamento son obligatorios');
+      return false;
+    }
+    return true;
+  };
 
-    const validar = () => {
-        if (!form.sed_nombre || !form.sed_departamento) {
-            setError('Campos obligatorios faltantes');
-            return false;
-        }
-        return true;
-    };
+  const guardar = async () => {
+    try {
+      setError('');
+      setMensaje('');
 
-    const guardar = async () => {
-        try {
-            setError('');
-            setMensaje('');
+      if (!validar()) return;
 
-            if (!validar()) return;
+      if (modoEdicion && id !== null) {
+        await actualizarSede(id, form);
+        setMensaje('Sede actualizada correctamente');
+      } else {
+        await crearSede(form);
+        setMensaje('Sede creada correctamente');
+      }
 
-            if (modoEdicion && id !== null) {
-                await actualizarSede(id, form);
-                setMensaje('Sede actualizada');
-            } else {
-                await crearSede(form);
-                setMensaje('Sede creada');
-            }
+      limpiarFormulario();
+      await cargarDatos();
+    } catch (err: any) {
+      setError('Error guardando: ' + (err.response?.data?.error || err.message));
+    }
+  };
 
-            limpiarFormulario();
-            await cargarDatos();
-        } catch (err: any) {
-            setError('Error guardando: ' + err.message);
-        }
-    };
+  const handleEliminar = async (idEliminar: number) => {
+    if (!window.confirm('¿Deseas eliminar esta sede?')) return;
 
-    const handleEliminar = async (id: number) => {
-        if (!window.confirm('¿Eliminar sede?')) return;
-        await eliminarSede(id);
-        await cargarDatos();
-    };
+    try {
+      setError('');
+      setMensaje('');
+      await eliminarSede(idEliminar);
+      setMensaje('Sede eliminada correctamente');
 
-    const handleEditar = (s: Sede) => {
-        setModoEdicion(true);
-        setId(s.SED_ID);
+      if (id === idEliminar) limpiarFormulario();
 
-        setForm({
-            sed_nombre: s.SED_NOMBRE,
-            sed_telefono: s.SED_TELEFONO,
-            sed_departamento: s.SED_DEPARTAMENTO,
-            sed_municipio: s.SED_MUNICIPIO,
-            sed_zona: s.SED_ZONA
-        });
-    };
+      await cargarDatos();
+    } catch (err: any) {
+      setError('Error eliminando: ' + (err.response?.data?.error || err.message));
+    }
+  };
 
-    if (cargando) return <p>Cargando sedes...</p>;
+  const handleEditar = (s: Sede) => {
+    setModoEdicion(true);
+    setId(s.SED_ID);
+    setMensaje('');
+    setError('');
+    setForm({
+      sed_nombre: s.SED_NOMBRE,
+      sed_telefono: String(s.SED_TELEFONO || ''),
+      sed_departamento: s.SED_DEPARTAMENTO,
+      sed_municipio: s.SED_MUNICIPIO || '',
+      sed_zona: s.SED_ZONA || ''
+    });
+  };
 
+  if (cargando) {
     return (
-        <div style={{ padding: '20px', fontFamily: 'Arial', color: 'white' }}>
-            <h2>Sedes</h2>
-
-            {error && <p style={{ color: 'red' }}>{error}</p>}
-            {mensaje && <p style={{ color: 'green' }}>{mensaje}</p>}
-
-            <div style={{
-                border: '1px solid #ccc',
-                padding: '16px',
-                borderRadius: '8px',
-                maxWidth: '900px',
-                marginBottom: '20px',
-                backgroundColor: '#222'
-            }}>
-                <h3>{modoEdicion ? 'Editar' : 'Nueva'} Sede</h3>
-
-                <div style={{
-                    display: 'grid',
-                    gap: '12px',
-                    gridTemplateColumns: '1fr 1fr',
-                    justifyItems: 'start' // 👈 IGUAL que el otro
-                }}>
-
-                    {[
-                        { label: 'Nombre', name: 'sed_nombre', type: 'text' },
-                        { label: 'Teléfono', name: 'sed_telefono', type: 'number' },
-                        { label: 'Departamento', name: 'sed_departamento', type: 'text' },
-                        { label: 'Municipio', name: 'sed_municipio', type: 'text' },
-                        { label: 'Zona', name: 'sed_zona', type: 'text' }
-                    ].map((field) => (
-                        <div key={field.name} style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
-                            <label>{field.label}:</label>
-                            <input
-                                type={field.type}
-                                name={field.name}
-                                value={(form as any)[field.name]}
-                                onChange={handleChange}
-                                style={inputStyle}
-                            />
-                        </div>
-                    ))}
-
-                </div>
-
-                {/* 👇 BOTONES EXACTAMENTE IGUAL */}
-                <div style={{ marginTop: '20px', display: 'flex', gap: '10px' }}>
-                    <button
-                        onClick={guardar}
-                        style={{
-                            padding: '8px 16px',
-                            cursor: 'pointer',
-                            backgroundColor: '#4CAF50',
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: '4px'
-                        }}
-                    >
-                        {modoEdicion ? 'Actualizar' : 'Guardar'}
-                    </button>
-
-                    <button
-                        onClick={limpiarFormulario}
-                        style={{
-                            padding: '8px 16px',
-                            cursor: 'pointer',
-                            backgroundColor: '#f44336',
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: '4px'
-                        }}
-                    >
-                        Limpiar / Cancelar
-                    </button>
-                </div>
-            </div>
-
-            <table border={1} style={{ width: '100%', color: 'white' }}>
-                <thead>
-                    <tr>
-                        <th>ID</th>
-                        <th>Nombre</th>
-                        <th>Teléfono</th>
-                        <th>Departamento</th>
-                        <th>Acciones</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {datos.map((s) => (
-                        <tr key={s.SED_ID}>
-                            <td>{s.SED_ID}</td>
-                            <td>{s.SED_NOMBRE}</td>
-                            <td>{s.SED_TELEFONO}</td>
-                            <td>{s.SED_DEPARTAMENTO}</td>
-                            <td>
-                                <button onClick={() => handleEditar(s)}>Editar</button>
-                                <button onClick={() => handleEliminar(s.SED_ID)}>Eliminar</button>
-                            </td>
-                        </tr>
-                    ))}
-                </tbody>
-            </table>
-        </div>
+      <Box sx={{ p: 3 }}>
+        <Typography variant="h6">Cargando sedes...</Typography>
+      </Box>
     );
+  }
+
+  return (
+    <Box sx={{ py: 2 }}>
+      {/* Formulario */}
+      <Paper elevation={3} sx={{ p: 3, mb: 3 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 3 }}>
+          <LocationOnIcon color="primary" />
+          <Typography variant="h4" sx={{ fontWeight: 'bold' }}>
+            Sedes
+          </Typography>
+        </Box>
+
+        <Typography variant="h6" sx={{ mb: 2 }}>
+          {modoEdicion ? 'Editar sede' : 'Nueva sede'}
+        </Typography>
+
+        <Grid container spacing={2}>
+          <Grid size={{ xs: 12, md: 6 }}>
+            <TextField
+              fullWidth
+              label="Nombre"
+              name="sed_nombre"
+              value={form.sed_nombre}
+              onChange={handleChange}
+            />
+          </Grid>
+
+          <Grid size={{ xs: 12, md: 6 }}>
+            <TextField
+              fullWidth
+              label="Teléfono"
+              name="sed_telefono"
+              value={form.sed_telefono}
+              onChange={handleChange}
+            />
+          </Grid>
+
+          <Grid size={{ xs: 12, md: 6 }}>
+            <TextField
+              fullWidth
+              label="Departamento"
+              name="sed_departamento"
+              value={form.sed_departamento}
+              onChange={handleChange}
+            />
+          </Grid>
+
+          <Grid size={{ xs: 12, md: 6 }}>
+            <TextField
+              fullWidth
+              label="Municipio"
+              name="sed_municipio"
+              value={form.sed_municipio}
+              onChange={handleChange}
+            />
+          </Grid>
+
+          <Grid size={{ xs: 12, md: 6 }}>
+            <TextField
+              fullWidth
+              label="Zona"
+              name="sed_zona"
+              value={form.sed_zona}
+              onChange={handleChange}
+            />
+          </Grid>
+
+          <Grid size={{ xs: 12 }}>
+            <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mt: 1 }}>
+              <Button
+                variant="contained"
+                startIcon={<SaveIcon />}
+                onClick={guardar}
+              >
+                {modoEdicion ? 'Actualizar' : 'Guardar'}
+              </Button>
+
+              <Button
+                variant="outlined"
+                color="secondary"
+                startIcon={<CleaningServicesIcon />}
+                onClick={limpiarFormulario}
+              >
+                Limpiar
+              </Button>
+            </Box>
+          </Grid>
+        </Grid>
+      </Paper>
+
+      {/* Tabla */}
+      <Paper elevation={3} sx={{ p: 3 }}>
+        <Typography variant="h6" sx={{ mb: 2 }}>
+          Listado de sedes: {datos.length}
+        </Typography>
+
+        <TableContainer>
+          <Table>
+            <TableHead>
+              <TableRow>
+                <TableCell><strong>ID</strong></TableCell>
+                <TableCell><strong>Nombre</strong></TableCell>
+                <TableCell><strong>Teléfono</strong></TableCell>
+                <TableCell><strong>Departamento</strong></TableCell>
+                <TableCell><strong>Municipio</strong></TableCell>
+                <TableCell><strong>Zona</strong></TableCell>
+                <TableCell><strong>Acciones</strong></TableCell>
+              </TableRow>
+            </TableHead>
+
+            <TableBody>
+              {datos.length > 0 ? (
+                datos.map((s) => (
+                  <TableRow key={s.SED_ID} hover>
+                    <TableCell>{s.SED_ID}</TableCell>
+                    <TableCell>{s.SED_NOMBRE}</TableCell>
+                    <TableCell>{s.SED_TELEFONO}</TableCell>
+                    <TableCell>{s.SED_DEPARTAMENTO}</TableCell>
+                    <TableCell>{s.SED_MUNICIPIO}</TableCell>
+                    <TableCell>{s.SED_ZONA}</TableCell>
+                    <TableCell>
+                      <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          startIcon={<EditIcon />}
+                          onClick={() => handleEditar(s)}
+                        >
+                          Editar
+                        </Button>
+
+                        <Button
+                          size="small"
+                          variant="contained"
+                          color="error"
+                          startIcon={<DeleteIcon />}
+                          onClick={() => handleEliminar(s.SED_ID)}
+                        >
+                          Eliminar
+                        </Button>
+                      </Box>
+                    </TableCell>
+                  </TableRow>
+                ))
+              ) : (
+                <TableRow>
+                  <TableCell colSpan={7} align="center">
+                    No hay sedes registradas
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      </Paper>
+
+      {/* Snackbars */}
+      <Snackbar
+        open={!!mensaje}
+        autoHideDuration={3000}
+        onClose={() => setMensaje('')}
+        anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+      >
+        <Alert severity="success" onClose={() => setMensaje('')} sx={{ width: '100%' }}>
+          {mensaje}
+        </Alert>
+      </Snackbar>
+
+      <Snackbar
+        open={!!error}
+        autoHideDuration={4000}
+        onClose={() => setError('')}
+        anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+      >
+        <Alert severity="error" onClose={() => setError('')} sx={{ width: '100%' }}>
+          {error}
+        </Alert>
+      </Snackbar>
+    </Box>
+  );
 }
 
 export default SedeCRUD;

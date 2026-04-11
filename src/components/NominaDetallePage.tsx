@@ -7,6 +7,29 @@ import {
     eliminarDetalleNomina
 } from '../services/nomina-detalle.service.ts';
 
+import {
+    Alert,
+    Box,
+    Button,
+    Grid,
+    Paper,
+    Snackbar,
+    Table,
+    TableBody,
+    TableCell,
+    TableContainer,
+    TableHead,
+    TableRow,
+    TextField,
+    Typography
+} from '@mui/material';
+
+import SaveIcon from '@mui/icons-material/Save';
+import CleaningServicesIcon from '@mui/icons-material/CleaningServices';
+import EditIcon from '@mui/icons-material/Edit';
+import DeleteIcon from '@mui/icons-material/Delete';
+import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
+
 const initialForm: NominaDetalleForm = {
     det_referencia: 0,
     det_monto: 0,
@@ -42,14 +65,9 @@ function NominaDetalleCRUD() {
         cargarDatos();
     }, []);
 
-    const handleChange = (
-        e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
-    ) => {
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const { name, value } = e.target;
-        setForm((prev) => ({
-            ...prev,
-            [name]: value
-        }));
+        setForm((prev) => ({ ...prev, [name]: value }));
     };
 
     const limpiarFormulario = () => {
@@ -60,34 +78,26 @@ function NominaDetalleCRUD() {
     };
 
     const validarFormulario = () => {
-        if (
-            form.det_referencia === 0 ||
-            form.det_monto === 0 ||
-            form.nom_id === 0
-        ) {
-            setError('Referencia, Monto y Nom_ID son obligatorios');
+        if (!form.det_referencia || !form.det_monto || !form.nom_id) {
+            setError('Referencia, Monto y Nómina ID son obligatorios');
             return false;
         }
         return true;
     };
 
-
-    const limpiarDatos = (form: NominaDetalleForm) => {
-        return {
-            det_referencia: form.det_referencia ? Number(form.det_referencia) : null,
-            det_monto: form.det_monto ? Number(form.det_monto) : null,
-            nom_id: form.nom_id ? Number(form.nom_id) : null,
-            tis_id: form.tis_id ? Number(form.tis_id) : null,
-            tds_id: form.tds_id ? Number(form.tds_id) : null,
-            kre_id: form.kre_id ? Number(form.kre_id) : null
-        };
-    };
+    const limpiarDatos = (f: NominaDetalleForm) => ({
+        det_referencia: f.det_referencia ? Number(f.det_referencia) : null,
+        det_monto: f.det_monto ? Number(f.det_monto) : null,
+        nom_id: f.nom_id ? Number(f.nom_id) : null,
+        tis_id: f.tis_id ? Number(f.tis_id) : null,
+        tds_id: f.tds_id ? Number(f.tds_id) : null,
+        kre_id: f.kre_id ? Number(f.kre_id) : null
+    });
 
     const guardarDetalle = async () => {
         try {
             setError('');
             setMensaje('');
-
             if (!validarFormulario()) return;
 
             const dataLimpia = limpiarDatos(form);
@@ -102,7 +112,6 @@ function NominaDetalleCRUD() {
 
             limpiarFormulario();
             await cargarDatos();
-
         } catch (err: any) {
             setError('Error guardando registro: ' + (err.response?.data?.error || err.message));
         }
@@ -115,6 +124,7 @@ function NominaDetalleCRUD() {
             setMensaje('');
             await eliminarDetalleNomina(id);
             setMensaje('Registro eliminado correctamente');
+            if (detalleId === id) limpiarFormulario();
             await cargarDatos();
         } catch (err: any) {
             setError('Error eliminando registro: ' + (err.response?.data?.error || err.message));
@@ -124,6 +134,8 @@ function NominaDetalleCRUD() {
     const handleEditar = (d: NominaDetalle) => {
         setModoEdicion(true);
         setDetalleId(d.DET_ID);
+        setMensaje('');
+        setError('');
         setForm({
             det_referencia: d.DET_REFERENCIA ?? 0,
             det_monto: d.DET_MONTO ?? 0,
@@ -134,99 +146,213 @@ function NominaDetalleCRUD() {
         });
     };
 
-    if (cargando) return <p>Cargando detalles de nómina...</p>;
+    if (cargando) {
+        return (
+            <Box sx={{ p: 3 }}>
+                <Typography variant="h6">Cargando detalles de nómina...</Typography>
+            </Box>
+        );
+    }
 
     return (
-        <div style={{ padding: '20px', fontFamily: 'Arial', color: 'white' }}>
-            <h2>CRUD Detalle de Nómina</h2>
+        <Box sx={{ py: 2 }}>
+            {/* Formulario */}
+            <Paper elevation={3} sx={{ p: 3, mb: 3 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 3 }}>
+                    <ReceiptLongIcon color="primary" />
+                    <Typography variant="h4" sx={{ fontWeight: 'bold' }}>
+                        Detalle de Nómina
+                    </Typography>
+                </Box>
 
-            {error && <p style={{ color: 'red' }}>{error}</p>}
-            {mensaje && <p style={{ color: 'green' }}>{mensaje}</p>}
+                <Typography variant="h6" sx={{ mb: 2 }}>
+                    {modoEdicion ? 'Editar detalle' : 'Nuevo detalle'}
+                </Typography>
 
-            {/* FORMULARIO (TU DISEÑO SE MANTIENE) */}
-            <div style={{ border: '1px solid #ccc', padding: '16px', borderRadius: '8px', maxWidth: '700px', marginBottom: '20px', backgroundColor: '#222' }}>
-                <h3>{modoEdicion ? 'Editar Detalle' : 'Nuevo Detalle'}</h3>
+                <Grid container spacing={2}>
+                    <Grid size={{ xs: 12, md: 6 }}>
+                        <TextField
+                            fullWidth
+                            label="Referencia"
+                            name="det_referencia"
+                            type="text"
+                            value={form.det_referencia}
+                            onChange={handleChange}
+                            required
+                        />
+                    </Grid>
 
-                <div style={{ display: 'grid', gap: '10px', gridTemplateColumns: '1fr 1fr' }}>
-                    
-                    <div style={{ display: 'flex', flexDirection: 'column' }}>
-                        <label>Referencia:</label>
-                        <input type="text" name="det_referencia" value={form.det_referencia ?? 0 } onChange={handleChange} />
-                    </div>
+                    <Grid size={{ xs: 12, md: 6 }}>
+                        <TextField
+                            fullWidth
+                            label="Monto (Q)"
+                            name="det_monto"
+                            type="number"
+                            value={form.det_monto}
+                            onChange={handleChange}
+                            slotProps={{ htmlInput: { step: 0.01, min: 0 } }}
+                            required
+                        />
+                    </Grid>
 
-                    <div style={{ display: 'flex', flexDirection: 'column' }}>
-                        <label>Monto:</label>
-                        <input type="number" name="det_monto" value={form.det_monto ?? 0 } onChange={handleChange} />
-                    </div>
+                    <Grid size={{ xs: 12, md: 6 }}>
+                        <TextField
+                            fullWidth
+                            label="Nómina ID"
+                            name="nom_id"
+                            type="number"
+                            value={form.nom_id}
+                            onChange={handleChange}
+                            required
+                        />
+                    </Grid>
 
-                    <div style={{ display: 'flex', flexDirection: 'column' }}>
-                        <label>Nómina ID:</label>
-                        <input type="number" name="nom_id" value={form.nom_id ?? 0 } onChange={handleChange} />
-                    </div>
+                    <Grid size={{ xs: 12, md: 6 }}>
+                        <TextField
+                            fullWidth
+                            label="TIS ID (Ingreso)"
+                            name="tis_id"
+                            type="number"
+                            value={form.tis_id}
+                            onChange={handleChange}
+                        />
+                    </Grid>
 
-                    <div style={{ display: 'flex', flexDirection: 'column' }}>
-                        <label>TIS ID:</label>
-                        <input type="number" name="tis_id" value={form.tis_id ?? 0 } onChange={handleChange} />
-                    </div>
+                    <Grid size={{ xs: 12, md: 6 }}>
+                        <TextField
+                            fullWidth
+                            label="TDS ID (Descuento)"
+                            name="tds_id"
+                            type="number"
+                            value={form.tds_id}
+                            onChange={handleChange}
+                        />
+                    </Grid>
 
-                    <div style={{ display: 'flex', flexDirection: 'column' }}>
-                        <label>TDS ID:</label>
-                        <input type="number" name="tds_id" value={form.tds_id ?? 0 } onChange={handleChange} />
-                    </div>
+                    <Grid size={{ xs: 12, md: 6 }}>
+                        <TextField
+                            fullWidth
+                            label="KRE ID (Resultado KPI)"
+                            name="kre_id"
+                            type="number"
+                            value={form.kre_id}
+                            onChange={handleChange}
+                        />
+                    </Grid>
 
-                    <div style={{ display: 'flex', flexDirection: 'column' }}>
-                        <label>KRE ID:</label>
-                        <input type="number" name="kre_id" value={form.kre_id ?? 0 } onChange={handleChange} />
-                    </div>
+                    <Grid size={{ xs: 12 }}>
+                        <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mt: 1 }}>
+                            <Button
+                                variant="contained"
+                                startIcon={<SaveIcon />}
+                                onClick={guardarDetalle}
+                            >
+                                {modoEdicion ? 'Actualizar' : 'Guardar'}
+                            </Button>
 
-                </div>
+                            <Button
+                                variant="outlined"
+                                color="secondary"
+                                startIcon={<CleaningServicesIcon />}
+                                onClick={limpiarFormulario}
+                            >
+                                Limpiar
+                            </Button>
+                        </Box>
+                    </Grid>
+                </Grid>
+            </Paper>
 
-                <div style={{ marginTop: '20px', display: 'flex', gap: '10px' }}>
-                    <button onClick={guardarDetalle} style={{ padding: '8px 16px', backgroundColor: '#4CAF50', color: 'white', border: 'none' }}>
-                        {modoEdicion ? 'Actualizar' : 'Guardar'}
-                    </button>
-                    <button onClick={limpiarFormulario} style={{ padding: '8px 16px', backgroundColor: '#f44336', color: 'white', border: 'none' }}>
-                        Limpiar
-                    </button>
-                </div>
-            </div>
+            {/* Tabla */}
+            <Paper elevation={3} sx={{ p: 3 }}>
+                <Typography variant="h6" sx={{ mb: 2 }}>
+                    Listado de detalles: {datos.length}
+                </Typography>
 
-            {/* TABLA (DISEÑO IGUAL) */}
-            <table border={1} cellPadding={8} style={{ width: '100%', borderCollapse: 'collapse', color: 'white', borderColor: '#444' }}>
-                <thead style={{ backgroundColor: '#333' }}>
-                    <tr>
-                        <th>ID</th>
-                        <th>Referencia</th>
-                        <th>Monto</th>
-                        <th>Nomina</th>
-                        <th>Ingreso</th>
-                        <th>Descuento</th>
-                        <th>Acciones</th>
-                    </tr>
-                </thead>
+                <TableContainer>
+                    <Table>
+                        <TableHead>
+                            <TableRow>
+                                <TableCell><strong>ID</strong></TableCell>
+                                <TableCell><strong>Referencia</strong></TableCell>
+                                <TableCell><strong>Monto</strong></TableCell>
+                                <TableCell><strong>Nómina</strong></TableCell>
+                                <TableCell><strong>Ingreso (TIS)</strong></TableCell>
+                                <TableCell><strong>Descuento (TDS)</strong></TableCell>
+                                <TableCell><strong>KRE</strong></TableCell>
+                                <TableCell><strong>Acciones</strong></TableCell>
+                            </TableRow>
+                        </TableHead>
 
-                <tbody>
-                    {datos.length > 0 ? datos.map((d) => (
-                        <tr key={d.DET_ID}>
-                            <td>{d.DET_ID}</td>
-                            <td>{d.DET_REFERENCIA}</td>
-                            <td>Q{d.DET_MONTO}</td>
-                            <td>{d.NOM_ID}</td>
-                            <td>{d.TIS_ID || '-'}</td>
-                            <td>{d.TDS_ID || '-'}</td>
-                            <td>
-                                <button onClick={() => handleEditar(d)}>Editar</button>
-                                <button onClick={() => handleEliminar(d.DET_ID)}>Eliminar</button>
-                            </td>
-                        </tr>
-                    )) : (
-                        <tr>
-                            <td colSpan={7} style={{ textAlign: 'center' }}>No hay registros</td>
-                        </tr>
-                    )}
-                </tbody>
-            </table>
-        </div>
+                        <TableBody>
+                            {datos.length > 0 ? (
+                                datos.map((d) => (
+                                    <TableRow key={d.DET_ID} hover>
+                                        <TableCell>{d.DET_ID}</TableCell>
+                                        <TableCell>{d.DET_REFERENCIA}</TableCell>
+                                        <TableCell>Q{Number(d.DET_MONTO).toLocaleString('es-GT')}</TableCell>
+                                        <TableCell>{d.NOM_ID}</TableCell>
+                                        <TableCell>{d.TIS_ID || '—'}</TableCell>
+                                        <TableCell>{d.TDS_ID || '—'}</TableCell>
+                                        <TableCell>{d.KRE_ID || '—'}</TableCell>
+                                        <TableCell>
+                                            <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                                                <Button
+                                                    size="small"
+                                                    variant="outlined"
+                                                    startIcon={<EditIcon />}
+                                                    onClick={() => handleEditar(d)}
+                                                >
+                                                    Editar
+                                                </Button>
+                                                <Button
+                                                    size="small"
+                                                    variant="contained"
+                                                    color="error"
+                                                    startIcon={<DeleteIcon />}
+                                                    onClick={() => handleEliminar(d.DET_ID)}
+                                                >
+                                                    Eliminar
+                                                </Button>
+                                            </Box>
+                                        </TableCell>
+                                    </TableRow>
+                                ))
+                            ) : (
+                                <TableRow>
+                                    <TableCell colSpan={8} align="center">
+                                        No hay registros de nómina
+                                    </TableCell>
+                                </TableRow>
+                            )}
+                        </TableBody>
+                    </Table>
+                </TableContainer>
+            </Paper>
+
+            {/* Snackbars */}
+            <Snackbar
+                open={!!mensaje}
+                autoHideDuration={3000}
+                onClose={() => setMensaje('')}
+                anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+            >
+                <Alert severity="success" onClose={() => setMensaje('')} sx={{ width: '100%' }}>
+                    {mensaje}
+                </Alert>
+            </Snackbar>
+
+            <Snackbar
+                open={!!error}
+                autoHideDuration={4000}
+                onClose={() => setError('')}
+                anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+            >
+                <Alert severity="error" onClose={() => setError('')} sx={{ width: '100%' }}>
+                    {error}
+                </Alert>
+            </Snackbar>
+        </Box>
     );
 }
 

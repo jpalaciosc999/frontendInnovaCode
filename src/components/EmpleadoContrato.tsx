@@ -7,6 +7,31 @@ import {
     eliminarContrato
 } from '../services/empleado_contrato.service';
 
+import {
+    Alert,
+    Box,
+    Button,
+    Chip,
+    Grid,
+    Paper,
+    Snackbar,
+    Table,
+    TableBody,
+    TableCell,
+    TableContainer,
+    TableHead,
+    TableRow,
+    TextField,
+    Typography,
+    MenuItem
+} from '@mui/material';
+
+import SaveIcon from '@mui/icons-material/Save';
+import CleaningServicesIcon from '@mui/icons-material/CleaningServices';
+import EditIcon from '@mui/icons-material/Edit';
+import DeleteIcon from '@mui/icons-material/Delete';
+import ArticleIcon from '@mui/icons-material/Article';
+
 const initialForm: EmpleadoContratoForm = {
     tco_fecha_inicio: '',
     tco_fecha_fin: '',
@@ -23,16 +48,6 @@ function EmpleadoContratoCRUD() {
     const [modoEdicion, setModoEdicion] = useState(false);
     const [id, setId] = useState<number | null>(null);
     const [form, setForm] = useState<EmpleadoContratoForm>(initialForm);
-
-    const inputStyle = {
-        padding: '5px 8px',
-        fontSize: '12px',
-        width: '150px',
-        borderRadius: '6px',
-        border: '1px solid #444',
-        backgroundColor: '#111',
-        color: 'white'
-    };
 
     const cargarDatos = async () => {
         try {
@@ -51,12 +66,9 @@ function EmpleadoContratoCRUD() {
         cargarDatos();
     }, []);
 
-    const handleChange = (e: any) => {
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const { name, value } = e.target;
-        setForm((prev) => ({
-            ...prev,
-            [name]: value
-        }));
+        setForm((prev) => ({ ...prev, [name]: value }));
     };
 
     const limpiarFormulario = () => {
@@ -68,7 +80,7 @@ function EmpleadoContratoCRUD() {
 
     const validar = () => {
         if (!form.tco_fecha_inicio || !form.tco_estado || !form.tic_id) {
-            setError('Campos obligatorios faltantes');
+            setError('Campos obligatorios faltantes: Fecha de inicio, Estado e ID de Empleado son requeridos');
             return false;
         }
         return true;
@@ -78,147 +90,260 @@ function EmpleadoContratoCRUD() {
         try {
             setError('');
             setMensaje('');
-
             if (!validar()) return;
 
             if (modoEdicion && id !== null) {
                 await actualizarContrato(id, form);
-                setMensaje('Contrato actualizado');
+                setMensaje('Contrato actualizado correctamente');
             } else {
                 await crearContrato(form);
-                setMensaje('Contrato creado');
+                setMensaje('Contrato creado correctamente');
             }
 
             limpiarFormulario();
             await cargarDatos();
         } catch (err: any) {
-            setError('Error guardando: ' + err.message);
+            setError('Error al guardar: ' + (err.response?.data?.error || err.message));
         }
     };
 
-    const handleEliminar = async (id: number) => {
-        if (!window.confirm('¿Eliminar contrato?')) return;
-        await eliminarContrato(id);
-        await cargarDatos();
+    const handleEliminar = async (contratoId: number) => {
+        if (!window.confirm('¿Deseas eliminar este contrato?')) return;
+        try {
+            setError('');
+            setMensaje('');
+            await eliminarContrato(contratoId);
+            setMensaje('Contrato eliminado correctamente');
+            if (id === contratoId) limpiarFormulario();
+            await cargarDatos();
+        } catch (err: any) {
+            setError('Error al eliminar: ' + (err.response?.data?.error || err.message));
+        }
     };
 
     const handleEditar = (c: EmpleadoContrato) => {
         setModoEdicion(true);
         setId(c.TCO_ID);
-
+        setMensaje('');
+        setError('');
         setForm({
-            tco_fecha_inicio: c.TCO_FECHA_INICIO,
-            tco_fecha_fin: c.TCO_FECHA_FIN,
+            tco_fecha_inicio: c.TCO_FECHA_INICIO ? String(c.TCO_FECHA_INICIO).split('T')[0] : '',
+            tco_fecha_fin: c.TCO_FECHA_FIN ? String(c.TCO_FECHA_FIN).split('T')[0] : '',
             tco_estado: c.TCO_ESTADO,
-            tic_fecha_modificacion: c.TIC_FECHA_MODIFICACION,
+            tic_fecha_modificacion: c.TIC_FECHA_MODIFICACION ? String(c.TIC_FECHA_MODIFICACION).split('T')[0] : '',
             tic_id: c.TIC_ID
         });
     };
 
-    if (cargando) return <p>Cargando contratos...</p>;
+    const obtenerChipEstado = (estado: string) => {
+        if (estado === 'A') return <Chip label="Activo" color="success" size="small" />;
+        if (estado === 'I') return <Chip label="Inactivo" color="error" size="small" />;
+        return <Chip label={estado} color="default" size="small" />;
+    };
+
+    const formatearFecha = (fecha: string) => {
+        if (!fecha) return '—';
+        return new Date(fecha).toLocaleDateString('es-GT');
+    };
+
+    if (cargando) {
+        return (
+            <Box sx={{ p: 3 }}>
+                <Typography variant="h6">Cargando contratos...</Typography>
+            </Box>
+        );
+    }
 
     return (
-        <div style={{ padding: '20px', fontFamily: 'Arial', color: 'white' }}>
-            <h2>Contratos de Empleado</h2>
+        <Box sx={{ py: 2 }}>
+            {/* Formulario */}
+            <Paper elevation={3} sx={{ p: 3, mb: 3 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 3 }}>
+                    <ArticleIcon color="primary" />
+                    <Typography variant="h4" sx={{ fontWeight: 'bold' }}>
+                        Contratos de Empleado
+                    </Typography>
+                </Box>
 
-            {error && <p style={{ color: 'red' }}>{error}</p>}
-            {mensaje && <p style={{ color: 'green' }}>{mensaje}</p>}
+                <Typography variant="h6" sx={{ mb: 2 }}>
+                    {modoEdicion ? 'Editar contrato' : 'Nuevo contrato'}
+                </Typography>
 
-            <div style={{
-                border: '1px solid #ccc',
-                padding: '16px',
-                borderRadius: '8px',
-                maxWidth: '900px',
-                marginBottom: '20px',
-                backgroundColor: '#222'
-            }}>
-                <h3>{modoEdicion ? 'Editar' : 'Nuevo'} Contrato</h3>
+                <Grid container spacing={2}>
+                    <Grid size={{ xs: 12, md: 6 }}>
+                        <TextField
+                            fullWidth
+                            label="Fecha de inicio"
+                            name="tco_fecha_inicio"
+                            type="date"
+                            value={form.tco_fecha_inicio}
+                            onChange={handleChange}
+                            slotProps={{ inputLabel: { shrink: true } }}
+                            required
+                        />
+                    </Grid>
 
-                <div style={{
-                    display: 'grid',
-                    gap: '12px',
-                    gridTemplateColumns: '1fr 1fr',
-                    justifyItems: 'start'
-                }}>
+                    <Grid size={{ xs: 12, md: 6 }}>
+                        <TextField
+                            fullWidth
+                            label="Fecha de fin"
+                            name="tco_fecha_fin"
+                            type="date"
+                            value={form.tco_fecha_fin}
+                            onChange={handleChange}
+                            slotProps={{ inputLabel: { shrink: true } }}
+                        />
+                    </Grid>
 
-                    {[
-                        { label: 'Fecha inicio', name: 'tco_fecha_inicio', type: 'date' },
-                        { label: 'Fecha fin', name: 'tco_fecha_fin', type: 'date' },
-                        { label: 'Estado (A/I)', name: 'tco_estado', type: 'text' },
-                        { label: 'Fecha modificación', name: 'tic_fecha_modificacion', type: 'date' },
-                        { label: 'Empleado ID', name: 'tic_id', type: 'number' }
-                    ].map((field) => (
-                        <div key={field.name} style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
-                            <label>{field.label}:</label>
-                            <input
-                                type={field.type}
-                                name={field.name}
-                                value={(form as any)[field.name]}
-                                onChange={handleChange}
-                                style={inputStyle}
-                            />
-                        </div>
-                    ))}
+                    <Grid size={{ xs: 12, md: 6 }}>
+                        <TextField
+                            select
+                            fullWidth
+                            label="Estado"
+                            name="tco_estado"
+                            value={form.tco_estado}
+                            onChange={handleChange}
+                            required
+                        >
+                            <MenuItem value="A">Activo</MenuItem>
+                            <MenuItem value="I">Inactivo</MenuItem>
+                        </TextField>
+                    </Grid>
 
-                </div>
+                    <Grid size={{ xs: 12, md: 6 }}>
+                        <TextField
+                            fullWidth
+                            label="Fecha de modificación"
+                            name="tic_fecha_modificacion"
+                            type="date"
+                            value={form.tic_fecha_modificacion}
+                            onChange={handleChange}
+                            slotProps={{ inputLabel: { shrink: true } }}
+                        />
+                    </Grid>
 
-                <div style={{ marginTop: '20px', display: 'flex', gap: '10px' }}>
-                    <button
-                        onClick={guardar}
-                        style={{
-                            padding: '8px 16px',
-                            cursor: 'pointer',
-                            backgroundColor: '#4CAF50',
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: '4px'
-                        }}
-                    >
-                        {modoEdicion ? 'Actualizar' : 'Guardar'}
-                    </button>
+                    <Grid size={{ xs: 12, md: 6 }}>
+                        <TextField
+                            fullWidth
+                            label="ID de Empleado"
+                            name="tic_id"
+                            type="number"
+                            value={form.tic_id}
+                            onChange={handleChange}
+                            required
+                        />
+                    </Grid>
 
-                    <button
-                        onClick={limpiarFormulario}
-                        style={{
-                            padding: '8px 16px',
-                            cursor: 'pointer',
-                            backgroundColor: '#f44336',
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: '4px'
-                        }}
-                    >
-                        Limpiar / Cancelar
-                    </button>
-                </div>
-            </div>
+                    <Grid size={{ xs: 12 }}>
+                        <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mt: 1 }}>
+                            <Button
+                                variant="contained"
+                                startIcon={<SaveIcon />}
+                                onClick={guardar}
+                            >
+                                {modoEdicion ? 'Actualizar' : 'Guardar'}
+                            </Button>
 
-            <table border={1} style={{ width: '100%', color: 'white' }}>
-                <thead>
-                    <tr>
-                        <th>ID</th>
-                        <th>Inicio</th>
-                        <th>Fin</th>
-                        <th>Estado</th>
-                        <th>Acciones</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {datos.map((c) => (
-                        <tr key={c.TCO_ID}>
-                            <td>{c.TCO_ID}</td>
-                            <td>{c.TCO_FECHA_INICIO}</td>
-                            <td>{c.TCO_FECHA_FIN}</td>
-                            <td>{c.TCO_ESTADO}</td>
-                            <td>
-                                <button onClick={() => handleEditar(c)}>Editar</button>
-                                <button onClick={() => handleEliminar(c.TCO_ID)}>Eliminar</button>
-                            </td>
-                        </tr>
-                    ))}
-                </tbody>
-            </table>
-        </div>
+                            <Button
+                                variant="outlined"
+                                color="secondary"
+                                startIcon={<CleaningServicesIcon />}
+                                onClick={limpiarFormulario}
+                            >
+                                Limpiar / Cancelar
+                            </Button>
+                        </Box>
+                    </Grid>
+                </Grid>
+            </Paper>
+
+            {/* Tabla */}
+            <Paper elevation={3} sx={{ p: 3 }}>
+                <Typography variant="h6" sx={{ mb: 2 }}>
+                    Listado de contratos: {datos.length}
+                </Typography>
+
+                <TableContainer>
+                    <Table>
+                        <TableHead>
+                            <TableRow>
+                                <TableCell><strong>ID</strong></TableCell>
+                                <TableCell><strong>Inicio</strong></TableCell>
+                                <TableCell><strong>Fin</strong></TableCell>
+                                <TableCell><strong>Estado</strong></TableCell>
+                                <TableCell><strong>Empleado ID</strong></TableCell>
+                                <TableCell><strong>Acciones</strong></TableCell>
+                            </TableRow>
+                        </TableHead>
+
+                        <TableBody>
+                            {datos.length > 0 ? (
+                                datos.map((c) => (
+                                    <TableRow key={c.TCO_ID} hover>
+                                        <TableCell>{c.TCO_ID}</TableCell>
+                                        <TableCell>{formatearFecha(c.TCO_FECHA_INICIO)}</TableCell>
+                                        <TableCell>{formatearFecha(c.TCO_FECHA_FIN)}</TableCell>
+                                        <TableCell>{obtenerChipEstado(c.TCO_ESTADO)}</TableCell>
+                                        <TableCell>{c.TIC_ID}</TableCell>
+                                        <TableCell>
+                                            <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                                                <Button
+                                                    size="small"
+                                                    variant="outlined"
+                                                    startIcon={<EditIcon />}
+                                                    onClick={() => handleEditar(c)}
+                                                >
+                                                    Editar
+                                                </Button>
+
+                                                <Button
+                                                    size="small"
+                                                    variant="contained"
+                                                    color="error"
+                                                    startIcon={<DeleteIcon />}
+                                                    onClick={() => handleEliminar(c.TCO_ID)}
+                                                >
+                                                    Eliminar
+                                                </Button>
+                                            </Box>
+                                        </TableCell>
+                                    </TableRow>
+                                ))
+                            ) : (
+                                <TableRow>
+                                    <TableCell colSpan={6} align="center">
+                                        No hay contratos registrados
+                                    </TableCell>
+                                </TableRow>
+                            )}
+                        </TableBody>
+                    </Table>
+                </TableContainer>
+            </Paper>
+
+            {/* Snackbars */}
+            <Snackbar
+                open={!!mensaje}
+                autoHideDuration={3000}
+                onClose={() => setMensaje('')}
+                anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+            >
+                <Alert severity="success" onClose={() => setMensaje('')} sx={{ width: '100%' }}>
+                    {mensaje}
+                </Alert>
+            </Snackbar>
+
+            <Snackbar
+                open={!!error}
+                autoHideDuration={4000}
+                onClose={() => setError('')}
+                anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+            >
+                <Alert severity="error" onClose={() => setError('')} sx={{ width: '100%' }}>
+                    {error}
+                </Alert>
+            </Snackbar>
+        </Box>
     );
 }
 

@@ -1,415 +1,382 @@
 import { useEffect, useState } from 'react';
-
 import type { Marcaje, MarcajeForm } from '../interfaces/marcaje';
-
 import {
-
     obtenerMarcajes,
-
     crearMarcaje,
-
     actualizarMarcaje,
-
     eliminarMarcaje
-
 } from '../services/marcaje.service.ts';
 
+import {
+    Alert,
+    Box,
+    Button,
+    Chip,
+    Grid,
+    MenuItem,
+    Paper,
+    Snackbar,
+    Table,
+    TableBody,
+    TableCell,
+    TableContainer,
+    TableHead,
+    TableRow,
+    TextField,
+    Typography
+} from '@mui/material';
 
+import SaveIcon from '@mui/icons-material/Save';
+import CleaningServicesIcon from '@mui/icons-material/CleaningServices';
+import EditIcon from '@mui/icons-material/Edit';
+import DeleteIcon from '@mui/icons-material/Delete';
+import AccessTimeIcon from '@mui/icons-material/AccessTime';
 
 const initialForm: MarcajeForm = {
-
     fecha: '',
-
     entrada: '',
-
     salida: '',
-
     horas_extra: '',
-
     estado: 'Normal',
-
     emp_id: ''
-
 };
 
-
+const ESTADOS = ['Normal', 'Retraso', 'Falta Justificada', 'Permiso'];
 
 function MarcajeCRUD() {
-
     const [datos, setDatos] = useState<Marcaje[]>([]);
-
     const [cargando, setCargando] = useState(true);
-
     const [error, setError] = useState('');
-
     const [mensaje, setMensaje] = useState('');
-
     const [modoEdicion, setModoEdicion] = useState(false);
-
     const [marcajeId, setMarcajeId] = useState<number | null>(null);
-
     const [form, setForm] = useState<MarcajeForm>(initialForm);
 
-
-
     const cargarDatos = async () => {
-
         try {
-
             setCargando(true);
-
             setError('');
-
             const data = await obtenerMarcajes();
-
             setDatos(data);
-
         } catch (err: any) {
-
             setError('Error cargando marcajes: ' + err.message);
-
         } finally {
-
             setCargando(false);
-
         }
-
     };
-
-
 
     useEffect(() => {
-
         cargarDatos();
-
     }, []);
 
-
-
-    const handleChange = (
-
-        e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
-
-    ) => {
-
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const { name, value } = e.target;
-
-        setForm((prev) => ({
-
-            ...prev,
-
-            [name]: value
-
-        }));
-
+        setForm((prev) => ({ ...prev, [name]: value }));
     };
-
-
 
     const limpiarFormulario = () => {
-
         setForm(initialForm);
-
         setModoEdicion(false);
-
         setMarcajeId(null);
-
         setError('');
-
     };
-
-
 
     const validarFormulario = () => {
-
         if (!form.fecha || !form.entrada || !form.emp_id) {
-
-            setError('Fecha, Entrada y ID de Empleado son obligatorios');
-
+            setError('Fecha, Hora de Entrada e ID de Empleado son obligatorios');
             return false;
-
         }
-
         return true;
-
     };
 
-
-
     const guardarMarcaje = async () => {
-
         try {
-
             setError('');
-
             setMensaje('');
-
             if (!validarFormulario()) return;
 
-
-
             if (modoEdicion && marcajeId !== null) {
-
                 await actualizarMarcaje(marcajeId, form);
-
                 setMensaje('Marcaje actualizado correctamente');
-
             } else {
-
                 await crearMarcaje(form);
-
                 setMensaje('Marcaje creado correctamente');
-
             }
 
             limpiarFormulario();
-
             await cargarDatos();
-
         } catch (err: any) {
-
             setError('Error guardando registro: ' + (err.response?.data?.error || err.message));
-
         }
-
     };
-
-
 
     const handleEliminar = async (id: number) => {
-
         if (!window.confirm('¿Deseas eliminar este registro de marcaje?')) return;
-
         try {
-
             setError('');
-
             setMensaje('');
-
             await eliminarMarcaje(id);
-
             setMensaje('Registro eliminado correctamente');
-
+            if (marcajeId === id) limpiarFormulario();
             await cargarDatos();
-
         } catch (err: any) {
-
             setError('Error eliminando registro: ' + (err.response?.data?.error || err.message));
-
         }
-
     };
-
-
 
     const handleEditar = (m: Marcaje) => {
-
         setModoEdicion(true);
-
         setMarcajeId(m.MAR_ID);
-
-        // Formateamos las fechas para los inputs datetime-local y date
-
+        setMensaje('');
+        setError('');
         setForm({
-
             fecha: m.MAR_FECHA ? m.MAR_FECHA.substring(0, 10) : '',
-
             entrada: m.MAR_ENTRADA ? m.MAR_ENTRADA.substring(0, 16) : '',
-
             salida: m.MAR_SALIDA ? m.MAR_SALIDA.substring(0, 16) : '',
-
             horas_extra: m.MAR_HORAS_EXTRA?.toString() || '',
-
             estado: m.MAR_ESTADO || 'Normal',
-
             emp_id: m.EMP_ID?.toString() || ''
-
         });
-
     };
 
+    const obtenerChipEstado = (estado: string) => {
+        const colores: Record<string, 'success' | 'warning' | 'error' | 'info'> = {
+            Normal: 'success',
+            Retraso: 'warning',
+            'Falta Justificada': 'error',
+            Permiso: 'info'
+        };
+        return (
+            <Chip
+                label={estado}
+                color={colores[estado] ?? 'default'}
+                size="small"
+            />
+        );
+    };
 
+    const formatearFecha = (valor?: string) =>
+        valor ? new Date(valor).toLocaleDateString('es-GT') : '—';
 
-    if (cargando) return <p>Cargando marcajes...</p>;
+    const formatearHora = (valor?: string) =>
+        valor ? new Date(valor).toLocaleTimeString('es-GT', { hour: '2-digit', minute: '2-digit' }) : '—';
 
-
+    if (cargando) {
+        return (
+            <Box sx={{ p: 3 }}>
+                <Typography variant="h6">Cargando marcajes...</Typography>
+            </Box>
+        );
+    }
 
     return (
-
-        <div style={{ padding: '20px', fontFamily: 'Arial', color: 'white' }}>
-
-            <h2>CRUD Control de Asistencia (Marcajes)</h2>
-
-            {error && <p style={{ color: '#ff5555' }}>{error}</p>}
-
-            {mensaje && <p style={{ color: '#4CAF50' }}>{mensaje}</p>}
-
-
-
-            <div style={{ border: '1px solid #444', padding: '16px', borderRadius: '8px', maxWidth: '800px', marginBottom: '20px', backgroundColor: '#222' }}>
-
-                <h3>{modoEdicion ? 'Editar Marcaje' : 'Nuevo Marcaje'}</h3>
-
-                <div style={{ display: 'grid', gap: '10px', gridTemplateColumns: '1fr 1fr' }}>
-
-                    <div style={{ display: 'flex', flexDirection: 'column' }}>
-
-                        <label>Empleado ID:</label>
-
-                        <input type="number" name="emp_id" value={form.emp_id} onChange={handleChange} placeholder="ID del empleado" />
-
-                    </div>
-
-                    <div style={{ display: 'flex', flexDirection: 'column' }}>
-
-                        <label>Fecha Jornada:</label>
-
-                        <input type="date" name="fecha" value={form.fecha} onChange={handleChange} />
-
-                    </div>
-
-                    <div style={{ display: 'flex', flexDirection: 'column' }}>
-
-                        <label>Hora Entrada:</label>
-
-                        <input type="datetime-local" name="entrada" value={form.entrada} onChange={handleChange} />
-
-                    </div>
-
-                    <div style={{ display: 'flex', flexDirection: 'column' }}>
-
-                        <label>Hora Salida:</label>
-
-                        <input type="datetime-local" name="salida" value={form.salida} onChange={handleChange} />
-
-                    </div>
-
-                    <div style={{ display: 'flex', flexDirection: 'column' }}>
-
-                        <label>Horas Extra:</label>
-
-                        <input type="number" step="0.01" name="horas_extra" value={form.horas_extra} onChange={handleChange} placeholder="0.00" />
-
-                    </div>
-
-                    <div style={{ display: 'flex', flexDirection: 'column' }}>
-
-                        <label>Estado:</label>
-
-                        <select name="estado" value={form.estado} onChange={handleChange} style={{ padding: '4px' }}>
-
-                            <option value="Normal">Normal</option>
-
-                            <option value="Retraso">Retraso</option>
-
-                            <option value="Falta Justificada">Falta Justificada</option>
-
-                            <option value="Permiso">Permiso</option>
-
-                        </select>
-
-                    </div>
-
-                </div>
-
-
-
-                <div style={{ marginTop: '20px', display: 'flex', gap: '10px' }}>
-
-                    <button onClick={guardarMarcaje} style={{ padding: '8px 16px', cursor: 'pointer', backgroundColor: '#4CAF50', color: 'white', border: 'none', borderRadius: '4px' }}>
-
-                        {modoEdicion ? 'Actualizar' : 'Guardar Marcaje'}
-
-                    </button>
-
-                    <button onClick={limpiarFormulario} style={{ padding: '8px 16px', cursor: 'pointer', backgroundColor: '#f44336', color: 'white', border: 'none', borderRadius: '4px' }}>
-
-                        Cancelar
-
-                    </button>
-
-                </div>
-
-            </div>
-
-
-
-            <table border={1} cellPadding={8} style={{ width: '100%', borderCollapse: 'collapse', color: 'white', borderColor: '#444' }}>
-
-                <thead style={{ backgroundColor: '#333' }}>
-
-                    <tr>
-
-                        <th>ID</th>
-
-                        <th>Emp ID</th>
-
-                        <th>Fecha</th>
-
-                        <th>Entrada</th>
-
-                        <th>Salida</th>
-
-                        <th>Extras</th>
-
-                        <th>Estado</th>
-
-                        <th>Acciones</th>
-
-                    </tr>
-
-                </thead>
-
-                <tbody>
-
-                    {datos.length > 0 ? datos.map((m) => (
-
-                        <tr key={m.MAR_ID}>
-
-                            <td style={{ textAlign: 'center' }}>{m.MAR_ID}</td>
-
-                            <td style={{ textAlign: 'center' }}>{m.EMP_ID}</td>
-
-                            <td>{m.MAR_FECHA ? new Date(m.MAR_FECHA).toLocaleDateString() : '-'}</td>
-
-                            <td>{m.MAR_ENTRADA ? new Date(m.MAR_ENTRADA).toLocaleTimeString() : '-'}</td>
-
-                            <td>{m.MAR_SALIDA ? new Date(m.MAR_SALIDA).toLocaleTimeString() : '-'}</td>
-
-                            <td style={{ textAlign: 'center' }}>{m.MAR_HORAS_EXTRA}</td>
-
-                            <td style={{ textAlign: 'center' }}>{m.MAR_ESTADO}</td>
-
-                            <td style={{ textAlign: 'center' }}>
-
-                                <button onClick={() => handleEditar(m)} style={{ marginRight: '5px' }}>Editar</button>
-
-                                <button onClick={() => handleEliminar(m.MAR_ID)} style={{ backgroundColor: '#ff5555', color: 'white', border: 'none', borderRadius: '3px', cursor: 'pointer' }}>Eliminar</button>
-
-                            </td>
-
-                        </tr>
-
-                    )) : (
-
-                        <tr>
-
-                            <td colSpan={8} style={{ textAlign: 'center' }}>No hay marcajes registrados</td>
-
-                        </tr>
-
-                    )}
-
-                </tbody>
-
-            </table>
-
-        </div>
-
+        <Box sx={{ py: 2 }}>
+            {/* Formulario */}
+            <Paper elevation={3} sx={{ p: 3, mb: 3 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 3 }}>
+                    <AccessTimeIcon color="primary" />
+                    <Typography variant="h4" sx={{ fontWeight: 'bold' }}>
+                        Control de Asistencia (Marcajes)
+                    </Typography>
+                </Box>
+
+                <Typography variant="h6" sx={{ mb: 2 }}>
+                    {modoEdicion ? 'Editar marcaje' : 'Nuevo marcaje'}
+                </Typography>
+
+                <Grid container spacing={2}>
+                    <Grid size={{ xs: 12, md: 6 }}>
+                        <TextField
+                            fullWidth
+                            label="ID de Empleado"
+                            name="emp_id"
+                            type="number"
+                            value={form.emp_id}
+                            onChange={handleChange}
+                            required
+                        />
+                    </Grid>
+
+                    <Grid size={{ xs: 12, md: 6 }}>
+                        <TextField
+                            fullWidth
+                            label="Fecha Jornada"
+                            name="fecha"
+                            type="date"
+                            value={form.fecha}
+                            onChange={handleChange}
+                            slotProps={{ inputLabel: { shrink: true } }}
+                            required
+                        />
+                    </Grid>
+
+                    <Grid size={{ xs: 12, md: 6 }}>
+                        <TextField
+                            fullWidth
+                            label="Hora de Entrada"
+                            name="entrada"
+                            type="datetime-local"
+                            value={form.entrada}
+                            onChange={handleChange}
+                            slotProps={{ inputLabel: { shrink: true } }}
+                            required
+                        />
+                    </Grid>
+
+                    <Grid size={{ xs: 12, md: 6 }}>
+                        <TextField
+                            fullWidth
+                            label="Hora de Salida"
+                            name="salida"
+                            type="datetime-local"
+                            value={form.salida}
+                            onChange={handleChange}
+                            slotProps={{ inputLabel: { shrink: true } }}
+                        />
+                    </Grid>
+
+                    <Grid size={{ xs: 12, md: 6 }}>
+                        <TextField
+                            fullWidth
+                            label="Horas Extra"
+                            name="horas_extra"
+                            type="number"
+                            value={form.horas_extra}
+                            onChange={handleChange}
+                            slotProps={{ htmlInput: { step: 0.01, min: 0 } }}
+                            placeholder="0.00"
+                        />
+                    </Grid>
+
+                    <Grid size={{ xs: 12, md: 6 }}>
+                        <TextField
+                            select
+                            fullWidth
+                            label="Estado"
+                            name="estado"
+                            value={form.estado}
+                            onChange={handleChange}
+                        >
+                            {ESTADOS.map((e) => (
+                                <MenuItem key={e} value={e}>{e}</MenuItem>
+                            ))}
+                        </TextField>
+                    </Grid>
+
+                    <Grid size={{ xs: 12 }}>
+                        <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mt: 1 }}>
+                            <Button
+                                variant="contained"
+                                startIcon={<SaveIcon />}
+                                onClick={guardarMarcaje}
+                            >
+                                {modoEdicion ? 'Actualizar' : 'Guardar Marcaje'}
+                            </Button>
+
+                            <Button
+                                variant="outlined"
+                                color="secondary"
+                                startIcon={<CleaningServicesIcon />}
+                                onClick={limpiarFormulario}
+                            >
+                                Cancelar
+                            </Button>
+                        </Box>
+                    </Grid>
+                </Grid>
+            </Paper>
+
+            {/* Tabla */}
+            <Paper elevation={3} sx={{ p: 3 }}>
+                <Typography variant="h6" sx={{ mb: 2 }}>
+                    Listado de marcajes: {datos.length}
+                </Typography>
+
+                <TableContainer>
+                    <Table>
+                        <TableHead>
+                            <TableRow>
+                                <TableCell><strong>ID</strong></TableCell>
+                                <TableCell><strong>Emp ID</strong></TableCell>
+                                <TableCell><strong>Fecha</strong></TableCell>
+                                <TableCell><strong>Entrada</strong></TableCell>
+                                <TableCell><strong>Salida</strong></TableCell>
+                                <TableCell><strong>Extras</strong></TableCell>
+                                <TableCell><strong>Estado</strong></TableCell>
+                                <TableCell><strong>Acciones</strong></TableCell>
+                            </TableRow>
+                        </TableHead>
+
+                        <TableBody>
+                            {datos.length > 0 ? (
+                                datos.map((m) => (
+                                    <TableRow key={m.MAR_ID} hover>
+                                        <TableCell>{m.MAR_ID}</TableCell>
+                                        <TableCell>{m.EMP_ID}</TableCell>
+                                        <TableCell>{formatearFecha(m.MAR_FECHA)}</TableCell>
+                                        <TableCell>{formatearHora(m.MAR_ENTRADA)}</TableCell>
+                                        <TableCell>{formatearHora(m.MAR_SALIDA)}</TableCell>
+                                        <TableCell>{m.MAR_HORAS_EXTRA ?? '—'}</TableCell>
+                                        <TableCell>{obtenerChipEstado(m.MAR_ESTADO)}</TableCell>
+                                        <TableCell>
+                                            <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                                                <Button
+                                                    size="small"
+                                                    variant="outlined"
+                                                    startIcon={<EditIcon />}
+                                                    onClick={() => handleEditar(m)}
+                                                >
+                                                    Editar
+                                                </Button>
+                                                <Button
+                                                    size="small"
+                                                    variant="contained"
+                                                    color="error"
+                                                    startIcon={<DeleteIcon />}
+                                                    onClick={() => handleEliminar(m.MAR_ID)}
+                                                >
+                                                    Eliminar
+                                                </Button>
+                                            </Box>
+                                        </TableCell>
+                                    </TableRow>
+                                ))
+                            ) : (
+                                <TableRow>
+                                    <TableCell colSpan={8} align="center">
+                                        No hay marcajes registrados
+                                    </TableCell>
+                                </TableRow>
+                            )}
+                        </TableBody>
+                    </Table>
+                </TableContainer>
+            </Paper>
+
+            {/* Snackbars */}
+            <Snackbar
+                open={!!mensaje}
+                autoHideDuration={3000}
+                onClose={() => setMensaje('')}
+                anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+            >
+                <Alert severity="success" onClose={() => setMensaje('')} sx={{ width: '100%' }}>
+                    {mensaje}
+                </Alert>
+            </Snackbar>
+
+            <Snackbar
+                open={!!error}
+                autoHideDuration={4000}
+                onClose={() => setError('')}
+                anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+            >
+                <Alert severity="error" onClose={() => setError('')} sx={{ width: '100%' }}>
+                    {error}
+                </Alert>
+            </Snackbar>
+        </Box>
     );
-
 }
-
-
 
 export default MarcajeCRUD;
