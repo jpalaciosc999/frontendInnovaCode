@@ -40,6 +40,7 @@ import PersonIcon from '@mui/icons-material/Person';
 import EditNoteIcon from '@mui/icons-material/EditNote';
 import InsightsIcon from '@mui/icons-material/Insights';
 import QueryStatsIcon from '@mui/icons-material/QueryStats';
+import ScheduleIcon from '@mui/icons-material/Schedule';
 
 type MenuItemType = {
   text: string;
@@ -74,6 +75,7 @@ const menuItems: MenuItemType[] = [
   { text: 'Usuario Bitácora', path: '/usuario-bitacora', icon: <EditNoteIcon /> },
   { text: 'KPIs', path: '/kpis', icon: <InsightsIcon /> },
   { text: 'Resultados KPI', path: '/kpi-resultado', icon: <QueryStatsIcon /> },
+  { text: 'Horarios', path: '/horarios', icon: <ScheduleIcon /> },
 ];
 
 function Navbar() {
