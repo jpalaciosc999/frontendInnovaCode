@@ -1,14 +1,21 @@
 export interface Usuario {
-    USU_ID: number;
-    USU_NOMBRE: string;
-    USU_CORREO: string;
-    USU_PASSWORD: string;
-    USU_ESTADO: string;
+  id: number;
+  username: string;
+  nombre_completo: string;
+  correo: string;
+  password: string;
+  estado: string;
+  fecha_creacion: string;
+  rol_id: number;
+  emp_id: number;
 }
 
 export interface UsuarioForm {
-    usu_nombre: string;
-    usu_correo: string;
-    usu_password: string;
-    usu_estado: string;
+  username: string;
+  nombre_completo: string;
+  correo: string;
+  password: string;
+  estado: string;
+  rol_id?: number;
+  emp_id?: number;
 }
