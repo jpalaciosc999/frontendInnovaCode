@@ -7,6 +7,36 @@ import {
   eliminarEmpleado
 } from '../services/empleados.service';
 
+import {
+  Alert,
+  Box,
+  Button,
+  Chip,
+  FormControl,
+  Grid,
+  InputLabel,
+  MenuItem,
+  Paper,
+  Select,
+  Snackbar,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  TextField,
+  Typography
+} from '@mui/material';
+
+import type { SelectChangeEvent } from '@mui/material/Select';
+
+import SaveIcon from '@mui/icons-material/Save';
+import CleaningServicesIcon from '@mui/icons-material/CleaningServices';
+import EditIcon from '@mui/icons-material/Edit';
+import DeleteIcon from '@mui/icons-material/Delete';
+import PeopleIcon from '@mui/icons-material/People';
+
 const initialForm: EmpleadoForm = {
   emp_nombre: '',
   emp_apellido: '',
@@ -44,13 +74,15 @@ function PruebaAxios() {
   }, []);
 
   const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
+    e:
+      | React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+      | SelectChangeEvent
   ) => {
     const { name, value } = e.target;
 
     setForm((prev) => ({
       ...prev,
-      [name]: value
+      [name as string]: value
     }));
   };
 
@@ -146,155 +178,246 @@ function PruebaAxios() {
     });
   };
 
-  if (cargando) return <p>Cargando...</p>;
+  const obtenerChipEstado = (estado: string) => {
+    if (estado === 'A') {
+      return <Chip label="Activo" color="success" size="small" />;
+    }
+
+    if (estado === 'I') {
+      return <Chip label="Inactivo" color="default" size="small" />;
+    }
+
+    return <Chip label={estado || 'Sin estado'} size="small" />;
+  };
+
+  if (cargando) {
+    return (
+      <Box sx={{ p: 3 }}>
+        <Typography variant="h6">Cargando empleados...</Typography>
+      </Box>
+    );
+  }
 
   return (
-    <div style={{ padding: '20px', fontFamily: 'Arial' }}>
-      <h2>CRUD de Empleados</h2>
-
-      {error && <p style={{ color: 'red', fontWeight: 'bold' }}>{error}</p>}
-      {mensaje && <p style={{ color: 'green', fontWeight: 'bold' }}>{mensaje}</p>}
-
-      <div
-        style={{
-          border: '1px solid #ccc',
-          borderRadius: '8px',
-          padding: '16px',
-          marginBottom: '24px',
-          maxWidth: '700px'
-        }}
-      >
-        <h3>{modoEdicion ? 'Editar empleado' : 'Nuevo empleado'}</h3>
-
-        <div style={{ display: 'grid', gap: '10px' }}>
-          <input
-            type="text"
-            name="emp_nombre"
-            placeholder="Nombre"
-            value={form.emp_nombre}
-            onChange={handleChange}
-          />
-
-          <input
-            type="text"
-            name="emp_apellido"
-            placeholder="Apellido"
-            value={form.emp_apellido}
-            onChange={handleChange}
-          />
-
-          <input
-            type="text"
-            name="emp_dpi"
-            placeholder="DPI"
-            value={form.emp_dpi}
-            onChange={handleChange}
-          />
-
-          <input
-            type="text"
-            name="emp_nit"
-            placeholder="NIT"
-            value={form.emp_nit}
-            onChange={handleChange}
-          />
-
-          <input
-            type="text"
-            name="emp_telefono"
-            placeholder="Teléfono"
-            value={form.emp_telefono}
-            onChange={handleChange}
-          />
-
-          <input
-            type="date"
-            name="emp_fecha_contratacion"
-            value={form.emp_fecha_contratacion}
-            onChange={handleChange}
-          />
-
-          <select
-            name="emp_estado"
-            value={form.emp_estado}
-            onChange={handleChange}
-          >
-            <option value="">Seleccione estado</option>
-            <option value="A">Activo</option>
-            <option value="I">Inactivo</option>
-          </select>
-
-          <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
-            <button onClick={guardarEmpleado}>
-              {modoEdicion ? 'Actualizar' : 'Guardar'}
-            </button>
-
-            <button onClick={limpiarFormulario}>Limpiar</button>
-          </div>
-        </div>
-      </div>
-
-      <h3>Listado de empleados: {datos.length}</h3>
-
-      <div style={{ overflowX: 'auto' }}>
-        <table
-          border={1}
-          cellPadding={8}
-          cellSpacing={0}
-          style={{ width: '100%', borderCollapse: 'collapse' }}
+    <Box sx={{ py: 2 }}>
+      <Paper elevation={3} sx={{ p: 3, mb: 3 }}>
+        <Box
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 1,
+            mb: 3
+          }}
         >
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>Nombre</th>
-              <th>Apellido</th>
-              <th>DPI</th>
-              <th>NIT</th>
-              <th>Teléfono</th>
-              <th>Fecha contratación</th>
-              <th>Estado</th>
-              <th>Acciones</th>
-            </tr>
-          </thead>
-          <tbody>
-            {datos.length > 0 ? (
-              datos.map((empleado) => (
-                <tr key={empleado.EMP_ID}>
-                  <td>{empleado.EMP_ID}</td>
-                  <td>{empleado.EMP_NOMBRE}</td>
-                  <td>{empleado.EMP_APELLIDO}</td>
-                  <td>{empleado.EMP_DPI}</td>
-                  <td>{empleado.EMP_NIT}</td>
-                  <td>{empleado.EMP_TELEFONO}</td>
-                  <td>
-                    {empleado.EMP_FECHA_CONTRATACION
-                      ? String(empleado.EMP_FECHA_CONTRATACION).slice(0, 10)
-                      : ''}
-                  </td>
-                  <td>{empleado.EMP_ESTADO}</td>
-                  <td>
-                    <div style={{ display: 'flex', gap: '8px' }}>
-                      <button onClick={() => handleEditar(empleado)}>
-                        Editar
-                      </button>
-                      <button onClick={() => handleEliminar(empleado.EMP_ID)}>
-                        Eliminar
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))
-            ) : (
-              <tr>
-                <td colSpan={9} style={{ textAlign: 'center' }}>
-                  No hay empleados registrados
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-    </div>
+          <PeopleIcon color="primary" />
+          <Typography variant="h4" sx={{ fontWeight: 'bold' }}>
+            CRUD de Empleados
+          </Typography>
+        </Box>
+
+        <Typography variant="h6" sx={{ mb: 2 }}>
+          {modoEdicion ? 'Editar empleado' : 'Nuevo empleado'}
+        </Typography>
+
+        <Grid container spacing={2}>
+          <Grid size={{ xs: 12, md: 6 }}>
+            <TextField
+              fullWidth
+              label="Nombre"
+              name="emp_nombre"
+              value={form.emp_nombre}
+              onChange={handleChange}
+            />
+          </Grid>
+
+          <Grid size={{ xs: 12, md: 6 }}>
+            <TextField
+              fullWidth
+              label="Apellido"
+              name="emp_apellido"
+              value={form.emp_apellido}
+              onChange={handleChange}
+            />
+          </Grid>
+
+          <Grid size={{ xs: 12, md: 6 }}>
+            <TextField
+              fullWidth
+              label="DPI"
+              name="emp_dpi"
+              value={form.emp_dpi}
+              onChange={handleChange}
+            />
+          </Grid>
+
+          <Grid size={{ xs: 12, md: 6 }}>
+            <TextField
+              fullWidth
+              label="NIT"
+              name="emp_nit"
+              value={form.emp_nit}
+              onChange={handleChange}
+            />
+          </Grid>
+
+          <Grid size={{ xs: 12, md: 6 }}>
+            <TextField
+              fullWidth
+              label="Teléfono"
+              name="emp_telefono"
+              value={form.emp_telefono}
+              onChange={handleChange}
+            />
+          </Grid>
+
+          <Grid size={{ xs: 12, md: 6 }}>
+            <TextField
+              fullWidth
+              label="Fecha de contratación"
+              name="emp_fecha_contratacion"
+              type="date"
+              value={form.emp_fecha_contratacion}
+              onChange={handleChange}
+              slotProps={{ inputLabel: { shrink: true } }}
+            />
+          </Grid>
+
+          <Grid size={{ xs: 12, md: 6 }}>
+            <FormControl fullWidth>
+              <InputLabel>Estado</InputLabel>
+              <Select
+                name="emp_estado"
+                value={form.emp_estado}
+                label="Estado"
+                onChange={handleChange}
+              >
+                <MenuItem value="">Seleccione estado</MenuItem>
+                <MenuItem value="A">Activo</MenuItem>
+                <MenuItem value="I">Inactivo</MenuItem>
+              </Select>
+            </FormControl>
+          </Grid>
+
+          <Grid size={{ xs: 12 }}>
+            <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mt: 1 }}>
+              <Button
+                variant="contained"
+                startIcon={<SaveIcon />}
+                onClick={guardarEmpleado}
+              >
+                {modoEdicion ? 'Actualizar' : 'Guardar'}
+              </Button>
+
+              <Button
+                variant="outlined"
+                color="secondary"
+                startIcon={<CleaningServicesIcon />}
+                onClick={limpiarFormulario}
+              >
+                Limpiar
+              </Button>
+            </Box>
+          </Grid>
+        </Grid>
+      </Paper>
+
+      <Paper elevation={3} sx={{ p: 3 }}>
+        <Typography variant="h6" sx={{ mb: 2 }}>
+          Listado de empleados: {datos.length}
+        </Typography>
+
+        <TableContainer>
+          <Table>
+            <TableHead>
+              <TableRow>
+                <TableCell><strong>ID</strong></TableCell>
+                <TableCell><strong>Nombre</strong></TableCell>
+                <TableCell><strong>Apellido</strong></TableCell>
+                <TableCell><strong>DPI</strong></TableCell>
+                <TableCell><strong>NIT</strong></TableCell>
+                <TableCell><strong>Teléfono</strong></TableCell>
+                <TableCell><strong>Fecha contratación</strong></TableCell>
+                <TableCell><strong>Estado</strong></TableCell>
+                <TableCell><strong>Acciones</strong></TableCell>
+              </TableRow>
+            </TableHead>
+
+            <TableBody>
+              {datos.length > 0 ? (
+                datos.map((empleado) => (
+                  <TableRow key={empleado.EMP_ID} hover>
+                    <TableCell>{empleado.EMP_ID}</TableCell>
+                    <TableCell>{empleado.EMP_NOMBRE}</TableCell>
+                    <TableCell>{empleado.EMP_APELLIDO}</TableCell>
+                    <TableCell>{empleado.EMP_DPI}</TableCell>
+                    <TableCell>{empleado.EMP_NIT}</TableCell>
+                    <TableCell>{empleado.EMP_TELEFONO}</TableCell>
+                    <TableCell>
+                      {empleado.EMP_FECHA_CONTRATACION
+                        ? String(empleado.EMP_FECHA_CONTRATACION).slice(0, 10)
+                        : ''}
+                    </TableCell>
+                    <TableCell>
+                      {obtenerChipEstado(empleado.EMP_ESTADO)}
+                    </TableCell>
+                    <TableCell>
+                      <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          startIcon={<EditIcon />}
+                          onClick={() => handleEditar(empleado)}
+                        >
+                          Editar
+                        </Button>
+
+                        <Button
+                          size="small"
+                          variant="contained"
+                          color="error"
+                          startIcon={<DeleteIcon />}
+                          onClick={() => handleEliminar(empleado.EMP_ID)}
+                        >
+                          Eliminar
+                        </Button>
+                      </Box>
+                    </TableCell>
+                  </TableRow>
+                ))
+              ) : (
+                <TableRow>
+                  <TableCell colSpan={9} align="center">
+                    No hay empleados registrados
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      </Paper>
+
+      <Snackbar
+        open={!!mensaje}
+        autoHideDuration={3000}
+        onClose={() => setMensaje('')}
+        anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+      >
+        <Alert severity="success" onClose={() => setMensaje('')} sx={{ width: '100%' }}>
+          {mensaje}
+        </Alert>
+      </Snackbar>
+
+      <Snackbar
+        open={!!error}
+        autoHideDuration={4000}
+        onClose={() => setError('')}
+        anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+      >
+        <Alert severity="error" onClose={() => setError('')} sx={{ width: '100%' }}>
+          {error}
+        </Alert>
+      </Snackbar>
+    </Box>
   );
 }
 
