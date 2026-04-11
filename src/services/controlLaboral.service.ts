@@ -1,7 +1,7 @@
 import api from '../api/axios';
 import type { ControlLaboral, ControlLaboralForm } from '../interfaces/controlLaboral';
 
-const ENDPOINT = 'Periodo';
+const ENDPOINT = 'Control';
 
 export const obtenerControles = async (): Promise<ControlLaboral[]> => {
   const res = await api.get<ControlLaboral[]>(ENDPOINT);
