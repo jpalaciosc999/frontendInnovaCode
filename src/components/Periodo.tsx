@@ -8,6 +8,36 @@ import {
   eliminarPeriodo
 } from '../services/periodo.service';
 
+import {
+  Alert,
+  Box,
+  Button,
+  Chip,
+  FormControl,
+  Grid,
+  InputLabel,
+  MenuItem,
+  Paper,
+  Select,
+  Snackbar,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  TextField,
+  Typography
+} from '@mui/material';
+
+import type { SelectChangeEvent } from '@mui/material/Select';
+
+import SaveIcon from '@mui/icons-material/Save';
+import CleaningServicesIcon from '@mui/icons-material/CleaningServices';
+import EditIcon from '@mui/icons-material/Edit';
+import DeleteIcon from '@mui/icons-material/Delete';
+import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
+
 const initialForm: PeriodoForm = {
   fecha_inicio: '',
   fecha_fin: '',
@@ -16,13 +46,13 @@ const initialForm: PeriodoForm = {
 };
 
 function Periodos() {
-  const [datos, setDatos]             = useState<Periodo[]>([]);
-  const [cargando, setCargando]       = useState(true);
-  const [error, setError]             = useState('');
-  const [mensaje, setMensaje]         = useState('');
+  const [datos, setDatos] = useState<Periodo[]>([]);
+  const [cargando, setCargando] = useState(true);
+  const [error, setError] = useState('');
+  const [mensaje, setMensaje] = useState('');
   const [modoEdicion, setModoEdicion] = useState(false);
-  const [perId, setPerId]             = useState<number | null>(null);
-  const [form, setForm]               = useState<PeriodoForm>(initialForm);
+  const [perId, setPerId] = useState<number | null>(null);
+  const [form, setForm] = useState<PeriodoForm>(initialForm);
 
   const cargarPeriodos = async () => {
     try {
@@ -39,9 +69,11 @@ function Periodos() {
 
   useEffect(() => { cargarPeriodos(); }, []);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement> | SelectChangeEvent
+  ) => {
     const { name, value } = e.target;
-    setForm(prev => ({ ...prev, [name]: value }));
+    setForm(prev => ({ ...prev, [name as string]: value }));
   };
 
   const limpiarFormulario = () => {
@@ -56,8 +88,8 @@ function Periodos() {
       setError('Todos los campos son obligatorios');
       return false;
     }
-    if (form.fecha_fin < form.fecha_inicio) {
-      setError('La fecha fin no puede ser menor a la fecha inicio');
+    if (new Date(form.fecha_fin) < new Date(form.fecha_inicio)) {
+      setError('La fecha fin no puede ser anterior a la fecha inicio');
       return false;
     }
     return true;
@@ -65,8 +97,10 @@ function Periodos() {
 
   const guardarPeriodo = async () => {
     try {
-      setError(''); setMensaje('');
+      setError('');
+      setMensaje('');
       if (!validarFormulario()) return;
+
       if (modoEdicion && perId !== null) {
         await actualizarPeriodo(perId, form);
         setMensaje('Periodo actualizado correctamente');
@@ -84,7 +118,8 @@ function Periodos() {
   const handleEliminar = async (id: number) => {
     if (!window.confirm('¿Deseas eliminar este periodo?')) return;
     try {
-      setError(''); setMensaje('');
+      setError('');
+      setMensaje('');
       await eliminarPeriodo(id);
       setMensaje('Periodo eliminado correctamente');
       if (perId === id) limpiarFormulario();
@@ -97,86 +132,199 @@ function Periodos() {
   const handleEditar = (per: Periodo) => {
     setModoEdicion(true);
     setPerId(per.PER_ID);
-    setMensaje(''); setError('');
+    setMensaje('');
+    setError('');
     setForm({
       fecha_inicio: per.PER_FECHA_INICIO?.slice(0, 10) || '',
-      fecha_fin:    per.PER_FECHA_FIN?.slice(0, 10)    || '',
-      fecha_pago:   per.PER_FECHA_PAGO?.slice(0, 10)   || '',
-      estado:       per.PER_ESTADO || ''
+      fecha_fin: per.PER_FECHA_FIN?.slice(0, 10) || '',
+      fecha_pago: per.PER_FECHA_PAGO?.slice(0, 10) || '',
+      estado: per.PER_ESTADO || ''
     });
   };
 
-  if (cargando) return <p>Cargando...</p>;
+  const obtenerChipEstado = (estado: string) => {
+    return estado === 'A'
+      ? <Chip label="Activo" color="success" size="small" />
+      : <Chip label="Inactivo" color="default" size="small" />;
+  };
+
+  if (cargando) {
+    return (
+      <Box sx={{ p: 3, textAlign: 'center' }}>
+        <Typography variant="h6">Cargando periodos...</Typography>
+      </Box>
+    );
+  }
 
   return (
-    <div style={{ padding: '20px', fontFamily: 'Arial' }}>
-      <h2>CRUD de Periodos</h2>
+    <Box sx={{ py: 2 }}>
+      <Paper elevation={3} sx={{ p: 3, mb: 3 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 3 }}>
+          <CalendarMonthIcon color="primary" fontSize="large" />
+          <Typography variant="h4" sx={{ fontWeight: 'bold' }}>
+            Periodos de Planilla
+          </Typography>
+        </Box>
 
-      {error   && <p style={{ color: 'red',   fontWeight: 'bold' }}>{error}</p>}
-      {mensaje && <p style={{ color: 'green', fontWeight: 'bold' }}>{mensaje}</p>}
+        <Typography variant="h6" sx={{ mb: 2 }}>
+          {modoEdicion ? 'Editar Periodo' : 'Nuevo Periodo'}
+        </Typography>
 
-      <div style={{ border: '1px solid #ccc', borderRadius: '8px', padding: '16px', marginBottom: '24px', maxWidth: '700px' }}>
-        <h3>{modoEdicion ? 'Editar periodo' : 'Nuevo periodo'}</h3>
-        <div style={{ display: 'grid', gap: '10px' }}>
-          <label>
-            Fecha Inicio
-            <input type="date" name="fecha_inicio" value={form.fecha_inicio} onChange={handleChange} style={{ display: 'block', width: '100%' }} />
-          </label>
-          <label>
-            Fecha Fin
-            <input type="date" name="fecha_fin" value={form.fecha_fin} onChange={handleChange} style={{ display: 'block', width: '100%' }} />
-          </label>
-          <label>
-            Fecha Pago
-            <input type="date" name="fecha_pago" value={form.fecha_pago} onChange={handleChange} style={{ display: 'block', width: '100%' }} />
-          </label>
-          <select name="estado" value={form.estado} onChange={handleChange}>
-            <option value="">Seleccione estado</option>
-            <option value="A">Activo</option>
-            <option value="I">Inactivo</option>
-          </select>
-          <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
-            <button onClick={guardarPeriodo}>{modoEdicion ? 'Actualizar' : 'Guardar'}</button>
-            <button onClick={limpiarFormulario}>Limpiar</button>
-          </div>
-        </div>
-      </div>
+        <Grid container spacing={3}>
+          <Grid size={{ xs: 12, md: 3 }}>
+            <TextField
+              fullWidth
+              type="date"
+              label="Fecha Inicio"
+              name="fecha_inicio"
+              slotProps={{ inputLabel: { shrink: true } }}
+              value={form.fecha_inicio}
+              onChange={handleChange}
+            />
+          </Grid>
+          <Grid size={{ xs: 12, md: 3 }}>
+            <TextField
+              fullWidth
+              type="date"
+              label="Fecha Fin"
+              name="fecha_fin"
+              slotProps={{ inputLabel: { shrink: true } }}
+              value={form.fecha_fin}
+              onChange={handleChange}
+            />
+          </Grid>
+          <Grid size={{ xs: 12, md: 3 }}>
+            <TextField
+              fullWidth
+              type="date"
+              label="Fecha de Pago"
+              name="fecha_pago"
+              slotProps={{ inputLabel: { shrink: true } }}
+              value={form.fecha_pago}
+              onChange={handleChange}
+            />
+          </Grid>
+          <Grid size={{ xs: 12, md: 3 }}>
+            <FormControl fullWidth>
+              <InputLabel>Estado</InputLabel>
+              <Select
+                name="estado"
+                value={form.estado}
+                label="Estado"
+                onChange={handleChange}
+              >
+                <MenuItem value="">Seleccione</MenuItem>
+                <MenuItem value="A">Activo</MenuItem>
+                <MenuItem value="I">Inactivo</MenuItem>
+              </Select>
+            </FormControl>
+          </Grid>
 
-      <h3>Listado de periodos: {datos.length}</h3>
-      <div style={{ overflowX: 'auto' }}>
-        <table border={1} cellPadding={8} cellSpacing={0} style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>Fecha Inicio</th>
-              <th>Fecha Fin</th>
-              <th>Fecha Pago</th>
-              <th>Estado</th>
-              <th>Acciones</th>
-            </tr>
-          </thead>
-          <tbody>
-            {datos.length > 0 ? datos.map(per => (
-              <tr key={per.PER_ID}>
-                <td>{per.PER_ID}</td>
-                <td>{per.PER_FECHA_INICIO?.slice(0, 10)}</td>
-                <td>{per.PER_FECHA_FIN?.slice(0, 10)}</td>
-                <td>{per.PER_FECHA_PAGO?.slice(0, 10)}</td>
-                <td>{per.PER_ESTADO}</td>
-                <td>
-                  <div style={{ display: 'flex', gap: '8px' }}>
-                    <button onClick={() => handleEditar(per)}>Editar</button>
-                    <button onClick={() => handleEliminar(per.PER_ID)}>Eliminar</button>
-                  </div>
-                </td>
-              </tr>
-            )) : (
-              <tr><td colSpan={6} style={{ textAlign: 'center' }}>No hay periodos registrados</td></tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-    </div>
+          <Grid size={{ xs: 12 }}>
+            <Box sx={{ display: 'flex', gap: 2, mt: 1 }}>
+              <Button
+                variant="contained"
+                startIcon={<SaveIcon />}
+                onClick={guardarPeriodo}
+              >
+                {modoEdicion ? 'Actualizar' : 'Guardar'}
+              </Button>
+              <Button
+                variant="outlined"
+                color="secondary"
+                startIcon={<CleaningServicesIcon />}
+                onClick={limpiarFormulario}
+              >
+                Limpiar
+              </Button>
+            </Box>
+          </Grid>
+        </Grid>
+      </Paper>
+
+      <Paper elevation={3} sx={{ p: 3 }}>
+        <Typography variant="h6" sx={{ mb: 2 }}>
+          Historial de Periodos: {datos.length}
+        </Typography>
+
+        <TableContainer>
+          <Table>
+            <TableHead>
+              <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
+                <TableCell><strong>ID</strong></TableCell>
+                <TableCell><strong>Rango de Fechas</strong></TableCell>
+                <TableCell><strong>Fecha Pago</strong></TableCell>
+                <TableCell><strong>Estado</strong></TableCell>
+                <TableCell align="center"><strong>Acciones</strong></TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {datos.length > 0 ? (
+                datos.map((per) => (
+                  <TableRow key={per.PER_ID} hover>
+                    <TableCell>{per.PER_ID}</TableCell>
+                    <TableCell>
+                      <Typography variant="body2">
+                        {per.PER_FECHA_INICIO?.slice(0, 10)} ⮕ {per.PER_FECHA_FIN?.slice(0, 10)}
+                      </Typography>
+                    </TableCell>
+                    <TableCell>{per.PER_FECHA_PAGO?.slice(0, 10)}</TableCell>
+                    <TableCell>{obtenerChipEstado(per.PER_ESTADO)}</TableCell>
+                    <TableCell align="center">
+                      <Box sx={{ display: 'flex', gap: 1, justifyContent: 'center' }}>
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          startIcon={<EditIcon />}
+                          onClick={() => handleEditar(per)}
+                        >
+                          Editar
+                        </Button>
+                        <Button
+                          size="small"
+                          variant="contained"
+                          color="error"
+                          startIcon={<DeleteIcon />}
+                          onClick={() => handleEliminar(per.PER_ID)}
+                        >
+                          Eliminar
+                        </Button>
+                      </Box>
+                    </TableCell>
+                  </TableRow>
+                ))
+              ) : (
+                <TableRow>
+                  <TableCell colSpan={5} align="center">No hay periodos registrados</TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      </Paper>
+
+      <Snackbar
+        open={!!mensaje}
+        autoHideDuration={3000}
+        onClose={() => setMensaje('')}
+        anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+      >
+        <Alert severity="success" variant="filled" onClose={() => setMensaje('')}>
+          {mensaje}
+        </Alert>
+      </Snackbar>
+
+      <Snackbar
+        open={!!error}
+        autoHideDuration={4000}
+        onClose={() => setError('')}
+        anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+      >
+        <Alert severity="error" variant="filled" onClose={() => setError('')}>
+          {error}
+        </Alert>
+      </Snackbar>
+    </Box>
   );
 }
 

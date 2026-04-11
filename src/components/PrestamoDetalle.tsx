@@ -10,6 +10,36 @@ import {
   eliminarPrestamoDetalle
 } from '../services/prestamoDetalle.service';
 
+import {
+  Alert,
+  Box,
+  Button,
+  Chip,
+  FormControl,
+  Grid,
+  InputLabel,
+  MenuItem,
+  Paper,
+  Select,
+  Snackbar,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  TextField,
+  Typography
+} from '@mui/material';
+
+import type { SelectChangeEvent } from '@mui/material/Select';
+
+import SaveIcon from '@mui/icons-material/Save';
+import CleaningServicesIcon from '@mui/icons-material/CleaningServices';
+import EditIcon from '@mui/icons-material/Edit';
+import DeleteIcon from '@mui/icons-material/Delete';
+import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
+
 const initialForm: PrestamoDetalleForm = {
   pde_numero_cuota: '',
   pde_fecha_pago: '',
@@ -35,7 +65,7 @@ function PrestamoDetalleView() {
       const data = await obtenerPrestamoDetalles();
       setDatos(data);
     } catch (err: any) {
-      setError('Error cargando detalle de préstamos: ' + err.message);
+      setError('Error cargando detalles: ' + err.message);
     } finally {
       setCargando(false);
     }
@@ -46,13 +76,10 @@ function PrestamoDetalleView() {
   }, []);
 
   const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement> | SelectChangeEvent
   ) => {
     const { name, value } = e.target;
-    setForm((prev) => ({
-      ...prev,
-      [name]: value
-    }));
+    setForm((prev) => ({ ...prev, [name as string]: value }));
   };
 
   const limpiarFormulario = () => {
@@ -63,18 +90,11 @@ function PrestamoDetalleView() {
   };
 
   const validarFormulario = () => {
-    if (
-      !form.pde_numero_cuota.trim() ||
-      !form.pde_fecha_pago.trim() ||
-      !form.pde_monto.trim() ||
-      !form.pde_saldo_restante.trim() ||
-      !form.pde_estado.trim() ||
-      !form.pre_id.trim()
-    ) {
+    const fields = Object.values(form);
+    if (fields.some(f => !f.toString().trim())) {
       setError('Todos los campos son obligatorios');
       return false;
     }
-
     return true;
   };
 
@@ -82,48 +102,34 @@ function PrestamoDetalleView() {
     try {
       setError('');
       setMensaje('');
-
       if (!validarFormulario()) return;
 
       if (modoEdicion && detalleId !== null) {
         await actualizarPrestamoDetalle(detalleId, form);
-        setMensaje('Detalle de préstamo actualizado correctamente');
+        setMensaje('Cuota actualizada correctamente');
       } else {
         await crearPrestamoDetalle(form);
-        setMensaje('Detalle de préstamo creado correctamente');
+        setMensaje('Cuota registrada correctamente');
       }
 
       limpiarFormulario();
       await cargarPrestamoDetalles();
     } catch (err: any) {
-      setError(
-        'Error guardando detalle de préstamo: ' +
-          (err.response?.data?.error || err.message)
-      );
+      setError('Error al guardar: ' + (err.response?.data?.error || err.message));
     }
   };
 
   const handleEliminar = async (id: number) => {
-    const confirmar = window.confirm('¿Deseas eliminar este detalle de préstamo?');
-    if (!confirmar) return;
-
+    if (!window.confirm('¿Deseas eliminar este detalle?')) return;
     try {
       setError('');
       setMensaje('');
-
       await eliminarPrestamoDetalle(id);
-      setMensaje('Detalle de préstamo eliminado correctamente');
-
-      if (detalleId === id) {
-        limpiarFormulario();
-      }
-
+      setMensaje('Detalle eliminado correctamente');
+      if (detalleId === id) limpiarFormulario();
       await cargarPrestamoDetalles();
     } catch (err: any) {
-      setError(
-        'Error eliminando detalle de préstamo: ' +
-          (err.response?.data?.error || err.message)
-      );
+      setError('Error al eliminar: ' + (err.response?.data?.error || err.message));
     }
   };
 
@@ -132,12 +138,9 @@ function PrestamoDetalleView() {
     setDetalleId(detalle.PDE_ID);
     setMensaje('');
     setError('');
-
     setForm({
       pde_numero_cuota: String(detalle.PDE_NUMERO_CUOTA || ''),
-      pde_fecha_pago: detalle.PDE_FECHA_PAGO
-        ? String(detalle.PDE_FECHA_PAGO).slice(0, 10)
-        : '',
+      pde_fecha_pago: detalle.PDE_FECHA_PAGO ? String(detalle.PDE_FECHA_PAGO).slice(0, 10) : '',
       pde_monto: String(detalle.PDE_MONTO || ''),
       pde_saldo_restante: String(detalle.PDE_SALDO_RESTANTE || ''),
       pde_estado: detalle.PDE_ESTADO || '',
@@ -145,136 +148,130 @@ function PrestamoDetalleView() {
     });
   };
 
-  if (cargando) return <p>Cargando...</p>;
+  const obtenerChipEstado = (estado: string) => {
+    if (estado === 'C') return <Chip label="Cancelado" color="success" size="small" variant="filled" />;
+    if (estado === 'P') return <Chip label="Pendiente" color="warning" size="small" variant="outlined" />;
+    return <Chip label={estado} size="small" />;
+  };
+
+  if (cargando) {
+    return (
+      <Box sx={{ p: 3, textAlign: 'center' }}>
+        <Typography variant="h6">Cargando detalles de pagos...</Typography>
+      </Box>
+    );
+  }
 
   return (
-    <div style={{ padding: '20px', fontFamily: 'Arial' }}>
-      <h2>CRUD de Detalle de Préstamo</h2>
+    <Box sx={{ py: 2 }}>
+      <Paper elevation={3} sx={{ p: 3, mb: 3 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 3 }}>
+          <ReceiptLongIcon color="primary" fontSize="large" />
+          <Typography variant="h4" sx={{ fontWeight: 'bold' }}>
+            Plan de Pagos / Detalle
+          </Typography>
+        </Box>
 
-      {error && <p style={{ color: 'red', fontWeight: 'bold' }}>{error}</p>}
-      {mensaje && <p style={{ color: 'green', fontWeight: 'bold' }}>{mensaje}</p>}
+        <Typography variant="h6" sx={{ mb: 2 }}>
+          {modoEdicion ? 'Editar Cuota' : 'Registrar Pago / Cuota'}
+        </Typography>
 
-      <div
-        style={{
-          border: '1px solid #ccc',
-          borderRadius: '8px',
-          padding: '16px',
-          marginBottom: '24px',
-          maxWidth: '700px'
-        }}
-      >
-        <h3>{modoEdicion ? 'Editar detalle' : 'Nuevo detalle'}</h3>
+        <Grid container spacing={2}>
+          <Grid size={{ xs: 12, md: 3 }}>
+            <TextField fullWidth type="number" label="ID Préstamo" name="pre_id" value={form.pre_id} onChange={handleChange} />
+          </Grid>
+          <Grid size={{ xs: 12, md: 3 }}>
+            <TextField fullWidth type="number" label="No. Cuota" name="pde_numero_cuota" value={form.pde_numero_cuota} onChange={handleChange} />
+          </Grid>
+          <Grid size={{ xs: 12, md: 3 }}>
+            <TextField fullWidth type="date" label="Fecha de Pago" name="pde_fecha_pago" slotProps={{ inputLabel: { shrink: true } }} value={form.pde_fecha_pago} onChange={handleChange} />
+          </Grid>
+          <Grid size={{ xs: 12, md: 3 }}>
+            <FormControl fullWidth>
+              <InputLabel>Estado</InputLabel>
+              <Select name="pde_estado" value={form.pde_estado} label="Estado" onChange={handleChange}>
+                <MenuItem value="">Seleccione</MenuItem>
+                <MenuItem value="P">Pendiente</MenuItem>
+                <MenuItem value="C">Cancelado</MenuItem>
+              </Select>
+            </FormControl>
+          </Grid>
+          <Grid size={{ xs: 12, md: 6 }}>
+            <TextField fullWidth type="number" label="Monto de Cuota" name="pde_monto" value={form.pde_monto} onChange={handleChange} />
+          </Grid>
+          <Grid size={{ xs: 12, md: 6 }}>
+            <TextField fullWidth type="number" label="Saldo Restante" name="pde_saldo_restante" value={form.pde_saldo_restante} onChange={handleChange} />
+          </Grid>
 
-        <div style={{ display: 'grid', gap: '10px' }}>
-          <input
-            type="number"
-            name="pde_numero_cuota"
-            placeholder="Número de cuota"
-            value={form.pde_numero_cuota}
-            onChange={handleChange}
-          />
+          <Grid size={{ xs: 12 }}>
+            <Box sx={{ display: 'flex', gap: 2, mt: 1 }}>
+              <Button variant="contained" startIcon={<SaveIcon />} onClick={guardarPrestamoDetalle}>
+                {modoEdicion ? 'Actualizar' : 'Guardar'}
+              </Button>
+              <Button variant="outlined" color="secondary" startIcon={<CleaningServicesIcon />} onClick={limpiarFormulario}>
+                Limpiar
+              </Button>
+            </Box>
+          </Grid>
+        </Grid>
+      </Paper>
 
-          <input
-            type="date"
-            name="pde_fecha_pago"
-            value={form.pde_fecha_pago}
-            onChange={handleChange}
-          />
+      <Paper elevation={3} sx={{ p: 3 }}>
+        <Typography variant="h6" sx={{ mb: 2 }}>
+          Historial de Cuotas: {datos.length}
+        </Typography>
 
-          <input
-            type="number"
-            name="pde_monto"
-            placeholder="Monto"
-            value={form.pde_monto}
-            onChange={handleChange}
-          />
+        <TableContainer>
+          <Table>
+            <TableHead>
+              <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
+                <TableCell><strong>ID</strong></TableCell>
+                <TableCell><strong>Préstamo</strong></TableCell>
+                <TableCell><strong>Cuota #</strong></TableCell>
+                <TableCell><strong>Fecha Pago</strong></TableCell>
+                <TableCell><strong>Monto</strong></TableCell>
+                <TableCell><strong>Saldo Rest.</strong></TableCell>
+                <TableCell><strong>Estado</strong></TableCell>
+                <TableCell align="center"><strong>Acciones</strong></TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {datos.length > 0 ? (
+                datos.map((detalle) => (
+                  <TableRow key={detalle.PDE_ID} hover>
+                    <TableCell>{detalle.PDE_ID}</TableCell>
+                    <TableCell sx={{ fontWeight: 'bold', color: 'primary.main' }}>#{detalle.PRE_ID}</TableCell>
+                    <TableCell>{detalle.PDE_NUMERO_CUOTA}</TableCell>
+                    <TableCell>{detalle.PDE_FECHA_PAGO ? String(detalle.PDE_FECHA_PAGO).slice(0, 10) : ''}</TableCell>
+                    <TableCell>Q. {Number(detalle.PDE_MONTO).toLocaleString()}</TableCell>
+                    <TableCell>Q. {Number(detalle.PDE_SALDO_RESTANTE).toLocaleString()}</TableCell>
+                    <TableCell>{obtenerChipEstado(detalle.PDE_ESTADO)}</TableCell>
+                    <TableCell align="center">
+                      <Box sx={{ display: 'flex', gap: 1, justifyContent: 'center' }}>
+                        <Button size="small" variant="outlined" startIcon={<EditIcon />} onClick={() => handleEditar(detalle)}>Editar</Button>
+                        <Button size="small" variant="contained" color="error" startIcon={<DeleteIcon />} onClick={() => handleEliminar(detalle.PDE_ID)}>Eliminar</Button>
+                      </Box>
+                    </TableCell>
+                  </TableRow>
+                ))
+              ) : (
+                <TableRow>
+                  <TableCell colSpan={8} align="center">No hay detalles registrados</TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      </Paper>
 
-          <input
-            type="number"
-            name="pde_saldo_restante"
-            placeholder="Saldo restante"
-            value={form.pde_saldo_restante}
-            onChange={handleChange}
-          />
+      <Snackbar open={!!mensaje} autoHideDuration={3000} onClose={() => setMensaje('')} anchorOrigin={{ vertical: 'top', horizontal: 'right' }}>
+        <Alert severity="success" variant="filled" onClose={() => setMensaje('')}>{mensaje}</Alert>
+      </Snackbar>
 
-          <select
-            name="pde_estado"
-            value={form.pde_estado}
-            onChange={handleChange}
-          >
-            <option value="">Seleccione estado</option>
-            <option value="P">Pendiente</option>
-            <option value="C">Cancelado</option>
-          </select>
-
-          <input
-            type="number"
-            name="pre_id"
-            placeholder="ID préstamo"
-            value={form.pre_id}
-            onChange={handleChange}
-          />
-
-          <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
-            <button onClick={guardarPrestamoDetalle}>
-              {modoEdicion ? 'Actualizar' : 'Guardar'}
-            </button>
-            <button onClick={limpiarFormulario}>Limpiar</button>
-          </div>
-        </div>
-      </div>
-
-      <h3>Listado de detalle de préstamos: {datos.length}</h3>
-
-      <div style={{ overflowX: 'auto' }}>
-        <table
-          border={1}
-          cellPadding={8}
-          cellSpacing={0}
-          style={{ width: '100%', borderCollapse: 'collapse' }}
-        >
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>No. cuota</th>
-              <th>Fecha pago</th>
-              <th>Monto</th>
-              <th>Saldo restante</th>
-              <th>Estado</th>
-              <th>Préstamo ID</th>
-              <th>Acciones</th>
-            </tr>
-          </thead>
-          <tbody>
-            {datos.length > 0 ? (
-              datos.map((detalle) => (
-                <tr key={detalle.PDE_ID}>
-                  <td>{detalle.PDE_ID}</td>
-                  <td>{detalle.PDE_NUMERO_CUOTA}</td>
-                  <td>{detalle.PDE_FECHA_PAGO ? String(detalle.PDE_FECHA_PAGO).slice(0, 10) : ''}</td>
-                  <td>{detalle.PDE_MONTO}</td>
-                  <td>{detalle.PDE_SALDO_RESTANTE}</td>
-                  <td>{detalle.PDE_ESTADO}</td>
-                  <td>{detalle.PRE_ID}</td>
-                  <td>
-                    <div style={{ display: 'flex', gap: '8px' }}>
-                      <button onClick={() => handleEditar(detalle)}>Editar</button>
-                      <button onClick={() => handleEliminar(detalle.PDE_ID)}>Eliminar</button>
-                    </div>
-                  </td>
-                </tr>
-              ))
-            ) : (
-              <tr>
-                <td colSpan={8} style={{ textAlign: 'center' }}>
-                  No hay detalles de préstamo registrados
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-    </div>
+      <Snackbar open={!!error} autoHideDuration={4000} onClose={() => setError('')} anchorOrigin={{ vertical: 'top', horizontal: 'right' }}>
+        <Alert severity="error" variant="filled" onClose={() => setError('')}>{error}</Alert>
+      </Snackbar>
+    </Box>
   );
 }
 
