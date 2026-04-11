@@ -1,7 +1,7 @@
 import api from '../api/axios';
 import type { UsuarioBitacora, UsuarioBitacoraForm } from '../interfaces/usuarioBitacora';
 
-const ENDPOINT = 'usuario-bitacora';
+const ENDPOINT = 'usuarioBitacora';
 
 export const obtenerUsuariosBitacora = async (): Promise<UsuarioBitacora[]> => {
     const response = await api.get<UsuarioBitacora[]>(`${ENDPOINT}/`);
