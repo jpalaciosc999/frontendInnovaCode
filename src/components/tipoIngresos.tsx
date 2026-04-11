@@ -7,6 +7,40 @@ import {
     eliminarIngreso
 } from '../services/tipoIngresos.service';
 
+import {
+    Alert,
+    Box,
+    Button,
+    Card,
+    CardContent,
+    FormControl,
+    Grid,
+    InputLabel,
+    MenuItem,
+    Paper,
+    Select,
+    Snackbar,
+    Table,
+    TableBody,
+    TableCell,
+    TableContainer,
+    TableHead,
+    TableRow,
+    TextField,
+    Typography,
+    InputAdornment
+} from '@mui/material';
+
+import type { SelectChangeEvent } from '@mui/material/Select';
+
+// Iconos
+import PaidIcon from '@mui/icons-material/Paid';
+import SaveIcon from '@mui/icons-material/Save';
+import CleaningServicesIcon from '@mui/icons-material/CleaningServices';
+import EditIcon from '@mui/icons-material/Edit';
+import DeleteIcon from '@mui/icons-material/Delete';
+import EventRepeatIcon from '@mui/icons-material/EventRepeat';
+
 const initialForm: IngresoForm = {
     tis_codigo: '',
     tis_nombre: '',
@@ -43,13 +77,12 @@ function TipoIngresos() {
     }, []);
 
     const handleChange = (
-        e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
+        e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement> | SelectChangeEvent
     ) => {
         const { name, value } = e.target;
-
         setForm((prev) => ({
             ...prev,
-            [name]: name === 'tis_valor_base' ? Number(value) : value
+            [name as string]: name === 'tis_valor_base' ? Number(value) : value
         }));
     };
 
@@ -91,43 +124,25 @@ function TipoIngresos() {
             limpiarFormulario();
             await cargarIngresos();
         } catch (err: any) {
-            setError(
-                'Error guardando ingreso: ' +
-                (err.response?.data?.error || err.message)
-            );
+            setError('Error al guardar: ' + (err.response?.data?.error || err.message));
         }
     };
 
     const handleEliminar = async (id: number) => {
-        const confirmar = window.confirm('¿Deseas eliminar este concepto de ingreso?');
-        if (!confirmar) return;
-
+        if (!window.confirm('¿Deseas eliminar este concepto de ingreso?')) return;
         try {
-            setError('');
-            setMensaje('');
-
+            setError(''); setMensaje('');
             await eliminarIngreso(id);
             setMensaje('Ingreso eliminado correctamente');
-
-            if (ingresoId === id) {
-                limpiarFormulario();
-            }
-
             await cargarIngresos();
         } catch (err: any) {
-            setError(
-                'Error eliminando ingreso: ' +
-                (err.response?.data?.error || err.message)
-            );
+            setError('Error al eliminar: ' + (err.response?.data?.error || err.message));
         }
     };
 
     const handleEditar = (ingreso: Ingreso) => {
         setModoEdicion(true);
         setIngresoId(ingreso.TIS_ID);
-        setMensaje('');
-        setError('');
-
         setForm({
             tis_codigo: ingreso.TIS_CODIGO || '',
             tis_nombre: ingreso.TIS_NOMBRE || '',
@@ -140,142 +155,162 @@ function TipoIngresos() {
         });
     };
 
-    if (cargando) return <p>Cargando ingresos...</p>;
+    if (cargando) return <Box sx={{ p: 5, textAlign: 'center' }}><Typography>Cargando conceptos...</Typography></Box>;
 
     return (
-        <div style={{ padding: '20px', fontFamily: 'Arial' }}>
-            <h2>CRUD de Conceptos de Ingreso</h2>
+        <Box sx={{ py: 3 }}>
+            <Card sx={{ mb: 4, borderRadius: 2 }} elevation={3}>
+                <CardContent sx={{ p: 3 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 3 }}>
+                        <PaidIcon color="primary" fontSize="large" />
+                        <Typography variant="h4" sx={{ fontWeight: 'bold' }}>Conceptos de Ingreso</Typography>
+                    </Box>
 
-            {error && <p style={{ color: 'red', fontWeight: 'bold' }}>{error}</p>}
-            {mensaje && <p style={{ color: 'green', fontWeight: 'bold' }}>{mensaje}</p>}
+                    <Grid container spacing={3}>
+                        <Grid size={{ xs: 12, md: 3 }}>
+                            <TextField
+                                fullWidth
+                                label="Código"
+                                name="tis_codigo"
+                                value={form.tis_codigo}
+                                onChange={handleChange}
+                                placeholder="Ej: BONO01"
+                            />
+                        </Grid>
+                        <Grid size={{ xs: 12, md: 5 }}>
+                            <TextField
+                                fullWidth
+                                label="Nombre del Ingreso"
+                                name="tis_nombre"
+                                value={form.tis_nombre}
+                                onChange={handleChange}
+                            />
+                        </Grid>
+                        <Grid size={{ xs: 12, md: 4 }}>
+                            <TextField
+                                fullWidth
+                                label="Valor Base"
+                                name="tis_valor_base"
+                                type="number"
+                                value={form.tis_valor_base}
+                                onChange={handleChange}
+                                slotProps={{
+                                    input: {
+                                        startAdornment: <InputAdornment position="start">Q</InputAdornment>,
+                                    }
+                                }}
+                            />
+                        </Grid>
+                        <Grid size={{ xs: 12, md: 8 }}>
+                            <TextField
+                                fullWidth
+                                multiline
+                                rows={2}
+                                label="Descripción"
+                                name="tis_descripcion"
+                                value={form.tis_descripcion}
+                                onChange={handleChange}
+                            />
+                        </Grid>
+                        <Grid size={{ xs: 12, md: 2 }}>
+                            <FormControl fullWidth>
+                                <InputLabel>¿Recurrente?</InputLabel>
+                                <Select
+                                    name="tis_es_recurrente"
+                                    value={form.tis_es_recurrente}
+                                    label="¿Recurrente?"
+                                    onChange={handleChange}
+                                >
+                                    <MenuItem value="S">Sí</MenuItem>
+                                    <MenuItem value="N">No</MenuItem>
+                                </Select>
+                            </FormControl>
+                        </Grid>
+                        <Grid size={{ xs: 12, md: 2 }}>
+                            <TextField
+                                fullWidth
+                                type="date"
+                                label="Fecha Modificación"
+                                name="fecha_modificacion"
+                                value={form.fecha_modificacion}
+                                onChange={handleChange}
+                                slotProps={{ inputLabel: { shrink: true } }}
+                            />
+                        </Grid>
 
-            <div
-                style={{
-                    border: '1px solid #ccc',
-                    borderRadius: '8px',
-                    padding: '16px',
-                    marginBottom: '24px',
-                    maxWidth: '700px'
-                }}
-            >
-                <h3>{modoEdicion ? 'Editar Ingreso' : 'Nuevo Ingreso'}</h3>
+                        <Grid size={{ xs: 12 }}>
+                            <Box sx={{ display: 'flex', gap: 2 }}>
+                                <Button variant="contained" startIcon={<SaveIcon />} onClick={guardarIngreso}>
+                                    {modoEdicion ? 'Actualizar' : 'Guardar'}
+                                </Button>
+                                <Button variant="outlined" color="inherit" startIcon={<CleaningServicesIcon />} onClick={limpiarFormulario}>
+                                    Limpiar
+                                </Button>
+                            </Box>
+                        </Grid>
+                    </Grid>
+                </CardContent>
+            </Card>
 
-                <div style={{ display: 'grid', gap: '10px' }}>
-                    <input
-                        type="text"
-                        name="tis_codigo"
-                        placeholder="Código (Ej: BONO01)"
-                        value={form.tis_codigo}
-                        onChange={handleChange}
-                    />
+            <Paper elevation={2} sx={{ borderRadius: 2, overflow: 'hidden' }}>
+                <TableContainer>
+                    <Table size="small">
+                        <TableHead>
+                            <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
+                                <TableCell><strong>ID</strong></TableCell>
+                                <TableCell><strong>Código</strong></TableCell>
+                                <TableCell><strong>Nombre</strong></TableCell>
+                                <TableCell align="right"><strong>Valor Base</strong></TableCell>
+                                <TableCell align="center"><strong>Recurrente</strong></TableCell>
+                                <TableCell><strong>Modificado</strong></TableCell>
+                                <TableCell align="center"><strong>Acciones</strong></TableCell>
+                            </TableRow>
+                        </TableHead>
+                        <TableBody>
+                            {datos.length > 0 ? (
+                                datos.map((ing) => (
+                                    <TableRow key={ing.TIS_ID} hover>
+                                        <TableCell>{ing.TIS_ID}</TableCell>
+                                        <TableCell sx={{ fontWeight: 'bold', color: 'primary.main' }}>{ing.TIS_CODIGO}</TableCell>
+                                        <TableCell>
+                                            <Typography variant="body2">{ing.TIS_NOMBRE}</Typography>
+                                            <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                                                {ing.TIS_DESCRIPCION}
+                                            </Typography>
+                                        </TableCell>
+                                        <TableCell align="right">Q {Number(ing.TIS_VALOR_BASE).toFixed(2)}</TableCell>
+                                        <TableCell align="center">
+                                            {ing.TIS_ES_RECURRENTE === 'S' ?
+                                                <EventRepeatIcon color="success" fontSize="small" /> :
+                                                <Typography variant="caption">Único</Typography>
+                                            }
+                                        </TableCell>
+                                        <TableCell>{ing.FECHA_MODIFICACION ? String(ing.FECHA_MODIFICACION).slice(0, 10) : '-'}</TableCell>
+                                        <TableCell align="center">
+                                            <Box sx={{ display: 'flex', gap: 1, justifyContent: 'center' }}>
+                                                <Button size="small" onClick={() => handleEditar(ing)}><EditIcon fontSize="small" /></Button>
+                                                <Button size="small" color="error" onClick={() => handleEliminar(ing.TIS_ID)}><DeleteIcon fontSize="small" /></Button>
+                                            </Box>
+                                        </TableCell>
+                                    </TableRow>
+                                ))
+                            ) : (
+                                <TableRow>
+                                    <TableCell colSpan={7} align="center" sx={{ py: 3 }}>No hay registros</TableCell>
+                                </TableRow>
+                            )}
+                        </TableBody>
+                    </Table>
+                </TableContainer>
+            </Paper>
 
-                    <input
-                        type="text"
-                        name="tis_nombre"
-                        placeholder="Nombre del Ingreso"
-                        value={form.tis_nombre}
-                        onChange={handleChange}
-                    />
-
-                    <textarea
-                        name="tis_descripcion"
-                        placeholder="Descripción"
-                        value={form.tis_descripcion}
-                        onChange={handleChange}
-                        style={{ fontFamily: 'Arial', padding: '5px' }}
-                    />
-
-                    <input
-                        type="number"
-                        name="tis_valor_base"
-                        placeholder="Valor Base"
-                        value={form.tis_valor_base}
-                        onChange={handleChange}
-                    />
-
-                    <select
-                        name="tis_es_recurrente"
-                        value={form.tis_es_recurrente}
-                        onChange={handleChange}
-                    >
-                        <option value="">¿Es recurrente?</option>
-                        <option value="S">Sí</option>
-                        <option value="N">No</option>
-                    </select>
-
-                    <input
-                        type="date"
-                        name="fecha_modificacion"
-                        value={form.fecha_modificacion}
-                        onChange={handleChange}
-                    />
-
-                    <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
-                        <button onClick={guardarIngreso}>
-                            {modoEdicion ? 'Actualizar' : 'Guardar'}
-                        </button>
-                        <button onClick={limpiarFormulario}>Limpiar</button>
-                    </div>
-                </div>
-            </div>
-
-            <h3>Listado de Ingresos: {datos.length}</h3>
-
-            <div style={{ overflowX: 'auto' }}>
-                <table
-                    border={1}
-                    cellPadding={8}
-                    cellSpacing={0}
-                    style={{ width: '100%', borderCollapse: 'collapse' }}
-                >
-                    <thead>
-                        <tr>
-                            <th>ID</th>
-                            <th>Código</th>
-                            <th>Nombre</th>
-                            <th>Valor Base</th>
-                            <th>Recurrente</th>
-                            <th>Modificado</th>
-                            <th>Acciones</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {datos.length > 0 ? (
-                            datos.map((ingreso) => (
-                                <tr key={ingreso.TIS_ID}>
-                                    <td>{ingreso.TIS_ID}</td>
-                                    <td>{ingreso.TIS_CODIGO}</td>
-                                    <td>{ingreso.TIS_NOMBRE}</td>
-                                    <td>
-                                        Q. {ingreso.TIS_VALOR_BASE != null
-                                            ? Number(ingreso.TIS_VALOR_BASE).toFixed(2)
-                                            : '0.00'}
-                                    </td>
-                                    <td>{ingreso.TIS_ES_RECURRENTE === 'S' ? 'Sí' : 'No'}</td>
-                                    <td>
-                                        {ingreso.FECHA_MODIFICACION
-                                            ? String(ingreso.FECHA_MODIFICACION).slice(0, 10)
-                                            : '-'}
-                                    </td>
-                                    <td>
-                                        <div style={{ display: 'flex', gap: '8px' }}>
-                                            <button onClick={() => handleEditar(ingreso)}>Editar</button>
-                                            <button onClick={() => handleEliminar(ingreso.TIS_ID)}>Eliminar</button>
-                                        </div>
-                                    </td>
-                                </tr>
-                            ))
-                        ) : (
-                            <tr>
-                                <td colSpan={7} style={{ textAlign: 'center' }}>
-                                    No hay ingresos registrados
-                                </td>
-                            </tr>
-                        )}
-                    </tbody>
-                </table>
-            </div>
-        </div>
+            <Snackbar open={!!mensaje} autoHideDuration={3000} onClose={() => setMensaje('')}>
+                <Alert severity="success" variant="filled">{mensaje}</Alert>
+            </Snackbar>
+            <Snackbar open={!!error} autoHideDuration={5000} onClose={() => setError('')}>
+                <Alert severity="error" variant="filled">{error}</Alert>
+            </Snackbar>
+        </Box>
     );
 }
 

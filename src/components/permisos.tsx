@@ -7,6 +7,29 @@ import {
   eliminarPermiso
 } from '../services/permisos.service';
 
+import {
+  Alert,
+  Box,
+  Button,
+  Grid,
+  Paper,
+  Snackbar,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  TextField,
+  Typography
+} from '@mui/material';
+
+import SaveIcon from '@mui/icons-material/Save';
+import CleaningServicesIcon from '@mui/icons-material/CleaningServices';
+import EditIcon from '@mui/icons-material/Edit';
+import DeleteIcon from '@mui/icons-material/Delete';
+import KeyIcon from '@mui/icons-material/Key';
+
 const initialForm: PermisoForm = {
   per_nombre_permiso: '',
   per_modulo: '',
@@ -39,7 +62,7 @@ function Permisos() {
     cargarPermisos();
   }, []);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setForm((prev) => ({ ...prev, [name]: value }));
   };
@@ -88,6 +111,8 @@ function Permisos() {
   const handleEditar = (permiso: Permiso) => {
     setModoEdicion(true);
     setPermisoId(permiso.PERMISOS_ID);
+    setMensaje('');
+    setError('');
     setForm({
       per_nombre_permiso: permiso.PER_NOMBRE_PERMISO || '',
       per_modulo: permiso.PER_MODULO || '',
@@ -99,6 +124,8 @@ function Permisos() {
     if (!window.confirm('¿Deseas eliminar este permiso?')) return;
 
     try {
+      setError('');
+      setMensaje('');
       await eliminarPermiso(id);
       setMensaje('Permiso eliminado correctamente');
       await cargarPermisos();
@@ -107,82 +134,163 @@ function Permisos() {
     }
   };
 
-  if (cargando) return <p>Cargando...</p>;
+  if (cargando) {
+    return (
+      <Box sx={{ p: 3, textAlign: 'center' }}>
+        <Typography variant="h6">Cargando permisos...</Typography>
+      </Box>
+    );
+  }
 
   return (
-    <div style={{ padding: '20px' }}>
-      <h2>CRUD de Permisos</h2>
+    <Box sx={{ py: 2 }}>
+      <Paper elevation={3} sx={{ p: 3, mb: 3 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 3 }}>
+          <KeyIcon color="primary" fontSize="large" />
+          <Typography variant="h4" sx={{ fontWeight: 'bold' }}>
+            Gestión de Permisos
+          </Typography>
+        </Box>
 
-      {error && <p style={{ color: 'red' }}>{error}</p>}
-      {mensaje && <p style={{ color: 'green' }}>{mensaje}</p>}
+        <Typography variant="h6" sx={{ mb: 2 }}>
+          {modoEdicion ? 'Editar permiso' : 'Nuevo permiso'}
+        </Typography>
 
-      <div style={{ border: '1px solid #ccc', padding: '16px', borderRadius: '8px', marginBottom: '24px', maxWidth: '700px' }}>
-        <h3>{modoEdicion ? 'Editar permiso' : 'Nuevo permiso'}</h3>
+        <Grid container spacing={2}>
+          <Grid size={{ xs: 12, md: 6 }}>
+            <TextField
+              fullWidth
+              label="Nombre del Permiso"
+              name="per_nombre_permiso"
+              value={form.per_nombre_permiso}
+              onChange={handleChange}
+            />
+          </Grid>
 
-        <div style={{ display: 'grid', gap: '10px' }}>
-          <input
-            type="text"
-            name="per_nombre_permiso"
-            placeholder="Nombre permiso"
-            value={form.per_nombre_permiso}
-            onChange={handleChange}
-          />
-          <input
-            type="text"
-            name="per_modulo"
-            placeholder="Módulo"
-            value={form.per_modulo}
-            onChange={handleChange}
-          />
-          <input
-            type="text"
-            name="per_descripcion"
-            placeholder="Descripción"
-            value={form.per_descripcion}
-            onChange={handleChange}
-          />
+          <Grid size={{ xs: 12, md: 6 }}>
+            <TextField
+              fullWidth
+              label="Módulo"
+              name="per_modulo"
+              value={form.per_modulo}
+              onChange={handleChange}
+            />
+          </Grid>
 
-          <div style={{ display: 'flex', gap: '10px' }}>
-            <button onClick={guardarPermiso}>
-              {modoEdicion ? 'Actualizar' : 'Guardar'}
-            </button>
-            <button onClick={limpiarFormulario}>Limpiar</button>
-          </div>
-        </div>
-      </div>
+          <Grid size={{ xs: 12 }}>
+            <TextField
+              fullWidth
+              label="Descripción"
+              name="per_descripcion"
+              multiline
+              rows={2}
+              value={form.per_descripcion}
+              onChange={handleChange}
+            />
+          </Grid>
 
-      <table border={1} cellPadding={8} cellSpacing={0} style={{ width: '100%', borderCollapse: 'collapse' }}>
-        <thead>
-          <tr>
-            <th>ID</th>
-            <th>Nombre permiso</th>
-            <th>Módulo</th>
-            <th>Descripción</th>
-            <th>Acciones</th>
-          </tr>
-        </thead>
-        <tbody>
-          {datos.length > 0 ? (
-            datos.map((permiso) => (
-              <tr key={permiso.PERMISOS_ID}>
-                <td>{permiso.PERMISOS_ID}</td>
-                <td>{permiso.PER_NOMBRE_PERMISO}</td>
-                <td>{permiso.PER_MODULO}</td>
-                <td>{permiso.PER_DESCRIPCION}</td>
-                <td>
-                  <button onClick={() => handleEditar(permiso)}>Editar</button>
-                  <button onClick={() => handleEliminar(permiso.PERMISOS_ID)}>Eliminar</button>
-                </td>
-              </tr>
-            ))
-          ) : (
-            <tr>
-              <td colSpan={5}>No hay permisos registrados</td>
-            </tr>
-          )}
-        </tbody>
-      </table>
-    </div>
+          <Grid size={{ xs: 12 }}>
+            <Box sx={{ display: 'flex', gap: 2, mt: 1 }}>
+              <Button
+                variant="contained"
+                startIcon={<SaveIcon />}
+                onClick={guardarPermiso}
+              >
+                {modoEdicion ? 'Actualizar' : 'Guardar'}
+              </Button>
+              <Button
+                variant="outlined"
+                color="secondary"
+                startIcon={<CleaningServicesIcon />}
+                onClick={limpiarFormulario}
+              >
+                Limpiar
+              </Button>
+            </Box>
+          </Grid>
+        </Grid>
+      </Paper>
+
+      <Paper elevation={3} sx={{ p: 3 }}>
+        <Typography variant="h6" sx={{ mb: 2 }}>
+          Listado de permisos registrados: {datos.length}
+        </Typography>
+
+        <TableContainer>
+          <Table>
+            <TableHead>
+              <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
+                <TableCell><strong>ID</strong></TableCell>
+                <TableCell><strong>Nombre</strong></TableCell>
+                <TableCell><strong>Módulo</strong></TableCell>
+                <TableCell><strong>Descripción</strong></TableCell>
+                <TableCell align="center"><strong>Acciones</strong></TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {datos.length > 0 ? (
+                datos.map((permiso) => (
+                  <TableRow key={permiso.PERMISOS_ID} hover>
+                    <TableCell>{permiso.PERMISOS_ID}</TableCell>
+                    <TableCell sx={{ fontWeight: 'medium' }}>{permiso.PER_NOMBRE_PERMISO}</TableCell>
+                    <TableCell>{permiso.PER_MODULO}</TableCell>
+                    <TableCell>{permiso.PER_DESCRIPCION}</TableCell>
+                    <TableCell align="center">
+                      <Box sx={{ display: 'flex', gap: 1, justifyContent: 'center' }}>
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          startIcon={<EditIcon />}
+                          onClick={() => handleEditar(permiso)}
+                        >
+                          Editar
+                        </Button>
+                        <Button
+                          size="small"
+                          variant="contained"
+                          color="error"
+                          startIcon={<DeleteIcon />}
+                          onClick={() => handleEliminar(permiso.PERMISOS_ID)}
+                        >
+                          Eliminar
+                        </Button>
+                      </Box>
+                    </TableCell>
+                  </TableRow>
+                ))
+              ) : (
+                <TableRow>
+                  <TableCell colSpan={5} align="center">No hay permisos registrados</TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      </Paper>
+
+      {/* Alertas */}
+      <Snackbar
+        open={!!mensaje}
+        autoHideDuration={3000}
+        onClose={() => setMensaje('')}
+        anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+      >
+        <Alert severity="success" variant="filled" onClose={() => setMensaje('')}>
+          {mensaje}
+        </Alert>
+      </Snackbar>
+
+      <Snackbar
+        open={!!error}
+        autoHideDuration={4000}
+        onClose={() => setError('')}
+        anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+      >
+        <Alert severity="error" variant="filled" onClose={() => setError('')}>
+          {error}
+        </Alert>
+      </Snackbar>
+    </Box>
   );
 }
 
