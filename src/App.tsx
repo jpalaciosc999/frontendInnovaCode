@@ -19,7 +19,7 @@ import TipoIngresos from './components/tipoIngresos';
 import NominaDetallePage from './components/NominaDetallePage';
 import KPIPage from './components/KPIPage';
 import KPIResultadoPage from './components/KPIResultadoPage';
-import MarcajePage from './components/MarcajePage';
+import MarcajePage from './components/MarcajeCRUD';
 import EmpleadoContrato from './components/EmpleadoContrato';
 import Sede from './components/Sede';
 import Bitacora from './components/Bitacora';
