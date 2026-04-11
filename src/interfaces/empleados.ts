@@ -8,6 +8,7 @@ export interface Empleado {
   EMP_FECHA_CONTRATACION: string;
   EMP_ESTADO: string;
   DEP_ID?: number;
+  HOR_ID?: number;
 }
 
 export interface EmpleadoForm {
@@ -19,4 +20,5 @@ export interface EmpleadoForm {
   emp_fecha_contratacion: string;
   emp_estado: string;
   dep_id: string;
+  hor_id: string;
 }
