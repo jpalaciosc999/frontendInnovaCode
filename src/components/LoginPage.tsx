@@ -3,6 +3,33 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { loginUsuario } from '../services/authService';
 
+const pickUsuarioValue = (usuario: Record<string, unknown>, keys: string[]) => {
+  for (const key of keys) {
+    const value = usuario[key];
+    if (value !== undefined && value !== null && String(value).trim() !== '') return value;
+  }
+  return undefined;
+};
+
+const loginWithCredentialFallback = async (credential: string, password: string) => {
+  const baseRequest = {
+    username: credential,
+    correo: credential,
+    password,
+  };
+
+  try {
+    return await loginUsuario(baseRequest);
+  } catch (error) {
+    if (!credential.includes('@')) throw error;
+
+    return loginUsuario({
+      ...baseRequest,
+      username: credential.split('@')[0],
+    });
+  }
+};
+
 const LoginPage = () => {
   const [email, setEmail] = useState('');
   const [contrasena, setContrasena] = useState('');
@@ -22,16 +49,23 @@ const LoginPage = () => {
     }
     setLoading(true);
     try {
-      const response = await loginUsuario({
-  username: email,
-  password: contrasena,
-});
+      const credential = email.trim();
+      const response = await loginWithCredentialFallback(credential, contrasena);
 
-login(response.token, {
-  ...response.usuario,
-  email: response.usuario.correo,
-rol: String(response.usuario.rol_id),
-});
+      const usuario = response.usuario as unknown as Record<string, unknown>;
+      const rolId = pickUsuarioValue(usuario, ['rol_id', 'ROL_ID']);
+      const rolNombre = pickUsuarioValue(usuario, ['rol_nombre', 'ROL_NOMBRE', 'rol', 'role']);
+      const correo = pickUsuarioValue(usuario, ['correo', 'CORREO', 'email', 'EMAIL']);
+
+      login(response.token, {
+        ...response.usuario,
+        id: Number(pickUsuarioValue(usuario, ['id', 'ID', 'USU_ID', 'usu_id']) ?? response.usuario.id),
+        email: String(correo ?? ''),
+        correo: String(correo ?? ''),
+        rol: String(rolNombre ?? rolId ?? ''),
+        rol_id: rolId !== undefined ? Number(rolId) : undefined,
+        rol_nombre: rolNombre !== undefined ? String(rolNombre) : undefined,
+      });
 
       navigate('/');
     } catch (err: any) {
@@ -345,13 +379,13 @@ rol: String(response.usuario.rol_id),
 
           <form onSubmit={handleSubmit} noValidate>
             <div className="lp-field">
-              <label className="lp-label" htmlFor="email">Correo electrónico</label>
+              <label className="lp-label" htmlFor="email">Usuario o correo electrónico</label>
               <div className="lp-input-wrap">
                 <input
                   id="email"
                   type="email"
                   className="lp-input"
-                  placeholder="admin@innovahome.com"
+                  placeholder="usuario@empresa.com"
                   value={email}
                   onChange={e => setEmail(e.target.value)}
                   autoComplete="email"

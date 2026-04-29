@@ -16,6 +16,7 @@ import {
 } from '@mui/material';
 
 import MenuIcon from '@mui/icons-material/Menu';
+import LogoutIcon from '@mui/icons-material/Logout';
 import HomeIcon from '@mui/icons-material/Home';
 import PeopleIcon from '@mui/icons-material/People';
 import BusinessIcon from '@mui/icons-material/Business';
@@ -50,6 +51,7 @@ import DownloadIcon from '@mui/icons-material/Download';
 import FolderIcon from '@mui/icons-material/Folder';
 import ExpandLess from '@mui/icons-material/ExpandLess';
 import ExpandMore from '@mui/icons-material/ExpandMore';
+import { useAuth } from '../context/AuthContext';
 
 type MenuItemType = {
   text: string;
@@ -153,6 +155,13 @@ function Navbar() {
   });
 
   const location = useLocation();
+  const { canAccessPath, logout, user } = useAuth();
+  const visibleSections = menuSections
+    .map((section) => ({
+      ...section,
+      items: section.items.filter((item) => canAccessPath(item.path)),
+    }))
+    .filter((section) => section.items.length > 0);
 
   const toggleDrawer = (state: boolean) => () => {
     setOpen(state);
@@ -223,6 +232,18 @@ function Navbar() {
           <Typography variant="h6" sx={{ fontWeight: 700 }}>
             Frontend Innova
           </Typography>
+
+          <Box sx={{ flexGrow: 1 }} />
+
+          {user && (
+            <Typography variant="body2" sx={{ mr: 1, display: { xs: 'none', sm: 'block' } }}>
+              {user.nombre_completo || user.email}
+            </Typography>
+          )}
+
+          <IconButton color="inherit" title="Cerrar sesión" onClick={logout}>
+            <LogoutIcon />
+          </IconButton>
         </Toolbar>
       </AppBar>
 
@@ -260,7 +281,7 @@ function Navbar() {
 
             <Divider sx={{ my: 0.5 }} />
 
-            {menuSections.map((section) => {
+            {visibleSections.map((section) => {
               const isSectionActive = section.items.some(
                 (item) => item.path === location.pathname
               );

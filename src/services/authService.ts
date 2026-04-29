@@ -2,6 +2,7 @@ import api from '../api/axios';
 
 export type LoginRequest = {
   username: string;
+  correo?: string;
   password: string;
 };
 
