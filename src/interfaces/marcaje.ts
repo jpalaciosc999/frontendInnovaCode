@@ -2,20 +2,16 @@ export interface Marcaje {
   MAR_ID: number;
   MAR_FECHA: string;
   MAR_ENTRADA: string;
-  MAR_SALIDA: string;
-  MAR_HORAS_EXTRA: number;
-  MAR_ESTADO: string;
+  MAR_SALIDA: string | null; // Puede ser null si aún no marca salida
   EMP_ID: number;
+  MAR_AUTORIZACION: number; // 0 para No, 1 para Sí 
   EMP_NOMBRE?: string;
   EMP_APELLIDO?: string;
-  HOR_DESCRIPCION?: string;
+  DIFERENCIA_HORAS?: string; // Para el cálculo hh:mm:ss [cite: 12]
 }
 
+// Interfaz para el estado del formulario simplificado
 export interface MarcajeForm {
-  fecha: string;
-  entrada: string;
-  salida: string;
-  horas_extra: string | number;
-  estado: string;
-  emp_id: string | number;
+  emp_id: number;
+  fecha: string; // Solo para visualización [cite: 7]
 }
