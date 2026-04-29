@@ -64,8 +64,6 @@ function MarcajeCRUD() {
 
   const [cargando, setCargando] = useState(true);
   const [cargandoEmpleados, setCargandoEmpleados] = useState(false);
-  const [cargandoHorarios, setCargandoHorarios] = useState(false);
-
   const [error, setError] = useState('');
   const [mensaje, setMensaje] = useState('');
 
@@ -104,15 +102,12 @@ function MarcajeCRUD() {
 
   const cargarHorarios = async () => {
     try {
-      setCargandoHorarios(true);
-      const data = await obtenerHorarios();
-      setHorarios(data);
-    } catch (err: any) {
-      setError('Error cargando horarios: ' + (err.response?.data?.error || err.message));
-    } finally {
-      setCargandoHorarios(false);
-    }
-  };
+    const data = await obtenerHorarios();
+    setHorarios(data);
+  } catch (err: any) {
+    setError('Error cargando horarios: ' + (err.response?.data?.error || err.message));
+  }
+};
 
   useEffect(() => {
     cargarDatos();

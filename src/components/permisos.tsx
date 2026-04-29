@@ -29,6 +29,8 @@ import CleaningServicesIcon from '@mui/icons-material/CleaningServices';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import KeyIcon from '@mui/icons-material/Key';
+import AutoFixHighIcon from '@mui/icons-material/AutoFixHigh';
+import { suggestedPermissions } from '../config/permissionSuggestions';
 
 const initialForm: PermisoForm = {
   per_nombre_permiso: '',
@@ -108,6 +110,41 @@ function Permisos() {
     }
   };
 
+  const crearPermisosSugeridos = async () => {
+    try {
+      setError('');
+      setMensaje('');
+
+      const permisosExistentes = new Set(
+        datos.map((permiso) => permiso.PER_NOMBRE_PERMISO.trim().toUpperCase())
+      );
+
+      const faltantes = suggestedPermissions.filter(
+        (permiso) => !permisosExistentes.has(permiso.nombre)
+      );
+
+      if (faltantes.length === 0) {
+        setMensaje('Todos los permisos sugeridos ya existen');
+        return;
+      }
+
+      await Promise.all(
+        faltantes.map((permiso) =>
+          crearPermiso({
+            per_nombre_permiso: permiso.nombre,
+            per_modulo: permiso.modulo,
+            per_descripcion: permiso.descripcion,
+          })
+        )
+      );
+
+      setMensaje(`Permisos sugeridos creados: ${faltantes.length}`);
+      await cargarPermisos();
+    } catch (err: any) {
+      setError('Error creando permisos sugeridos: ' + (err.response?.data?.error || err.message));
+    }
+  };
+
   const handleEditar = (permiso: Permiso) => {
     setModoEdicion(true);
     setPermisoId(permiso.PERMISOS_ID);
@@ -155,6 +192,10 @@ function Permisos() {
         <Typography variant="h6" sx={{ mb: 2 }}>
           {modoEdicion ? 'Editar permiso' : 'Nuevo permiso'}
         </Typography>
+
+        <Alert severity="info" sx={{ mb: 2 }}>
+          Puedes crear permisos manualmente o generar el catalogo sugerido para los roles del sistema.
+        </Alert>
 
         <Grid container spacing={2}>
           <Grid size={{ xs: 12, md: 6 }}>
@@ -205,6 +246,13 @@ function Permisos() {
                 onClick={limpiarFormulario}
               >
                 Limpiar
+              </Button>
+              <Button
+                variant="outlined"
+                startIcon={<AutoFixHighIcon />}
+                onClick={crearPermisosSugeridos}
+              >
+                Crear permisos sugeridos
               </Button>
             </Box>
           </Grid>
