@@ -9,6 +9,7 @@ import LoginPage from './components/LoginPage';
 import Navbar from './components/Navbar';
 import AccessDenied from './components/common/AccessDenied';
 import PendingView from './components/common/PendingView';
+
 import Home from './pages/Home';
 import PruebaAxios from './components/PruebaAxios';
 import Departamentos from './components/Departamentos';
@@ -37,11 +38,10 @@ import TipoContrato from './components/TipoContrato';
 import UsuarioBitacora from './components/UsuarioBitacora';
 import HorarioCRUD from './components/HorarioCRUD';
 import CalculadoraIgss from './components/CalculadoraIgss';
-import CalculadoraISR from './components/CalculadoraIsr'; 
-import GenerarCSV from './components/Generarcsv';   
 import CalculadoraIsr from './components/CalculadoraIsr';
-import GenerarCSV from './components/Generarcsv';
 import SuspensionIgss from './components/SuspensionIgss';
+import GenerarCSV from './components/Generarcsv';
+
 import {
   AUTH_USER_CHANGED_EVENT,
   allViews,
@@ -62,52 +62,72 @@ function GuardedRoute({
   const view = allViews.find((item) => item.path === path);
 
   if (!canAccessPath(path, currentRole)) {
-    return <AccessDenied requiredRoles={view?.roles.map((role) => roleLabels[role])} />;
+    return (
+      <AccessDenied
+        requiredRoles={view?.roles.map((role) => roleLabels[role])}
+      />
+    );
   }
 
   return children;
 }
 
-// Layout con Navbar — solo se muestra en rutas protegidas
-function Layout() {
+function Layout({ currentRole }: { currentRole: ReturnType<typeof getCurrentUserRole> }) {
+  const guarded = (path: string, element: ReactNode) => (
+    <GuardedRoute path={path} currentRole={currentRole}>
+      {element}
+    </GuardedRoute>
+  );
+
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: 'grey.100' }}>
       <Navbar />
+
       <Container maxWidth="xl" sx={{ py: 3 }}>
         <Routes>
           <Route path="/" element={<Home />} />
-          <Route path="/empleados" element={<PruebaAxios />} />
-          <Route path="/departamentos" element={<Departamentos />} />
-          <Route path="/puestos" element={<Puestos />} />
-          <Route path="/prestamos" element={<Prestamos />} />
-          <Route path="/prestamo-detalle" element={<PrestamoDetalleView />} />
-          <Route path="/permisos" element={<Permisos />} />
-          <Route path="/rol-permisos" element={<RolPermisosView />} />
-          <Route path="/roles" element={<Roles />} />
-          <Route path="/periodo" element={<Periodo />} />
-          <Route path="/control-laboral" element={<ControlLaboral />} />
-          <Route path="/cuenta-bancaria" element={<CuentaBancaria />} />
-          <Route path="/descuentos" element={<Descuentos />} />
-          <Route path="/tipo-ingresos" element={<TipoIngresos />} />
-          <Route path="/nomina-detalle" element={<NominaDetallePage />} />
-          <Route path="/kpis" element={<KPIPage />} />
-          <Route path="/kpi-resultado" element={<KPIResultadoPage />} />
-          <Route path="/marcajes" element={<MarcajePage />} />
-          <Route path="/empleado-contrato" element={<EmpleadoContrato />} />
-          <Route path="/sede" element={<Sede />} />
-          <Route path="/bitacora" element={<Bitacora />} />
-          <Route path="/liquidacion" element={<Liquidacion />} />
-          <Route path="/nomina" element={<Nomina />} />
-          <Route path="/usuarios" element={<Usuario />} />
-          <Route path="/tipo-contrato" element={<TipoContrato />} />
-          <Route path="/usuario-bitacora" element={<UsuarioBitacora />} />
-          <Route path="/horarios" element={<HorarioCRUD />} />
-          <Route path="/calculadora-igss" element={<CalculadoraIgss />} />
-          <Route path="/calculadora-isr" element={<CalculadoraIsr />} />
-          <Route path="/suspensiones-igss" element={<SuspensionIgss />} />
-          <Route path="/tipos-descuento" element={<Descuentos />} />
-          <Route path="/prestamos-banco" element={<Prestamos />} />
-          <Route path="/generar-csv" element={<GenerarCSV />} />
+
+          <Route path="/empleados" element={guarded('/empleados', <PruebaAxios />)} />
+          <Route path="/departamentos" element={guarded('/departamentos', <Departamentos />)} />
+          <Route path="/puestos" element={guarded('/puestos', <Puestos />)} />
+          <Route path="/prestamos" element={guarded('/prestamos', <Prestamos />)} />
+          <Route path="/prestamo-detalle" element={guarded('/prestamo-detalle', <PrestamoDetalleView />)} />
+          <Route path="/permisos" element={guarded('/permisos', <Permisos />)} />
+          <Route path="/rol-permisos" element={guarded('/rol-permisos', <RolPermisosView />)} />
+          <Route path="/roles" element={guarded('/roles', <Roles />)} />
+          <Route path="/periodo" element={guarded('/periodo', <Periodo />)} />
+          <Route path="/control-laboral" element={guarded('/control-laboral', <ControlLaboral />)} />
+          <Route path="/cuenta-bancaria" element={guarded('/cuenta-bancaria', <CuentaBancaria />)} />
+          <Route path="/descuentos" element={guarded('/descuentos', <Descuentos />)} />
+          <Route path="/tipo-ingresos" element={guarded('/tipo-ingresos', <TipoIngresos />)} />
+          <Route path="/nomina-detalle" element={guarded('/nomina-detalle', <NominaDetallePage />)} />
+          <Route path="/kpis" element={guarded('/kpis', <KPIPage />)} />
+          <Route path="/kpi-resultado" element={guarded('/kpi-resultado', <KPIResultadoPage />)} />
+          <Route path="/marcajes" element={guarded('/marcajes', <MarcajePage />)} />
+          <Route path="/empleado-contrato" element={guarded('/empleado-contrato', <EmpleadoContrato />)} />
+          <Route path="/sede" element={guarded('/sede', <Sede />)} />
+          <Route path="/sucursales" element={guarded('/sucursales', <Sede />)} />
+          <Route path="/bitacora" element={guarded('/bitacora', <Bitacora />)} />
+          <Route path="/liquidacion" element={guarded('/liquidacion', <Liquidacion />)} />
+          <Route path="/nomina" element={guarded('/nomina', <Nomina />)} />
+          <Route path="/usuarios" element={guarded('/usuarios', <Usuario />)} />
+          <Route path="/tipo-contrato" element={guarded('/tipo-contrato', <TipoContrato />)} />
+          <Route path="/usuario-bitacora" element={guarded('/usuario-bitacora', <UsuarioBitacora />)} />
+          <Route path="/horarios" element={guarded('/horarios', <HorarioCRUD />)} />
+          <Route path="/calculadora-igss" element={guarded('/calculadora-igss', <CalculadoraIgss />)} />
+          <Route path="/calculadora-isr" element={guarded('/calculadora-isr', <CalculadoraIsr />)} />
+          <Route path="/suspensiones-igss" element={guarded('/suspensiones-igss', <SuspensionIgss />)} />
+          <Route path="/tipos-descuento" element={guarded('/tipos-descuento', <Descuentos />)} />
+          <Route path="/prestamos-banco" element={guarded('/prestamos-banco', <Prestamos />)} />
+          <Route path="/generar-csv" element={guarded('/generar-csv', <GenerarCSV />)} />
+
+          <Route path="/resumen-marcaje" element={guarded('/resumen-marcaje', <PendingView title="Resumen de Marcaje" roleName="RRHH" />)} />
+          <Route path="/registro-vacaciones" element={guarded('/registro-vacaciones', <PendingView title="Registro de Vacaciones" roleName="RRHH" />)} />
+          <Route path="/isr" element={guarded('/isr', <PendingView title="ISR" roleName="Contabilidad" />)} />
+          <Route path="/irtra" element={guarded('/irtra', <PendingView title="IRTRA" roleName="Contabilidad" />)} />
+          <Route path="/intecap" element={guarded('/intecap', <PendingView title="INTECAP" roleName="Contabilidad" />)} />
+          <Route path="/aprobacion-nomina" element={guarded('/aprobacion-nomina', <PendingView title="Aprobación de Nómina" roleName="Gerente" />)} />
+
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Container>
@@ -130,72 +150,18 @@ function App() {
     };
   }, []);
 
-  const guarded = (path: string, element: ReactNode) => (
-    <GuardedRoute path={path} currentRole={currentRole}>
-      {element}
-    </GuardedRoute>
-  );
-
   return (
     <AuthProvider>
       <CssBaseline />
+
       <Routes>
-        {/* Ruta pública: sin Navbar */}
         <Route path="/login" element={<LoginPage />} />
 
-        {/* Rutas protegidas: si no hay token redirige a /login */}
         <Route element={<ProtectedRoute />}>
-          <Route path="/*" element={<Layout />} />
+          <Route path="/*" element={<Layout currentRole={currentRole} />} />
         </Route>
 
-        <Container maxWidth="xl" sx={{ py: 3 }}>
-          <Routes>
-            <Route path="/" element={<Home />} />
-            <Route path="/empleados" element={guarded('/empleados', <PruebaAxios />)} />
-            <Route path="/departamentos" element={guarded('/departamentos', <Departamentos />)} />
-            <Route path="/puestos" element={guarded('/puestos', <Puestos />)} />
-            <Route path="/prestamos" element={guarded('/prestamos', <Prestamos />)} />
-            <Route path="/prestamo-detalle" element={guarded('/prestamo-detalle', <PrestamoDetalleView />)} />
-            <Route path="/permisos" element={guarded('/permisos', <Permisos />)} />
-            <Route path="/rol-permisos" element={guarded('/rol-permisos', <RolPermisosView />)} />
-            <Route path="/roles" element={guarded('/roles', <Roles />)} />
-            <Route path="/periodo" element={guarded('/periodo', <Periodo />)} />
-            <Route path="/control-laboral" element={guarded('/control-laboral', <ControlLaboral />)} />
-            <Route path="/cuenta-bancaria" element={guarded('/cuenta-bancaria', <CuentaBancaria />)} />
-            <Route path="/descuentos" element={guarded('/descuentos', <Descuentos />)} />
-            <Route path="/tipo-ingresos" element={guarded('/tipo-ingresos', <TipoIngresos />)} />
-            <Route path="/nomina-detalle" element={guarded('/nomina-detalle', <NominaDetallePage />)} />
-            <Route path="/kpis" element={guarded('/kpis', <KPIPage />)} />
-            <Route path="/kpi-resultado" element={guarded('/kpi-resultado', <KPIResultadoPage />)} />
-            <Route path="/marcajes" element={guarded('/marcajes', <MarcajePage />)} />
-            <Route path="/empleado-contrato" element={guarded('/empleado-contrato', <EmpleadoContrato />)} />
-            <Route path="/sede" element={guarded('/sede', <Sede />)} />
-            <Route path="/sucursales" element={guarded('/sucursales', <Sede />)} />
-            <Route path="/bitacora" element={guarded('/bitacora', <Bitacora />)} />
-            <Route path="/liquidacion" element={guarded('/liquidacion', <Liquidacion />)} />
-            <Route path="/nomina" element={guarded('/nomina', <Nomina />)} />
-            <Route path="/usuarios" element={guarded('/usuarios', <Usuario />)} />
-            <Route path="/tipo-contrato" element={guarded('/tipo-contrato', <TipoContrato />)} />
-            <Route path="/usuario-bitacora" element={guarded('/usuario-bitacora', <UsuarioBitacora />)} />
-            <Route path="/horarios" element={guarded('/horarios', <HorarioCRUD />)} />
-            <Route path="/calculadora-igss" element={guarded('/calculadora-igss', <CalculadoraIgss />)} />
-            <Route path="/calculadora-isr" element={guarded('/calculadora-isr', <CalculadoraISR />)} />
-            <Route path="/suspensiones-igss" element={guarded('/suspensiones-igss', <SuspensionIgss />)} />
-            <Route path="/tipos-descuento" element={guarded('/tipos-descuento', <Descuentos />)} />
-            <Route path="/prestamos-banco" element={guarded('/prestamos-banco', <Prestamos />)} />
-            <Route path="/generar-csv" element={guarded('/generar-csv', <GenerarCSV />)} />
-            <Route path="/resumen-marcaje" element={guarded('/resumen-marcaje', <PendingView title="Resumen de Marcaje" roleName="RRHH" />)} />
-            <Route path="/registro-vacaciones" element={guarded('/registro-vacaciones', <PendingView title="Registro de Vacaciones" roleName="RRHH" />)} />
-            <Route path="/isr" element={guarded('/isr', <PendingView title="ISR" roleName="Contabilidad" />)} />
-            <Route path="/irtra" element={guarded('/irtra', <PendingView title="IRTRA" roleName="Contabilidad" />)} />
-            <Route path="/intecap" element={guarded('/intecap', <PendingView title="INTECAP" roleName="Contabilidad" />)} />
-            <Route path="/aprobacion-nomina" element={guarded('/aprobacion-nomina', <PendingView title="Aprobacion de Nomina" roleName="Gerente" />)} />
-          </Routes>
-        </Container>
-      </Box>
-    </>
-        {/* Cualquier ruta desconocida va al login */}
-      <Route path="*" element={<Navigate to="/login" replace />} />
+        <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
     </AuthProvider>
   );
