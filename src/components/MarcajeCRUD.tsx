@@ -64,7 +64,7 @@ function MarcajeCRUD() {
 
   const [cargando, setCargando] = useState(true);
   const [cargandoEmpleados, setCargandoEmpleados] = useState(false);
-  const [cargandoHorarios, setCargandoHorarios] = useState(false);
+  const [, setCargandoHorarios] = useState(false);
 
   const [error, setError] = useState('');
   const [mensaje, setMensaje] = useState('');
