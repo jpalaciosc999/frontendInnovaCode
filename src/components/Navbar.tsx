@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import type { ReactNode } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import {
   AppBar,
@@ -13,9 +14,11 @@ import {
   Box,
   Divider,
   Collapse,
+  Chip,
 } from '@mui/material';
 
 import MenuIcon from '@mui/icons-material/Menu';
+import LogoutIcon from '@mui/icons-material/Logout';
 import HomeIcon from '@mui/icons-material/Home';
 import PeopleIcon from '@mui/icons-material/People';
 import BusinessIcon from '@mui/icons-material/Business';
@@ -24,21 +27,18 @@ import SecurityIcon from '@mui/icons-material/Security';
 import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
 import AccountTreeIcon from '@mui/icons-material/AccountTree';
 import PaymentsIcon from '@mui/icons-material/Payments';
-import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
 import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
-import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import AccountBalanceIcon from '@mui/icons-material/AccountBalance';
-import TrendingUpIcon from '@mui/icons-material/TrendingUp';
-import MoneyOffIcon from '@mui/icons-material/MoneyOff';
 import AssignmentIcon from '@mui/icons-material/Assignment';
+import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
 import FactCheckIcon from '@mui/icons-material/FactCheck';
-import BadgeIcon from '@mui/icons-material/Badge';
 import ApartmentIcon from '@mui/icons-material/Apartment';
+import BadgeIcon from '@mui/icons-material/Badge';
+import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import HistoryIcon from '@mui/icons-material/History';
+import EditNoteIcon from '@mui/icons-material/EditNote';
 import DescriptionIcon from '@mui/icons-material/Description';
 import GroupIcon from '@mui/icons-material/Group';
-import PersonIcon from '@mui/icons-material/Person';
-import EditNoteIcon from '@mui/icons-material/EditNote';
 import InsightsIcon from '@mui/icons-material/Insights';
 import QueryStatsIcon from '@mui/icons-material/QueryStats';
 import ScheduleIcon from '@mui/icons-material/Schedule';
@@ -46,113 +46,126 @@ import HealthAndSafetyIcon from '@mui/icons-material/HealthAndSafety';
 import GavelIcon from '@mui/icons-material/Gavel';
 import MedicalServicesIcon from '@mui/icons-material/MedicalServices';
 import PercentIcon from '@mui/icons-material/Percent';
-import DownloadIcon from '@mui/icons-material/Download';
 import FolderIcon from '@mui/icons-material/Folder';
 import ExpandLess from '@mui/icons-material/ExpandLess';
 import ExpandMore from '@mui/icons-material/ExpandMore';
+import SummarizeIcon from '@mui/icons-material/Summarize';
+import EventAvailableIcon from '@mui/icons-material/EventAvailable';
+import ApprovalIcon from '@mui/icons-material/Approval';
+import UserRoleSelector from './UserRoleSelector';
+import {
+  AUTH_USER_CHANGED_EVENT,
+  appViews,
+  getCurrentUserRole,
+  roleLabels,
+  roleOrder,
+} from '../config/roleViews';
+import type { AppRole } from '../config/roleViews';
+import { useAuth } from '../context/AuthContext';
 
 type MenuItemType = {
   text: string;
   path: string;
-  icon: React.ReactNode;
+  icon: ReactNode;
 };
 
 type MenuSectionType = {
   key: string;
   text: string;
-  icon: React.ReactNode;
+  icon: ReactNode;
   items: MenuItemType[];
 };
 
-const menuSections: MenuSectionType[] = [
-  {
-    key: 'configuracion',
-    text: 'Configuración Inicial',
-    icon: <FolderIcon />,
-    items: [
-      { text: 'Empleados', path: '/empleados', icon: <PeopleIcon /> },
-      { text: 'Usuarios', path: '/usuarios', icon: <GroupIcon /> },
-      { text: 'Roles', path: '/roles', icon: <AccountTreeIcon /> },
-      { text: 'Permisos', path: '/permisos', icon: <SecurityIcon /> },
-      { text: 'Rol Permisos', path: '/rol-permisos', icon: <AdminPanelSettingsIcon /> },
-      { text: 'Departamentos', path: '/departamentos', icon: <BusinessIcon /> },
-      { text: 'Puestos', path: '/puestos', icon: <WorkIcon /> },
-      { text: 'Sede', path: '/sede', icon: <ApartmentIcon /> },
-      { text: 'Horarios', path: '/horarios', icon: <ScheduleIcon /> },
-      { text: 'Tipo Contrato', path: '/tipo-contrato', icon: <PersonIcon /> },
-      { text: 'Empleado Contrato', path: '/empleado-contrato', icon: <BadgeIcon /> },
-      { text: 'Cuenta Bancaria', path: '/cuenta-bancaria', icon: <AccountBalanceIcon /> },
-      { text: 'Tipos Descuento', path: '/tipos-descuento', icon: <PercentIcon /> },
-    ],
-  },
-  {
-    key: 'nomina',
-    text: 'Nómina',
-    icon: <FolderIcon />,
-    items: [
-      { text: 'Nómina', path: '/nomina', icon: <DescriptionIcon /> },
-      { text: 'Nómina Detalle', path: '/nomina-detalle', icon: <AssignmentIcon /> },
-      { text: 'Periodo', path: '/periodo', icon: <CalendarMonthIcon /> },
-      { text: 'Ingresos', path: '/tipo-ingresos', icon: <TrendingUpIcon /> },
-      { text: 'Descuentos', path: '/descuentos', icon: <MoneyOffIcon /> },
-      { text: 'Liquidación', path: '/liquidacion', icon: <DescriptionIcon /> },
-    ],
-  },
-  {
-    key: 'operaciones',
-    text: 'Operaciones',
-    icon: <FolderIcon />,
-    items: [
-      { text: 'Marcajes', path: '/marcajes', icon: <FactCheckIcon /> },
-      { text: 'Control Laboral', path: '/control-laboral', icon: <AccessTimeIcon /> },
-      { text: 'Préstamos', path: '/prestamos', icon: <PaymentsIcon /> },
-      { text: 'Detalle Préstamo', path: '/prestamo-detalle', icon: <ReceiptLongIcon /> },
-      { text: 'Préstamos Banco', path: '/prestamos-banco', icon: <AccountBalanceIcon /> },
-    ],
-  },
-  {
-    key: 'calculos',
-    text: 'Cálculos y Procesos',
-    icon: <FolderIcon />,
-    items: [
-      { text: 'Calculadora IGSS', path: '/calculadora-igss', icon: <HealthAndSafetyIcon /> },
-      { text: 'Calculadora ISR', path: '/calculadora-isr', icon: <GavelIcon /> },
-      { text: 'Suspensiones IGSS', path: '/suspensiones-igss', icon: <MedicalServicesIcon /> },
-      { text: 'Generar CSV Depósito', path: '/generar-csv', icon: <DownloadIcon /> },
-    ],
-  },
-  {
-    key: 'reportes',
-    text: 'Indicadores y Reportes',
-    icon: <FolderIcon />,
-    items: [
-      { text: 'KPIs', path: '/kpis', icon: <InsightsIcon /> },
-      { text: 'Resultados KPI', path: '/kpi-resultado', icon: <QueryStatsIcon /> },
-    ],
-  },
-  {
-    key: 'auditoria',
-    text: 'Auditoría',
-    icon: <FolderIcon />,
-    items: [
-      { text: 'Bitácora', path: '/bitacora', icon: <HistoryIcon /> },
-      { text: 'Usuario Bitácora', path: '/usuario-bitacora', icon: <EditNoteIcon /> },
-    ],
-  },
-];
+const viewIcons: Record<string, ReactNode> = {
+  marcaje: <FactCheckIcon />,
+  'resumen-marcaje': <SummarizeIcon />,
+  'registro-empleados': <PeopleIcon />,
+  departamentos: <BusinessIcon />,
+  puestos: <WorkIcon />,
+  sucursales: <ApartmentIcon />,
+  horarios: <ScheduleIcon />,
+  'cuenta-bancaria': <AccountBalanceIcon />,
+  kpis: <InsightsIcon />,
+  'kpi-resultado': <QueryStatsIcon />,
+  'suspensiones-igss': <MedicalServicesIcon />,
+  'registro-vacaciones': <EventAvailableIcon />,
+  'control-laboral': <AccessTimeIcon />,
+  'empleado-contrato': <BadgeIcon />,
+  'tipo-contrato': <BadgeIcon />,
+  'asignacion-roles': <AccountTreeIcon />,
+  'asignacion-permisos': <SecurityIcon />,
+  'registro-usuarios': <GroupIcon />,
+  'roles-permisos': <AdminPanelSettingsIcon />,
+  bitacora: <HistoryIcon />,
+  'usuario-bitacora': <EditNoteIcon />,
+  nomina: <DescriptionIcon />,
+  'nomina-detalle': <AssignmentIcon />,
+  periodos: <CalendarMonthIcon />,
+  'tipo-ingresos': <PaymentsIcon />,
+  descuentos: <PercentIcon />,
+  isr: <PercentIcon />,
+  irtra: <PercentIcon />,
+  intecap: <PercentIcon />,
+  prestamos: <PaymentsIcon />,
+  'prestamo-detalle': <ReceiptLongIcon />,
+  liquidacion: <DescriptionIcon />,
+  'calculadora-igss': <HealthAndSafetyIcon />,
+  'calculadora-isr': <GavelIcon />,
+  'tipos-descuento': <PercentIcon />,
+  'prestamos-banco': <AccountBalanceIcon />,
+  'generar-csv': <DescriptionIcon />,
+  'aprobacion-nomina': <ApprovalIcon />,
+};
+
+const buildMenuSections = (currentRole: AppRole | null): MenuSectionType[] =>
+  roleOrder
+    .filter((role) => !currentRole || currentRole === 'SUPREMO' || role === currentRole)
+    .map((role) => ({
+      key: role,
+      text: `Rol ${roleLabels[role]}`,
+      icon: <FolderIcon />,
+      items: appViews
+        .filter((view) => view.roles.includes(role))
+        .map((view) => ({
+          text: view.text,
+          path: view.path,
+          icon: viewIcons[view.key] ?? <FolderIcon />,
+        })),
+    }))
+    .filter((section) => section.items.length > 0);
 
 function Navbar() {
   const [open, setOpen] = useState(false);
+  const [currentRole, setCurrentRole] = useState(getCurrentUserRole());
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
-    configuracion: true,
-    nomina: true,
-    operaciones: true,
-    calculos: false,
-    reportes: false,
-    auditoria: false,
+    EMPLEADO: true,
+    RRHH: true,
+    ADMIN: true,
+    CONTABILIDAD: true,
+    GERENTE: true,
   });
 
   const location = useLocation();
+  const menuSections = useMemo(() => buildMenuSections(currentRole), [currentRole]);
+
+  useEffect(() => {
+    const syncCurrentRole = () => setCurrentRole(getCurrentUserRole());
+
+    window.addEventListener(AUTH_USER_CHANGED_EVENT, syncCurrentRole);
+    window.addEventListener('storage', syncCurrentRole);
+
+    return () => {
+      window.removeEventListener(AUTH_USER_CHANGED_EVENT, syncCurrentRole);
+      window.removeEventListener('storage', syncCurrentRole);
+    };
+  }, []);
+  const { canAccessPath, logout, user } = useAuth();
+  const visibleSections = menuSections
+    .map((section) => ({
+      ...section,
+      items: section.items.filter((item) => canAccessPath(item.path)),
+    }))
+    .filter((section) => section.items.length > 0);
 
   const toggleDrawer = (state: boolean) => () => {
     setOpen(state);
@@ -223,6 +236,18 @@ function Navbar() {
           <Typography variant="h6" sx={{ fontWeight: 700 }}>
             Frontend Innova
           </Typography>
+
+          <Box sx={{ flexGrow: 1 }} />
+
+          {user && (
+            <Typography variant="body2" sx={{ mr: 1, display: { xs: 'none', sm: 'block' } }}>
+              {user.nombre_completo || user.email}
+            </Typography>
+          )}
+
+          <IconButton color="inherit" title="Cerrar sesión" onClick={logout}>
+            <LogoutIcon />
+          </IconButton>
         </Toolbar>
       </AppBar>
 
@@ -230,16 +255,26 @@ function Navbar() {
         <Box sx={{ width: 310 }} role="presentation">
           <Box sx={{ p: 2 }}>
             <Typography variant="h6" sx={{ fontWeight: 700 }}>
-              Menú principal
+              Menu principal
             </Typography>
-            <Typography variant="body2" color="text.secondary">
-              Navegación del sistema
-            </Typography>
+            {currentRole ? (
+              <Chip size="small" label={`Rol: ${roleLabels[currentRole]}`} sx={{ mt: 1 }} />
+            ) : (
+              <Typography variant="body2" color="text.secondary">
+                Navegacion del sistema
+              </Typography>
+            )}
           </Box>
 
           <Divider />
 
           <List>
+            <Box sx={{ px: 2, py: 1.5 }}>
+              <UserRoleSelector onUserChanged={() => setCurrentRole(getCurrentUserRole())} />
+            </Box>
+
+            <Divider sx={{ my: 0.5 }} />
+
             <ListItemButton
               component={NavLink}
               to="/"
@@ -260,7 +295,7 @@ function Navbar() {
 
             <Divider sx={{ my: 0.5 }} />
 
-            {menuSections.map((section) => {
+            {visibleSections.map((section) => {
               const isSectionActive = section.items.some(
                 (item) => item.path === location.pathname
               );

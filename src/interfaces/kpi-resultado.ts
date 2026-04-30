@@ -4,6 +4,7 @@ export interface KPIResultado {
     KRE_CALCULO: number;
     KRE_FECHA: string;
     KPI_ID: number;
+    EMP_ID?: number;
 }
 
 export interface KPIResultadoForm {
@@ -11,4 +12,5 @@ export interface KPIResultadoForm {
     kre_calculo: string;
     kre_fecha: string;
     kpi_id: string;
+    emp_id?: string;
 }

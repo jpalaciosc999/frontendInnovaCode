@@ -1,7 +1,15 @@
-import { Routes, Route } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import type { ReactNode } from 'react';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import { Box, Container, CssBaseline } from '@mui/material';
 
+import { AuthProvider } from './context/AuthContext';
+import ProtectedRoute from './components/ProtectedRoute';
+import LoginPage from './components/LoginPage';
 import Navbar from './components/Navbar';
+import AccessDenied from './components/common/AccessDenied';
+import PendingView from './components/common/PendingView';
+
 import Home from './pages/Home';
 import PruebaAxios from './components/PruebaAxios';
 import Departamentos from './components/Departamentos';
@@ -34,9 +42,116 @@ import CalculadoraISR from './components/CalculadoraIsr';
 import GenerarCSV from './components/Generarcsv';
 import SuspensionIgss from './components/SuspensionIgss';
 
-function App() {
+import {
+  AUTH_USER_CHANGED_EVENT,
+  allViews,
+  canAccessPath,
+  getCurrentUserRole,
+  roleLabels,
+} from './config/roleViews';
+
+function GuardedRoute({
+  path,
+  currentRole,
+  children,
+}: {
+  path: string;
+  currentRole: ReturnType<typeof getCurrentUserRole>;
+  children: ReactNode;
+}) {
+  const view = allViews.find((item) => item.path === path);
+
+  if (!canAccessPath(path, currentRole)) {
+    return (
+      <AccessDenied
+        requiredRoles={view?.roles.map((role) => roleLabels[role])}
+      />
+    );
+  }
+
+  return children;
+}
+
+function Layout({ currentRole }: { currentRole: ReturnType<typeof getCurrentUserRole> }) {
+  const guarded = (path: string, element: ReactNode) => (
+    <GuardedRoute path={path} currentRole={currentRole}>
+      {element}
+    </GuardedRoute>
+  );
+
   return (
-    <>
+    <Box sx={{ minHeight: '100vh', bgcolor: 'grey.100' }}>
+      <Navbar />
+
+      <Container maxWidth="xl" sx={{ py: 3 }}>
+        <Routes>
+          <Route path="/" element={<Home />} />
+
+          <Route path="/empleados" element={guarded('/empleados', <PruebaAxios />)} />
+          <Route path="/departamentos" element={guarded('/departamentos', <Departamentos />)} />
+          <Route path="/puestos" element={guarded('/puestos', <Puestos />)} />
+          <Route path="/prestamos" element={guarded('/prestamos', <Prestamos />)} />
+          <Route path="/prestamo-detalle" element={guarded('/prestamo-detalle', <PrestamoDetalleView />)} />
+          <Route path="/permisos" element={guarded('/permisos', <Permisos />)} />
+          <Route path="/rol-permisos" element={guarded('/rol-permisos', <RolPermisosView />)} />
+          <Route path="/roles" element={guarded('/roles', <Roles />)} />
+          <Route path="/periodo" element={guarded('/periodo', <Periodo />)} />
+          <Route path="/control-laboral" element={guarded('/control-laboral', <ControlLaboral />)} />
+          <Route path="/cuenta-bancaria" element={guarded('/cuenta-bancaria', <CuentaBancaria />)} />
+          <Route path="/descuentos" element={guarded('/descuentos', <Descuentos />)} />
+          <Route path="/tipo-ingresos" element={guarded('/tipo-ingresos', <TipoIngresos />)} />
+          <Route path="/nomina-detalle" element={guarded('/nomina-detalle', <NominaDetallePage />)} />
+          <Route path="/kpis" element={guarded('/kpis', <KPIPage />)} />
+          <Route path="/kpi-resultado" element={guarded('/kpi-resultado', <KPIResultadoPage />)} />
+          <Route path="/marcajes" element={guarded('/marcajes', <MarcajePage />)} />
+          <Route path="/empleado-contrato" element={guarded('/empleado-contrato', <EmpleadoContrato />)} />
+          <Route path="/sede" element={guarded('/sede', <Sede />)} />
+          <Route path="/sucursales" element={guarded('/sucursales', <Sede />)} />
+          <Route path="/bitacora" element={guarded('/bitacora', <Bitacora />)} />
+          <Route path="/liquidacion" element={guarded('/liquidacion', <Liquidacion />)} />
+          <Route path="/nomina" element={guarded('/nomina', <Nomina />)} />
+          <Route path="/usuarios" element={guarded('/usuarios', <Usuario />)} />
+          <Route path="/tipo-contrato" element={guarded('/tipo-contrato', <TipoContrato />)} />
+          <Route path="/usuario-bitacora" element={guarded('/usuario-bitacora', <UsuarioBitacora />)} />
+          <Route path="/horarios" element={guarded('/horarios', <HorarioCRUD />)} />
+          <Route path="/calculadora-igss" element={guarded('/calculadora-igss', <CalculadoraIgss />)} />
+          <Route path="/calculadora-isr" element={guarded('/calculadora-isr', <CalculadoraIsr />)} />
+          <Route path="/suspensiones-igss" element={guarded('/suspensiones-igss', <SuspensionIgss />)} />
+          <Route path="/tipos-descuento" element={guarded('/tipos-descuento', <Descuentos />)} />
+          <Route path="/prestamos-banco" element={guarded('/prestamos-banco', <Prestamos />)} />
+          <Route path="/generar-csv" element={guarded('/generar-csv', <GenerarCSV />)} />
+
+          <Route path="/resumen-marcaje" element={guarded('/resumen-marcaje', <PendingView title="Resumen de Marcaje" roleName="RRHH" />)} />
+          <Route path="/registro-vacaciones" element={guarded('/registro-vacaciones', <PendingView title="Registro de Vacaciones" roleName="RRHH" />)} />
+          <Route path="/isr" element={guarded('/isr', <PendingView title="ISR" roleName="Contabilidad" />)} />
+          <Route path="/irtra" element={guarded('/irtra', <PendingView title="IRTRA" roleName="Contabilidad" />)} />
+          <Route path="/intecap" element={guarded('/intecap', <PendingView title="INTECAP" roleName="Contabilidad" />)} />
+          <Route path="/aprobacion-nomina" element={guarded('/aprobacion-nomina', <PendingView title="Aprobación de Nómina" roleName="Gerente" />)} />
+
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </Container>
+    </Box>
+  );
+}
+
+function App() {
+  const [currentRole, setCurrentRole] = useState(getCurrentUserRole());
+
+  useEffect(() => {
+    const syncCurrentRole = () => setCurrentRole(getCurrentUserRole());
+
+    window.addEventListener(AUTH_USER_CHANGED_EVENT, syncCurrentRole);
+    window.addEventListener('storage', syncCurrentRole);
+
+    return () => {
+      window.removeEventListener(AUTH_USER_CHANGED_EVENT, syncCurrentRole);
+      window.removeEventListener('storage', syncCurrentRole);
+    };
+  }, []);
+
+  return (
+    <AuthProvider>
       <CssBaseline />
 
       <Box sx={{ minHeight: '100vh', bgcolor: 'grey.100' }}>
@@ -81,6 +196,16 @@ function App() {
         </Container>
       </Box>
     </>
+      <Routes>
+        <Route path="/login" element={<LoginPage />} />
+
+        <Route element={<ProtectedRoute />}>
+          <Route path="/*" element={<Layout currentRole={currentRole} />} />
+        </Route>
+
+        <Route path="*" element={<Navigate to="/login" replace />} />
+      </Routes>
+    </AuthProvider>
   );
 }
 

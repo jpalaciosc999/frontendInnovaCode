@@ -103,6 +103,19 @@ function MarcajeCRUD() {
       }
     };
 
+  const [cargando, setCargando] = useState(true);
+  const [cargandoEmpleados, setCargandoEmpleados] = useState(false);
+  const [, setCargandoHorarios] = useState(false);
+  const [error, setError] = useState('');
+  const [mensaje, setMensaje] = useState('');
+  const [modoEdicion, setModoEdicion] = useState(false);
+  const [marcajeId, setMarcajeId] = useState<number | null>(null);
+  const [form, setForm] = useState<MarcajeForm>(initialForm);
+  const [modalEmpleados, setModalEmpleados] = useState(false);
+  const [filtroEmpleado, setFiltroEmpleado] = useState('');
+  const [empleadoNombre, setEmpleadoNombre] = useState('');
+
+
     cargarCatalogos();
   }, []);
 
@@ -126,6 +139,14 @@ function MarcajeCRUD() {
       setCargandoMas(false);
     }
   }, [empleadoSeleccionado]);
+
+    const data = await obtenerHorarios();
+    setHorarios(data);
+  } catch (err: any) {
+    setError('Error cargando horarios: ' + (err.response?.data?.error || err.message));
+  }
+};
+
 
   useEffect(() => { cargarDatos(0); }, [cargarDatos]);
 
@@ -159,7 +180,7 @@ function MarcajeCRUD() {
   const handleAutorizar = async (idMarcaje: number, estado: number) => {
     try {
       await updateMarcaje(idMarcaje, estado);
-      alert(estado === 1 ? "Autorizado ✅" : "Rechazado ❌");
+      alert(estado === 1 ? "Autorizado" : "Rechazado");
       cargarDatos(0); // Recarga para ver el cambio
     } catch (err: any) {
       alert(err.response?.data?.message || "Error al actualizar la autorización.");
@@ -268,6 +289,36 @@ function MarcajeCRUD() {
       </Box>
     </Box>
   );
+}
+
+function calcularMinutosProgramados(horario: Horario): number {
+  const [hi, mi] = horario.HOR_HORA_INICIO.split(':').map(Number);
+  const [hf, mf] = horario.HOR_HORA_FIN.split(':').map(Number);
+
+  let inicio = hi * 60 + mi;
+  let fin = hf * 60 + mf;
+
+  if (fin < inicio) {
+    fin += 24 * 60;
+  }
+
+  return fin - inicio;
+}
+
+function minutosATexto(minutos: number): string {
+  const signo = minutos < 0 ? '-' : '';
+  const absoluto = Math.abs(minutos);
+  const horas = Math.floor(absoluto / 60);
+  const mins = absoluto % 60;
+  return `${signo}${String(horas).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
+}
+
+function minutosConSignoATexto(minutos: number): string {
+  return minutos > 0 ? `+${minutosATexto(minutos)}` : minutosATexto(minutos);
+}
+
+function calcularHorasProgramadasTexto(horario: Horario): string {
+  return minutosATexto(calcularMinutosProgramados(horario));
 }
 
 export default MarcajeCRUD;
