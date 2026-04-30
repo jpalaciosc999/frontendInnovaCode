@@ -1,11 +1,13 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { Nomina, NominaForm } from '../interfaces/nomina';
+import type { KPIResultado } from '../interfaces/kpi-resultado';
 import {
   obtenerNominas,
   crearNomina,
   actualizarNomina,
   eliminarNomina
 } from '../services/nomina.service';
+import { obtenerResultados } from '../services/kpi-resultado.service';
 
 import {
   Alert,
@@ -56,13 +58,20 @@ function NominaCRUD() {
   const [modoEdicion, setModoEdicion] = useState(false);
   const [id, setId] = useState<number | null>(null);
   const [form, setForm] = useState<NominaForm>(initialForm);
+  const [resultadosKpi, setResultadosKpi] = useState<KPIResultado[]>([]);
+  const [bonoKpiAplicado, setBonoKpiAplicado] = useState(0);
+  const ultimoBonoAplicado = useRef(0);
 
   const cargarDatos = async () => {
     try {
       setCargando(true);
       setError('');
-      const data = await obtenerNominas();
-      setDatos(data);
+      const [nominasData, resultadosData] = await Promise.all([
+        obtenerNominas(),
+        obtenerResultados(),
+      ]);
+      setDatos(nominasData);
+      setResultadosKpi(resultadosData);
     } catch (err: any) {
       setError('Error cargando nóminas: ' + err.message);
     } finally {
@@ -86,12 +95,40 @@ function NominaCRUD() {
     }));
   }, [form.nom_total_ingresos, form.nom_total_descuento]);
 
+  const obtenerBonoProductividadEmpleado = (empId: string | number) =>
+    resultadosKpi
+      .filter((resultado) => String(resultado.EMP_ID ?? '') === String(empId))
+      .reduce((total, resultado) => total + Number(resultado.KRE_MONTO_TOTAL || 0), 0);
+
   const handleChange = (
     e:
       | React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
       | SelectChangeEvent
   ) => {
     const { name, value } = e.target;
+
+    if (name === 'empleado_id') {
+      const bono = obtenerBonoProductividadEmpleado(value);
+      setBonoKpiAplicado(bono);
+
+      setForm((prev) => {
+        const ingresosActuales = Number(prev.nom_total_ingresos || 0);
+        const ingresosSinBonoAnterior = ingresosActuales - ultimoBonoAplicado.current;
+        ultimoBonoAplicado.current = bono;
+
+        return {
+          ...prev,
+          empleado_id: value,
+          nom_total_ingresos: (ingresosSinBonoAnterior + bono).toFixed(2),
+        };
+      });
+      return;
+    }
+
+    if (name === 'nom_total_ingresos') {
+      ultimoBonoAplicado.current = bonoKpiAplicado;
+    }
+
     setForm((prev) => ({ ...prev, [name as string]: value }));
   };
 
@@ -100,6 +137,8 @@ function NominaCRUD() {
     setModoEdicion(false);
     setId(null);
     setError('');
+    setBonoKpiAplicado(0);
+    ultimoBonoAplicado.current = 0;
   };
 
   const validar = () => {
@@ -157,6 +196,9 @@ function NominaCRUD() {
       liq_id: String(n.LIQ_ID),
       nom_estado: n.NOM_ESTADO
     });
+    const bono = obtenerBonoProductividadEmpleado(n.EMP_ID);
+    setBonoKpiAplicado(bono);
+    ultimoBonoAplicado.current = bono;
   };
 
   const handleEliminar = async (idEliminar: number) => {
@@ -218,6 +260,11 @@ function NominaCRUD() {
               type="number"
               value={form.nom_total_ingresos}
               onChange={handleChange}
+              helperText={
+                bonoKpiAplicado > 0
+                  ? `Incluye bono productividad KPI: Q${bonoKpiAplicado.toLocaleString('es-GT')}`
+                  : 'Selecciona empleado para sumar bonos KPI registrados'
+              }
             />
           </Grid>
 
