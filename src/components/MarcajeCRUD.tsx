@@ -61,16 +61,14 @@ function MarcajeCRUD() {
   const [datos, setDatos] = useState<Marcaje[]>([]);
   const [empleados, setEmpleados] = useState<Empleado[]>([]);
   const [horarios, setHorarios] = useState<Horario[]>([]);
-
   const [cargando, setCargando] = useState(true);
   const [cargandoEmpleados, setCargandoEmpleados] = useState(false);
+  const [, setCargandoHorarios] = useState(false);
   const [error, setError] = useState('');
   const [mensaje, setMensaje] = useState('');
-
   const [modoEdicion, setModoEdicion] = useState(false);
   const [marcajeId, setMarcajeId] = useState<number | null>(null);
   const [form, setForm] = useState<MarcajeForm>(initialForm);
-
   const [modalEmpleados, setModalEmpleados] = useState(false);
   const [filtroEmpleado, setFiltroEmpleado] = useState('');
   const [empleadoNombre, setEmpleadoNombre] = useState('');
