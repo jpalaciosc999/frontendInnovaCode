@@ -38,9 +38,9 @@ import TipoContrato from './components/TipoContrato';
 import UsuarioBitacora from './components/UsuarioBitacora';
 import HorarioCRUD from './components/HorarioCRUD';
 import CalculadoraIgss from './components/CalculadoraIgss';
-import CalculadoraIsr from './components/CalculadoraIsr';
-import SuspensionIgss from './components/SuspensionIgss';
+import CalculadoraISR from './components/CalculadoraIsr';
 import GenerarCSV from './components/Generarcsv';
+import SuspensionIgss from './components/SuspensionIgss';
 
 import {
   AUTH_USER_CHANGED_EVENT,
@@ -154,6 +154,48 @@ function App() {
     <AuthProvider>
       <CssBaseline />
 
+      <Box sx={{ minHeight: '100vh', bgcolor: 'grey.100' }}>
+        <Navbar />
+
+        <Container maxWidth="xl" sx={{ py: 3 }}>
+          <Routes>
+            <Route path="/" element={<Home />} />
+            <Route path="/empleados" element={<PruebaAxios />} />
+            <Route path="/departamentos" element={<Departamentos />} />
+            <Route path="/puestos" element={<Puestos />} />
+            <Route path="/prestamos" element={<Prestamos />} />
+            <Route path="/prestamo-detalle" element={<PrestamoDetalleView />} />
+            <Route path="/permisos" element={<Permisos />} />
+            <Route path="/rol-permisos" element={<RolPermisosView />} />
+            <Route path="/roles" element={<Roles />} />
+            <Route path="/periodo" element={<Periodo />} />
+            <Route path="/control-laboral" element={<ControlLaboral />} />
+            <Route path="/cuenta-bancaria" element={<CuentaBancaria />} />
+            <Route path="/descuentos" element={<Descuentos />} />
+            <Route path="/tipo-ingresos" element={<TipoIngresos />} />
+            <Route path="/nomina-detalle" element={<NominaDetallePage />} />
+            <Route path="/kpis" element={<KPIPage />} />
+            <Route path="/kpi-resultado" element={<KPIResultadoPage />} />
+            <Route path="/marcajes" element={<MarcajePage />} />
+            <Route path="/empleado-contrato" element={<EmpleadoContrato />} />
+            <Route path="/sede" element={<Sede />} />
+            <Route path="/bitacora" element={<Bitacora />} />
+            <Route path="/liquidacion" element={<Liquidacion />} />
+            <Route path="/nomina" element={<Nomina />} />
+            <Route path="/usuarios" element={<Usuario />} />
+            <Route path="/tipo-contrato" element={<TipoContrato />} />
+            <Route path="/usuario-bitacora" element={<UsuarioBitacora />} />
+            <Route path="/horarios" element={<HorarioCRUD />} />
+            <Route path="/calculadora-igss" element={<CalculadoraIgss />} />
+            <Route path="/calculadora-isr" element={<CalculadoraISR />} />
+            <Route path="/suspensiones-igss" element={<SuspensionIgss />} />
+            <Route path="/tipos-descuento" element={<Descuentos />} />
+            <Route path="/prestamos-banco" element={<Prestamos />} />
+            <Route path="/generar-csv" element={<GenerarCSV />} />
+          </Routes>
+        </Container>
+      </Box>
+    </>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
 

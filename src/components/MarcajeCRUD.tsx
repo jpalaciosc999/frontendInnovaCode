@@ -1,66 +1,108 @@
-import { useEffect, useMemo, useState } from 'react';
-import type { Marcaje, MarcajeForm } from '../interfaces/marcaje';
+import { useState, useEffect, useCallback, type SyntheticEvent } from 'react';
+import {
+  Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
+  Typography, Divider, CircularProgress, Button, Box, Paper, Alert,
+  IconButton, Tooltip, Autocomplete, TextField
+} from '@mui/material';
+import AddIcon from '@mui/icons-material/Add';
+import CheckIcon from '@mui/icons-material/Check';
+import CloseIcon from '@mui/icons-material/Close';
+import HistoryIcon from '@mui/icons-material/History';
+import { obtenerHistorial, registrarMarcaje, updateMarcaje } from '../services/marcaje.service';
+import { obtenerEmpleados } from '../services/empleados.service';
+import { obtenerHorarios } from '../services/horario.service';
+import type { Marcaje } from '../interfaces/marcaje';
 import type { Empleado } from '../interfaces/empleados';
 import type { Horario } from '../interfaces/horario';
 
-import {
-  obtenerMarcajes,
-  crearMarcaje,
-  actualizarMarcaje,
-  eliminarMarcaje
-} from '../services/marcaje.service';
-
-import { obtenerEmpleados } from '../services/empleados.service';
-import { obtenerHorarios } from '../services/horario.service';
-
-import {
-  Alert,
-  Box,
-  Button,
-  Chip,
-  Dialog,
-  DialogContent,
-  DialogTitle,
-  Grid,
-  IconButton,
-  InputAdornment,
-  Paper,
-  Snackbar,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  TextField,
-  Typography,
-  MenuItem
-} from '@mui/material';
-
-import SaveIcon from '@mui/icons-material/Save';
-import CleaningServicesIcon from '@mui/icons-material/CleaningServices';
-import EditIcon from '@mui/icons-material/Edit';
-import DeleteIcon from '@mui/icons-material/Delete';
-import AccessTimeIcon from '@mui/icons-material/AccessTime';
-import SearchIcon from '@mui/icons-material/Search';
-import CloseIcon from '@mui/icons-material/Close';
-import PeopleIcon from '@mui/icons-material/People';
-
-const initialForm: MarcajeForm = {
-  fecha: '',
-  entrada: '',
-  salida: '',
-  horas_extra: '',
-  estado: 'Normal',
-  emp_id: ''
+type DiferenciaMarcaje = {
+  texto: string;
+  positiva: boolean;
 };
 
-const ESTADOS = ['Normal', 'Retraso', 'Falta Justificada', 'Permiso'];
+const obtenerPartesHora = (hora: string | undefined, respaldo: string) => {
+  const [hrs = '0', mins = '0', secs = '0'] = (hora || respaldo).split(':');
+  return {
+    horas: Number(hrs) || 0,
+    minutos: Number(mins) || 0,
+    segundos: Number(secs) || 0
+  };
+};
+
+const formatearDiferencia = (diffMs: number): string => {
+  const esNegativo = diffMs < 0;
+  const absolutoMs = Math.abs(diffMs);
+  const hrs = Math.floor(absolutoMs / 3600000);
+  const mins = Math.floor((absolutoMs % 3600000) / 60000);
+  const secs = Math.floor((absolutoMs % 60000) / 1000);
+  const formato = `${hrs}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+
+  return esNegativo ? `-${formato}` : formato;
+};
+
+const calcularDiferencia = (
+  entradaStr: string,
+  salidaStr: string | null,
+  horario?: Horario
+): DiferenciaMarcaje => {
+  if (!salidaStr) return { texto: "Pendiente", positiva: false };
+
+  const salida = new Date(salidaStr);
+  const referencia = new Date(entradaStr);
+  const horaFin = obtenerPartesHora(horario?.HOR_HORA_FIN, '18:00:00');
+  referencia.setHours(horaFin.horas, horaFin.minutos, horaFin.segundos, 0);
+
+  if (horario) {
+    const horaInicio = obtenerPartesHora(horario.HOR_HORA_INICIO, '08:00:00');
+    const inicioProgramado = new Date(entradaStr);
+    inicioProgramado.setHours(horaInicio.horas, horaInicio.minutos, horaInicio.segundos, 0);
+
+    if (referencia <= inicioProgramado) {
+      referencia.setDate(referencia.getDate() + 1);
+    }
+  }
+
+  const diffMs = salida.getTime() - referencia.getTime();
+
+  return {
+    texto: formatearDiferencia(diffMs),
+    positiva: diffMs > 0
+  };
+};
 
 function MarcajeCRUD() {
   const [datos, setDatos] = useState<Marcaje[]>([]);
   const [empleados, setEmpleados] = useState<Empleado[]>([]);
   const [horarios, setHorarios] = useState<Horario[]>([]);
+  const [empleadoSeleccionado, setEmpleadoSeleccionado] = useState<Empleado | null>(null);
+  const [cargandoMas, setCargandoMas] = useState(false);
+  const [cargandoEmpleados, setCargandoEmpleados] = useState(false);
+  const [error, setError] = useState('');
+  const [offset, setOffset] = useState(0);
+  const [fechaHoy, setFechaHoy] = useState(new Date());
+
+  useEffect(() => {
+    const timer = setInterval(() => setFechaHoy(new Date()), 60000);
+    return () => clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    const cargarCatalogos = async () => {
+      setCargandoEmpleados(true);
+      try {
+        const [empleadosData, horariosData] = await Promise.all([
+          obtenerEmpleados(),
+          obtenerHorarios()
+        ]);
+        setEmpleados(empleadosData);
+        setHorarios(horariosData);
+      } catch {
+        setError('Error al obtener empleados u horarios del servidor.');
+      } finally {
+        setCargandoEmpleados(false);
+      }
+    };
+
   const [cargando, setCargando] = useState(true);
   const [cargandoEmpleados, setCargandoEmpleados] = useState(false);
   const [, setCargandoHorarios] = useState(false);
@@ -73,33 +115,31 @@ function MarcajeCRUD() {
   const [filtroEmpleado, setFiltroEmpleado] = useState('');
   const [empleadoNombre, setEmpleadoNombre] = useState('');
 
-  const cargarDatos = async () => {
-    try {
-      setCargando(true);
-      setError('');
-      const data = await obtenerMarcajes();
-      setDatos(data);
-    } catch (err: any) {
-      setError('Error cargando marcajes: ' + (err.response?.data?.error || err.message));
-    } finally {
-      setCargando(false);
-    }
-  };
 
-  const cargarEmpleados = async () => {
-    try {
-      setCargandoEmpleados(true);
-      const data = await obtenerEmpleados();
-      setEmpleados(data);
-    } catch (err: any) {
-      setError('Error cargando empleados: ' + (err.response?.data?.error || err.message));
-    } finally {
-      setCargandoEmpleados(false);
-    }
-  };
+    cargarCatalogos();
+  }, []);
 
-  const cargarHorarios = async () => {
+  const horarioSeleccionado = horarios.find((horario) => horario.HOR_ID === empleadoSeleccionado?.HOR_ID);
+
+  const cargarDatos = useCallback(async (nuevoOffset: number = 0) => {
+    if (!empleadoSeleccionado) {
+      setDatos([]);
+      return;
+    }
+
+    setCargandoMas(true);
+    if (nuevoOffset === 0) setError('');
     try {
+      const res = await obtenerHistorial(empleadoSeleccionado.EMP_ID, nuevoOffset);
+      if (nuevoOffset === 0) setDatos(res);
+      else setDatos(prev => [...prev, ...res]);
+    } catch {
+      setError('Error al obtener datos del servidor.');
+    } finally {
+      setCargandoMas(false);
+    }
+  }, [empleadoSeleccionado]);
+
     const data = await obtenerHorarios();
     setHorarios(data);
   } catch (err: any) {
@@ -107,552 +147,146 @@ function MarcajeCRUD() {
   }
 };
 
-  useEffect(() => {
-    cargarDatos();
-    cargarEmpleados();
-    cargarHorarios();
-  }, []);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setForm((prev) => ({ ...prev, [name]: value }));
-  };
+  useEffect(() => { cargarDatos(0); }, [cargarDatos]);
 
-  const limpiarFormulario = () => {
-    setForm(initialForm);
-    setModoEdicion(false);
-    setMarcajeId(null);
-    setEmpleadoNombre('');
+  const handleSeleccionarEmpleado = (_event: SyntheticEvent, empleado: Empleado | null) => {
+    setEmpleadoSeleccionado(empleado);
+    setDatos([]);
+    setOffset(0);
     setError('');
   };
 
-  const abrirModalEmpleados = async () => {
-    setModalEmpleados(true);
-    setFiltroEmpleado('');
-
-    if (empleados.length === 0) {
-      await cargarEmpleados();
-    }
-  };
-
-  const seleccionarEmpleado = (empleado: Empleado) => {
-    const nombreCompleto = `${empleado.EMP_NOMBRE ?? ''} ${empleado.EMP_APELLIDO ?? ''}`.trim();
-    setForm((prev) => ({ ...prev, emp_id: String(empleado.EMP_ID) }));
-    setEmpleadoNombre(nombreCompleto || `Empleado #${empleado.EMP_ID}`);
-    setModalEmpleados(false);
-  };
-
-  const empleadosFiltrados = empleados.filter((emp) => {
-    const texto = filtroEmpleado.toLowerCase();
-    const nombre = `${emp.EMP_NOMBRE ?? ''} ${emp.EMP_APELLIDO ?? ''}`.toLowerCase();
-
-    return (
-      nombre.includes(texto) ||
-      String(emp.EMP_ID).includes(texto) ||
-      String(emp.EMP_DPI ?? '').toLowerCase().includes(texto) ||
-      String(emp.EMP_NIT ?? '').toLowerCase().includes(texto)
-    );
-  });
-
-  const empleadoSeleccionado = useMemo(
-    () => empleados.find((e) => String(e.EMP_ID) === String(form.emp_id)),
-    [empleados, form.emp_id]
-  );
-
-  const horarioSeleccionado = useMemo(
-    () => horarios.find((h) => h.HOR_ID === empleadoSeleccionado?.HOR_ID),
-    [horarios, empleadoSeleccionado]
-  );
-
-  const resumen = useMemo(() => {
-    if (!form.entrada || !form.salida) {
-      return {
-        horasTrabajadas: '—',
-        horasProgramadas: '—',
-        diferencia: '—'
-      };
+  const handleRegistrar = async () => {
+    if (!empleadoSeleccionado) {
+      setError('Selecciona un empleado antes de registrar el marcaje.');
+      return;
     }
 
-    const entrada = new Date(form.entrada);
-    const salida = new Date(form.salida);
-
-    if (Number.isNaN(entrada.getTime()) || Number.isNaN(salida.getTime()) || salida <= entrada) {
-      return {
-        horasTrabajadas: '—',
-        horasProgramadas: horarioSeleccionado ? calcularHorasProgramadasTexto(horarioSeleccionado) : '—',
-        diferencia: '—'
-      };
-    }
-
-    const minutosTrabajados = Math.round((salida.getTime() - entrada.getTime()) / 60000);
-    const minutosProgramados = horarioSeleccionado
-      ? calcularMinutosProgramados(horarioSeleccionado)
-      : 0;
-
-    const diferenciaMinutos = horarioSeleccionado
-      ? minutosTrabajados - minutosProgramados
-      : 0;
-
-    return {
-      horasTrabajadas: minutosATexto(minutosTrabajados),
-      horasProgramadas: horarioSeleccionado ? minutosATexto(minutosProgramados) : '—',
-      diferencia: horarioSeleccionado ? minutosConSignoATexto(diferenciaMinutos) : '—'
-    };
-  }, [form.entrada, form.salida, horarioSeleccionado]);
-
-  const validarFormulario = () => {
-    if (!form.fecha || !form.entrada || !form.salida || !form.emp_id) {
-      setError('Fecha, entrada, salida y empleado son obligatorios');
-      return false;
-    }
-
-    const entrada = new Date(form.entrada);
-    const salida = new Date(form.salida);
-
-    if (Number.isNaN(entrada.getTime()) || Number.isNaN(salida.getTime())) {
-      setError('Las fechas de entrada y salida no son válidas');
-      return false;
-    }
-
-    if (salida <= entrada) {
-      setError('La hora de salida debe ser mayor que la hora de entrada');
-      return false;
-    }
-
-    return true;
-  };
-
-  const guardarMarcaje = async () => {
-    try {
-      setError('');
-      setMensaje('');
-
-      if (!validarFormulario()) return;
-
-      if (modoEdicion && marcajeId !== null) {
-        await actualizarMarcaje(marcajeId, form);
-        setMensaje('Marcaje actualizado correctamente');
-      } else {
-        await crearMarcaje(form);
-        setMensaje('Marcaje creado correctamente');
-      }
-
-      limpiarFormulario();
-      await cargarDatos();
-    } catch (err: any) {
-      setError('Error guardando registro: ' + (err.response?.data?.error || err.message));
-    }
-  };
-
-  const handleEliminar = async (id: number) => {
-    if (!window.confirm('¿Deseas eliminar este registro de marcaje?')) return;
-
-    try {
-      setError('');
-      setMensaje('');
-      await eliminarMarcaje(id);
-      setMensaje('Registro eliminado correctamente');
-
-      if (marcajeId === id) limpiarFormulario();
-
-      await cargarDatos();
-    } catch (err: any) {
-      setError('Error eliminando registro: ' + (err.response?.data?.error || err.message));
-    }
-  };
-
-  const handleEditar = (m: Marcaje) => {
-    setModoEdicion(true);
-    setMarcajeId(m.MAR_ID);
-    setMensaje('');
     setError('');
-
-    const emp = empleados.find((e) => e.EMP_ID === m.EMP_ID);
-    const nombreCompleto = emp
-      ? `${emp.EMP_NOMBRE ?? ''} ${emp.EMP_APELLIDO ?? ''}`.trim()
-      : '';
-
-    setEmpleadoNombre(nombreCompleto || `Empleado #${m.EMP_ID}`);
-
-    setForm({
-      fecha: m.MAR_FECHA ? String(m.MAR_FECHA).substring(0, 10) : '',
-      entrada: m.MAR_ENTRADA ? String(m.MAR_ENTRADA).substring(0, 16) : '',
-      salida: m.MAR_SALIDA ? String(m.MAR_SALIDA).substring(0, 16) : '',
-      horas_extra: m.MAR_HORAS_EXTRA?.toString() || '',
-      estado: m.MAR_ESTADO || 'Normal',
-      emp_id: m.EMP_ID?.toString() || ''
-    });
+    setCargandoMas(true);
+    try {
+      const res = await registrarMarcaje(empleadoSeleccionado.EMP_ID);
+      alert(res.message);
+      setOffset(0);
+      await cargarDatos(0);
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Error en el servidor');
+    } finally {
+      setCargandoMas(false);
+    }
   };
 
-  const obtenerChipEstado = (estado: string) => {
-    const colores: Record<string, 'success' | 'warning' | 'error' | 'info'> = {
-      Normal: 'success',
-      Retraso: 'warning',
-      'Falta Justificada': 'error',
-      Permiso: 'info'
-    };
-
-    return (
-      <Chip
-        label={estado}
-        color={colores[estado] ?? 'default'}
-        size="small"
-      />
-    );
+  const handleAutorizar = async (idMarcaje: number, estado: number) => {
+    try {
+      await updateMarcaje(idMarcaje, estado);
+      alert(estado === 1 ? "Autorizado" : "Rechazado");
+      cargarDatos(0); // Recarga para ver el cambio
+    } catch (err: any) {
+      alert(err.response?.data?.message || "Error al actualizar la autorización.");
+    }
   };
-
-  const formatearFecha = (valor?: string) =>
-    valor ? new Date(valor).toLocaleDateString('es-GT') : '—';
-
-  const formatearHora = (valor?: string) =>
-    valor
-      ? new Date(valor).toLocaleTimeString('es-GT', {
-          hour: '2-digit',
-          minute: '2-digit'
-        })
-      : '—';
-
-  if (cargando) {
-    return (
-      <Box sx={{ p: 3 }}>
-        <Typography variant="h6">Cargando marcajes...</Typography>
-      </Box>
-    );
-  }
 
   return (
-    <Box sx={{ py: 2 }}>
-      <Paper elevation={3} sx={{ p: 3, mb: 3 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 3 }}>
-          <AccessTimeIcon color="primary" />
-          <Typography variant="h4" sx={{ fontWeight: 'bold' }}>
-            Control de Asistencia (Marcajes)
-          </Typography>
-        </Box>
+    <Box sx={{ p: 3, maxWidth: 1200, margin: 'auto' }}>
+      <Typography variant="h4" gutterBottom sx={{ color: '#1565c0', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: 2 }}>
+        <HistoryIcon fontSize="large" /> Control de Marcaje
+      </Typography>
+      <Divider sx={{ mb: 4 }} />
 
-        <Typography variant="h6" sx={{ mb: 2 }}>
-          {modoEdicion ? 'Editar marcaje' : 'Nuevo marcaje'}
-        </Typography>
-
-        <Grid container spacing={2}>
-          <Grid size={{ xs: 12, md: 6 }}>
-            <TextField
-              fullWidth
-              label="Empleado"
-              value={empleadoNombre ? `#${form.emp_id} — ${empleadoNombre}` : ''}
-              placeholder="Haz clic para seleccionar un empleado"
-              onClick={abrirModalEmpleados}
-              slotProps={{
-                input: {
-                  readOnly: true,
-                  endAdornment: (
-                    <InputAdornment position="end">
-                      <IconButton onClick={abrirModalEmpleados} edge="end">
-                        <PeopleIcon color="primary" />
-                      </IconButton>
-                    </InputAdornment>
-                  ),
-                  sx: { cursor: 'pointer' }
-                }
-              }}
-              required
-            />
-          </Grid>
-
-          <Grid size={{ xs: 12, md: 6 }}>
-            <TextField
-              fullWidth
-              label="Fecha Jornada"
-              name="fecha"
-              type="date"
-              value={form.fecha}
-              onChange={handleChange}
-              slotProps={{ inputLabel: { shrink: true } }}
-              required
-            />
-          </Grid>
-
-          <Grid size={{ xs: 12, md: 6 }}>
-            <TextField
-              fullWidth
-              label="Hora de Entrada"
-              name="entrada"
-              type="datetime-local"
-              value={form.entrada}
-              onChange={handleChange}
-              slotProps={{ inputLabel: { shrink: true } }}
-              required
-            />
-          </Grid>
-
-          <Grid size={{ xs: 12, md: 6 }}>
-            <TextField
-              fullWidth
-              label="Hora de Salida"
-              name="salida"
-              type="datetime-local"
-              value={form.salida}
-              onChange={handleChange}
-              slotProps={{ inputLabel: { shrink: true } }}
-              required
-            />
-          </Grid>
-
-          <Grid size={{ xs: 12, md: 4 }}>
-            <TextField
-              fullWidth
-              label="Horario del empleado"
-              value={
-                horarioSeleccionado
-                  ? `${horarioSeleccionado.HOR_DESCRIPCION} (${horarioSeleccionado.HOR_HORA_INICIO} - ${horarioSeleccionado.HOR_HORA_FIN})`
-                  : 'Sin horario asignado'
-              }
-              slotProps={{ input: { readOnly: true } }}
-            />
-          </Grid>
-
-          <Grid size={{ xs: 12, md: 4 }}>
-            <TextField
-              fullWidth
-              label="Horas trabajadas"
-              value={resumen.horasTrabajadas}
-              slotProps={{ input: { readOnly: true } }}
-            />
-          </Grid>
-
-          <Grid size={{ xs: 12, md: 4 }}>
-            <TextField
-              fullWidth
-              label="Diferencia vs horario"
-              value={resumen.diferencia}
-              slotProps={{ input: { readOnly: true } }}
-            />
-          </Grid>
-
-          <Grid size={{ xs: 12, md: 6 }}>
-            <TextField
-              select
-              fullWidth
-              label="Estado"
-              name="estado"
-              value={form.estado}
-              onChange={handleChange}
-            >
-              {ESTADOS.map((e) => (
-                <MenuItem key={e} value={e}>
-                  {e}
-                </MenuItem>
-              ))}
-            </TextField>
-          </Grid>
-
-          <Grid size={{ xs: 12 }}>
-            <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mt: 1 }}>
-              <Button
-                variant="contained"
-                startIcon={<SaveIcon />}
-                onClick={guardarMarcaje}
-              >
-                {modoEdicion ? 'Actualizar' : 'Guardar Marcaje'}
-              </Button>
-
-              <Button
-                variant="outlined"
-                color="secondary"
-                startIcon={<CleaningServicesIcon />}
-                onClick={limpiarFormulario}
-              >
-                Cancelar
-              </Button>
-            </Box>
-          </Grid>
-        </Grid>
-      </Paper>
-
-      <Paper elevation={3} sx={{ p: 3 }}>
-        <Typography variant="h6" sx={{ mb: 2 }}>
-          Listado de marcajes: {datos.length}
-        </Typography>
-
-        <TableContainer>
-          <Table>
-            <TableHead>
-              <TableRow>
-                <TableCell><strong>ID</strong></TableCell>
-                <TableCell><strong>Empleado</strong></TableCell>
-                <TableCell><strong>Fecha</strong></TableCell>
-                <TableCell><strong>Entrada</strong></TableCell>
-                <TableCell><strong>Salida</strong></TableCell>
-                <TableCell><strong>Diferencia</strong></TableCell>
-                <TableCell><strong>Estado</strong></TableCell>
-                <TableCell><strong>Acciones</strong></TableCell>
-              </TableRow>
-            </TableHead>
-
-            <TableBody>
-              {datos.length > 0 ? (
-                datos.map((m) => (
-                  <TableRow key={m.MAR_ID} hover>
-                    <TableCell>{m.MAR_ID}</TableCell>
-                    <TableCell>
-                      {m.EMP_NOMBRE || m.EMP_APELLIDO
-                        ? `${m.EMP_NOMBRE ?? ''} ${m.EMP_APELLIDO ?? ''}`.trim()
-                        : `#${m.EMP_ID}`}
-                    </TableCell>
-                    <TableCell>{formatearFecha(m.MAR_FECHA)}</TableCell>
-                    <TableCell>{formatearHora(m.MAR_ENTRADA)}</TableCell>
-                    <TableCell>{formatearHora(m.MAR_SALIDA)}</TableCell>
-                    <TableCell>{m.MAR_HORAS_EXTRA ?? '—'}</TableCell>
-                    <TableCell>{obtenerChipEstado(m.MAR_ESTADO)}</TableCell>
-                    <TableCell>
-                      <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                        <Button
-                          size="small"
-                          variant="outlined"
-                          startIcon={<EditIcon />}
-                          onClick={() => handleEditar(m)}
-                        >
-                          Editar
-                        </Button>
-
-                        <Button
-                          size="small"
-                          variant="contained"
-                          color="error"
-                          startIcon={<DeleteIcon />}
-                          onClick={() => handleEliminar(m.MAR_ID)}
-                        >
-                          Eliminar
-                        </Button>
-                      </Box>
-                    </TableCell>
-                  </TableRow>
-                ))
-              ) : (
-                <TableRow>
-                  <TableCell colSpan={8} align="center">
-                    No hay marcajes registrados
-                  </TableCell>
-                </TableRow>
+      <Paper elevation={3} sx={{ p: 3, mb: 4, backgroundColor: '#f8faff', borderRadius: 3 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
+          <Box>
+            <Typography variant="caption" sx={{ fontWeight: 'bold', color: 'gray' }}>EMPLEADO</Typography>
+            <Autocomplete
+              options={empleados}
+              value={empleadoSeleccionado}
+              loading={cargandoEmpleados}
+              onChange={handleSeleccionarEmpleado}
+              getOptionLabel={(empleado) => `${empleado.EMP_ID} - ${empleado.EMP_NOMBRE} ${empleado.EMP_APELLIDO}`}
+              isOptionEqualToValue={(option, value) => option.EMP_ID === value.EMP_ID}
+              sx={{ width: { xs: '100%', sm: 360 }, mt: 1 }}
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  label="Buscar empleado"
+                  placeholder="Nombre, apellido o ID"
+                  size="small"
+                />
               )}
-            </TableBody>
-          </Table>
-        </TableContainer>
+            />
+          </Box>
+          <Box>
+            <Typography variant="caption" sx={{ fontWeight: 'bold', color: 'gray' }}>FECHA ACTUAL</Typography>
+            <Typography variant="h6">{fechaHoy.toLocaleDateString()}</Typography>
+          </Box>
+          <Button
+            variant="contained" size="large"
+            startIcon={cargandoMas ? <CircularProgress size={20} color="inherit" /> : <AddIcon />}
+            onClick={handleRegistrar} disabled={cargandoMas || !empleadoSeleccionado}
+          > Registrar Marcaje </Button>
+        </Box>
+        {error && <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>}
       </Paper>
 
-      <Dialog
-        open={modalEmpleados}
-        onClose={() => setModalEmpleados(false)}
-        fullWidth
-        maxWidth="md"
-        slotProps={{ paper: { sx: { borderRadius: 3 } } }}
-      >
-        <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', pb: 1 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <PeopleIcon color="primary" />
-            <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
-              Seleccionar Empleado
-            </Typography>
-          </Box>
-          <IconButton onClick={() => setModalEmpleados(false)} size="small">
-            <CloseIcon />
-          </IconButton>
-        </DialogTitle>
+      <TableContainer component={Paper} sx={{ borderRadius: 3 }}>
+        <Table>
+          <TableHead sx={{ backgroundColor: '#1565c0' }}>
+            <TableRow>
+              <TableCell sx={{ color: 'white' }}>Fecha</TableCell>
+              <TableCell sx={{ color: 'white' }}>Entrada</TableCell>
+              <TableCell sx={{ color: 'white' }}>Salida</TableCell>
+              <TableCell sx={{ color: 'white' }}>Diferencia</TableCell>
+              <TableCell align="center" sx={{ color: 'white' }}>Autorización</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {datos.length > 0 ? datos.map((reg) => {
+              const diferencia = calcularDiferencia(reg.MAR_ENTRADA, reg.MAR_SALIDA, horarioSeleccionado);
 
-        <DialogContent sx={{ pt: 1 }}>
-          <TextField
-            fullWidth
-            autoFocus
-            placeholder="Buscar por ID, nombre, apellido, DPI o NIT..."
-            value={filtroEmpleado}
-            onChange={(e) => setFiltroEmpleado(e.target.value)}
-            sx={{ mb: 2 }}
-            slotProps={{
-              input: {
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <SearchIcon color="action" />
-                  </InputAdornment>
-                )
-              }
-            }}
-          />
+              return (
+              <TableRow key={reg.MAR_ID}>
+                <TableCell>{reg.MAR_FECHA ? new Date(reg.MAR_FECHA).toLocaleDateString() : '--'}</TableCell>
+                <TableCell>{reg.MAR_ENTRADA ? new Date(reg.MAR_ENTRADA).toLocaleTimeString() : '--'}</TableCell>
+                <TableCell>{reg.MAR_SALIDA ? new Date(reg.MAR_SALIDA).toLocaleTimeString() : '--'}</TableCell>
+                <TableCell>
+                  <Typography color={diferencia.positiva ? 'success.main' : 'text.primary'}>
+                    {diferencia.texto}
+                  </Typography>
+                </TableCell>
+                <TableCell align="center">
+                  {!diferencia.positiva ? <Typography color="text.secondary">No aplica</Typography> :
+                   reg.MAR_AUTORIZACION === 1 ? <Typography color="success.main">SÍ</Typography> :
+                   reg.MAR_AUTORIZACION === 2 ? <Typography color="error.main">NO</Typography> :
+                   <Box>
+                     <Tooltip title="Autorizar">
+                       <IconButton color="success" onClick={() => handleAutorizar(reg.MAR_ID, 1)}><CheckIcon /></IconButton>
+                     </Tooltip>
+                     <Tooltip title="Rechazar">
+                       <IconButton color="error" onClick={() => handleAutorizar(reg.MAR_ID, 2)}><CloseIcon /></IconButton>
+                     </Tooltip>
+                   </Box>}
+                </TableCell>
+              </TableRow>
+              );
+            }) : (
+              <TableRow>
+                <TableCell colSpan={5} align="center">
+                  {empleadoSeleccionado ? 'No hay marcajes registrados para este empleado.' : 'Selecciona un empleado para ver su historial.'}
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </TableContainer>
 
-          {cargandoEmpleados ? (
-            <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', py: 3 }}>
-              Cargando empleados...
-            </Typography>
-          ) : (
-            <TableContainer sx={{ maxHeight: 360 }}>
-              <Table size="small" stickyHeader>
-                <TableHead>
-                  <TableRow>
-                    <TableCell><strong>ID</strong></TableCell>
-                    <TableCell><strong>Nombre</strong></TableCell>
-                    <TableCell><strong>DPI</strong></TableCell>
-                    <TableCell><strong>NIT</strong></TableCell>
-                    <TableCell><strong>Horario</strong></TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {empleadosFiltrados.length > 0 ? (
-                    empleadosFiltrados.map((emp) => {
-                      const horario = horarios.find((h) => h.HOR_ID === emp.HOR_ID);
-
-                      return (
-                        <TableRow
-                          key={emp.EMP_ID}
-                          hover
-                          onClick={() => seleccionarEmpleado(emp)}
-                          sx={{ cursor: 'pointer' }}
-                        >
-                          <TableCell>{emp.EMP_ID}</TableCell>
-                          <TableCell>{`${emp.EMP_NOMBRE ?? ''} ${emp.EMP_APELLIDO ?? ''}`.trim()}</TableCell>
-                          <TableCell>{emp.EMP_DPI}</TableCell>
-                          <TableCell>{emp.EMP_NIT}</TableCell>
-                          <TableCell>
-                            {horario
-                              ? `${horario.HOR_DESCRIPCION} (${horario.HOR_HORA_INICIO} - ${horario.HOR_HORA_FIN})`
-                              : 'Sin horario'}
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })
-                  ) : (
-                    <TableRow>
-                      <TableCell colSpan={5} align="center">
-                        No se encontraron empleados
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </TableContainer>
-          )}
-        </DialogContent>
-      </Dialog>
-
-      <Snackbar
-        open={!!mensaje}
-        autoHideDuration={3000}
-        onClose={() => setMensaje('')}
-        anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
-      >
-        <Alert severity="success" onClose={() => setMensaje('')} sx={{ width: '100%' }}>
-          {mensaje}
-        </Alert>
-      </Snackbar>
-
-      <Snackbar
-        open={!!error}
-        autoHideDuration={4000}
-        onClose={() => setError('')}
-        anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
-      >
-        <Alert severity="error" onClose={() => setError('')} sx={{ width: '100%' }}>
-          {error}
-        </Alert>
-      </Snackbar>
+      <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
+        <Button
+          variant="outlined"
+          onClick={() => { const n = offset + 15; setOffset(n); cargarDatos(n); }}
+          disabled={cargandoMas || !empleadoSeleccionado}
+        > {cargandoMas ? <CircularProgress size={20} /> : "CARGAR MÁS (15 DÍAS)"} </Button>
+      </Box>
     </Box>
   );
 }
