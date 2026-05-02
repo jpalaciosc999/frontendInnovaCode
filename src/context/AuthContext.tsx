@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
 import { ALL_PERMISSIONS, canAccessPath as userCanAccessPath, toAccessKey } from '../auth/access';
+import { notifyAuthUserChanged } from '../config/roleViews';
 import { obtenerPermisos } from '../services/permisos.service';
 import { obtenerRolPermisos } from '../services/rolPermisos.service';
 import { obtenerRoles } from '../services/roles.service';
@@ -87,9 +88,18 @@ const isNumericRoleKey = (roleKey: string) => /^\d+$/.test(roleKey);
 
 const isFullAccessRole = (authUser: AuthUser, resolvedRoleName = '') => {
   const roleName = toAccessKey(getUserRoleName(authUser));
-  const roleId = String(getUserRoleId(authUser) ?? '');
 
-  return roleName === 'supremo' || toAccessKey(resolvedRoleName) === 'supremo' || roleId === '1';
+  return roleName === 'supremo' || toAccessKey(resolvedRoleName) === 'supremo';
+};
+
+const clearLegacyRoleState = () => {
+  localStorage.removeItem('usuario');
+  localStorage.removeItem('rol');
+  localStorage.removeItem('role');
+  localStorage.removeItem('userRole');
+  localStorage.removeItem('tipoUsuario');
+  localStorage.removeItem('authUser');
+  localStorage.removeItem('currentUser');
 };
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
@@ -102,18 +112,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loadingPermissions, setLoadingPermissions] = useState(false);
 
   const login = (newToken: string, newUser: AuthUser) => {
+    clearLegacyRoleState();
     localStorage.setItem('token', newToken);
     localStorage.setItem('user', JSON.stringify(newUser));
     setToken(newToken);
     setUser(newUser);
+    notifyAuthUserChanged();
   };
 
   const logout = () => {
+    clearLegacyRoleState();
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     setToken(null);
     setUser(null);
     setPermissions([]);
+    notifyAuthUserChanged();
   };
 
   const canAccessPath = useCallback(

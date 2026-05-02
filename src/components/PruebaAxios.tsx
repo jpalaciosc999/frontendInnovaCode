@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { Empleado, EmpleadoForm } from '../interfaces/empleados';
 import type { Departamento } from '../interfaces/departamentos';
 import type { Horario } from '../interfaces/horario';
@@ -64,6 +64,13 @@ const initialForm: EmpleadoForm = {
   hor_id: ''
 };
 
+const initialFilters = {
+  busqueda: '',
+  estado: '',
+  depId: '',
+  horId: ''
+};
+
 function PruebaAxios() {
   const [datos, setDatos] = useState<Empleado[]>([]);
   const [cargando, setCargando] = useState(true);
@@ -87,6 +94,7 @@ function PruebaAxios() {
 
   const [filtroDep, setFiltroDep] = useState('');
   const [filtroHor, setFiltroHor] = useState('');
+  const [filters, setFilters] = useState(initialFilters);
 
   const cargarEmpleados = async () => {
     try {
@@ -183,6 +191,17 @@ function PruebaAxios() {
   ) => {
     const { name, value } = e.target;
     setForm((prev) => ({ ...prev, [name as string]: value }));
+  };
+
+  const handleFilterChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement> | SelectChangeEvent
+  ) => {
+    const { name, value } = e.target;
+    setFilters((prev) => ({ ...prev, [name as string]: value }));
+  };
+
+  const limpiarFiltros = () => {
+    setFilters(initialFilters);
   };
 
   const limpiarFormulario = () => {
@@ -319,6 +338,26 @@ function PruebaAxios() {
     if (hor.HOR_DOMINGO) dias.push('Dom');
     return dias.join(', ');
   };
+
+  const empleadosFiltrados = useMemo(() => {
+    const texto = filters.busqueda.trim().toLowerCase();
+
+    return datos.filter((empleado) => {
+      const nombreCompleto = `${empleado.EMP_NOMBRE ?? ''} ${empleado.EMP_APELLIDO ?? ''}`.toLowerCase();
+      const identificadores = `${empleado.EMP_ID} ${empleado.EMP_DPI ?? ''} ${empleado.EMP_NIT ?? ''}`.toLowerCase();
+
+      if (texto && !nombreCompleto.includes(texto) && !identificadores.includes(texto)) return false;
+      if (filters.estado && empleado.EMP_ESTADO !== filters.estado) return false;
+      if (filters.depId && String(empleado.DEP_ID ?? '') !== filters.depId) return false;
+      if (filters.horId && String(empleado.HOR_ID ?? '') !== filters.horId) return false;
+
+      return true;
+    });
+  }, [datos, filters]);
+
+  const empleadosActivos = datos.filter((empleado) => empleado.EMP_ESTADO === 'A').length;
+  const empleadosSinDepartamento = datos.filter((empleado) => !empleado.DEP_ID).length;
+  const empleadosSinHorario = datos.filter((empleado) => !empleado.HOR_ID).length;
 
   if (cargando) {
     return (
@@ -495,9 +534,76 @@ function PruebaAxios() {
       </Paper>
 
       <Paper elevation={3} sx={{ p: 3 }}>
-        <Typography variant="h6" sx={{ mb: 2 }}>
-          Listado de empleados: {datos.length}
-        </Typography>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 2, flexWrap: 'wrap', mb: 2 }}>
+          <Typography variant="h6">
+            Listado de empleados: {empleadosFiltrados.length} de {datos.length}
+          </Typography>
+          <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+            <Chip label={`Activos: ${empleadosActivos}`} color="success" size="small" />
+            <Chip label={`Sin depto: ${empleadosSinDepartamento}`} color="warning" size="small" />
+            <Chip label={`Sin horario: ${empleadosSinHorario}`} color="warning" size="small" />
+          </Box>
+        </Box>
+
+        <Grid container spacing={2} sx={{ mb: 2 }}>
+          <Grid size={{ xs: 12, md: 3 }}>
+            <TextField
+              fullWidth
+              size="small"
+              label="Buscar"
+              name="busqueda"
+              value={filters.busqueda}
+              onChange={handleFilterChange}
+              placeholder="Nombre, DPI, NIT o ID"
+              slotProps={{
+                input: {
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <SearchIcon color="action" />
+                    </InputAdornment>
+                  )
+                }
+              }}
+            />
+          </Grid>
+          <Grid size={{ xs: 12, md: 2 }}>
+            <FormControl fullWidth size="small">
+              <InputLabel>Estado</InputLabel>
+              <Select name="estado" value={filters.estado} label="Estado" onChange={handleFilterChange}>
+                <MenuItem value="">Todos</MenuItem>
+                <MenuItem value="A">Activo</MenuItem>
+                <MenuItem value="I">Inactivo</MenuItem>
+              </Select>
+            </FormControl>
+          </Grid>
+          <Grid size={{ xs: 12, md: 3 }}>
+            <FormControl fullWidth size="small">
+              <InputLabel>Departamento</InputLabel>
+              <Select name="depId" value={filters.depId} label="Departamento" onChange={handleFilterChange}>
+                <MenuItem value="">Todos</MenuItem>
+                {departamentos.map((dep) => (
+                  <MenuItem key={dep.DEP_ID} value={String(dep.DEP_ID)}>{dep.DEP_NOMBRE}</MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          </Grid>
+          <Grid size={{ xs: 12, md: 3 }}>
+            <FormControl fullWidth size="small">
+              <InputLabel>Horario</InputLabel>
+              <Select name="horId" value={filters.horId} label="Horario" onChange={handleFilterChange}>
+                <MenuItem value="">Todos</MenuItem>
+                {horarios.map((hor) => (
+                  <MenuItem key={hor.HOR_ID} value={String(hor.HOR_ID)}>{hor.HOR_DESCRIPCION}</MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          </Grid>
+          <Grid size={{ xs: 12, md: 1 }}>
+            <Button fullWidth variant="outlined" onClick={limpiarFiltros}>
+              Limpiar
+            </Button>
+          </Grid>
+        </Grid>
 
         <TableContainer>
           <Table>
@@ -518,8 +624,8 @@ function PruebaAxios() {
             </TableHead>
 
             <TableBody>
-              {datos.length > 0 ? (
-                datos.map((empleado) => (
+              {empleadosFiltrados.length > 0 ? (
+                empleadosFiltrados.map((empleado) => (
                   <TableRow key={empleado.EMP_ID} hover>
                     <TableCell>{empleado.EMP_ID}</TableCell>
                     <TableCell>{empleado.EMP_NOMBRE}</TableCell>
@@ -566,7 +672,7 @@ function PruebaAxios() {
               ) : (
                 <TableRow>
                   <TableCell colSpan={11} align="center">
-                    No hay empleados registrados
+                    No hay empleados con esos filtros
                   </TableCell>
                 </TableRow>
               )}

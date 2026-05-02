@@ -31,7 +31,7 @@ export const AUTH_USER_CHANGED_EVENT = 'auth-user-changed';
 export const appViews: AppView[] = [
   { key: 'marcaje', text: 'Marcaje', path: '/marcajes', roles: ['EMPLEADO'] },
 
-  { key: 'resumen-marcaje', text: 'Resumen de Marcaje', path: '/resumen-marcaje', roles: ['RRHH'], pending: true },
+  { key: 'resumen-marcaje', text: 'Resumen de Marcaje', path: '/resumen-marcaje', roles: ['RRHH'] },
   { key: 'registro-empleados', text: 'Registro de Empleados', path: '/empleados', roles: ['RRHH'] },
   { key: 'departamentos', text: 'Departamentos', path: '/departamentos', roles: ['RRHH'] },
   { key: 'puestos', text: 'Puestos', path: '/puestos', roles: ['RRHH'] },
@@ -41,7 +41,7 @@ export const appViews: AppView[] = [
   { key: 'kpis', text: 'KPIs', path: '/kpis', roles: ['RRHH'] },
   { key: 'kpi-resultado', text: 'Resultados KPI', path: '/kpi-resultado', roles: ['RRHH'] },
   { key: 'suspensiones-igss', text: 'Suspensiones de IGSS', path: '/suspensiones-igss', roles: ['RRHH'] },
-  { key: 'registro-vacaciones', text: 'Registro de Vacaciones', path: '/registro-vacaciones', roles: ['RRHH'], pending: true },
+  { key: 'registro-vacaciones', text: 'Registro de Vacaciones', path: '/registro-vacaciones', roles: ['RRHH'] },
   { key: 'control-laboral', text: 'Control Laboral', path: '/control-laboral', roles: ['RRHH'] },
   { key: 'empleado-contrato', text: 'Empleado Contrato', path: '/empleado-contrato', roles: ['RRHH'] },
   { key: 'tipo-contrato', text: 'Tipo Contrato', path: '/tipo-contrato', roles: ['RRHH'] },
