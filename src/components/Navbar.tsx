@@ -52,7 +52,6 @@ import ExpandMore from '@mui/icons-material/ExpandMore';
 import SummarizeIcon from '@mui/icons-material/Summarize';
 import EventAvailableIcon from '@mui/icons-material/EventAvailable';
 import ApprovalIcon from '@mui/icons-material/Approval';
-import UserRoleSelector from './UserRoleSelector';
 import {
   AUTH_USER_CHANGED_EVENT,
   appViews,
@@ -269,12 +268,6 @@ function Navbar() {
           <Divider />
 
           <List>
-            <Box sx={{ px: 2, py: 1.5 }}>
-              <UserRoleSelector onUserChanged={() => setCurrentRole(getCurrentUserRole())} />
-            </Box>
-
-            <Divider sx={{ my: 0.5 }} />
-
             <ListItemButton
               component={NavLink}
               to="/"

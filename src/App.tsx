@@ -125,8 +125,8 @@ function Layout({
           <Route path="/prestamos-banco" element={guarded('/prestamos-banco', <Prestamos />)} />
           <Route path="/generar-csv" element={guarded('/generar-csv', <GenerarCSV />)} />
 
-          <Route path="/resumen-marcaje" element={guarded('/resumen-marcaje', <PendingView title="Resumen de Marcaje" roleName="RRHH" />)} />
-          <Route path="/registro-vacaciones" element={guarded('/registro-vacaciones', <PendingView title="Registro de Vacaciones" roleName="RRHH" />)} />
+          <Route path="/resumen-marcaje" element={guarded('/resumen-marcaje', <MarcajePage />)} />
+          <Route path="/registro-vacaciones" element={guarded('/registro-vacaciones', <ControlLaboral />)} />
           <Route path="/isr" element={guarded('/isr', <PendingView title="ISR" roleName="Contabilidad" />)} />
           <Route path="/irtra" element={guarded('/irtra', <PendingView title="IRTRA" roleName="Contabilidad" />)} />
           <Route path="/intecap" element={guarded('/intecap', <PendingView title="INTECAP" roleName="Contabilidad" />)} />

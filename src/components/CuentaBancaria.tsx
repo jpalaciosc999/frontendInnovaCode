@@ -94,10 +94,14 @@ function CuentaBancariaPage() {
     try {
       setCargando(true);
       setError('');
-      const data = await obtenerCuentas();
-      setDatos(data);
+      const [cuentasData, empleadosData] = await Promise.all([
+        obtenerCuentas(),
+        obtenerEmpleados(),
+      ]);
+      setDatos(cuentasData);
+      setEmpleados(empleadosData);
     } catch (err: any) {
-      setError('Error cargando cuentas: ' + err.message);
+      setError('Error cargando cuentas o empleados: ' + err.message);
     } finally {
       setCargando(false);
     }
@@ -127,6 +131,13 @@ function CuentaBancariaPage() {
     const nombre = [emp.EMP_NOMBRE, emp.EMP_APELLIDO].filter(Boolean).join(' ');
     setEmpNombre(nombre || `Empleado #${emp.EMP_ID}`);
     setModalAbierto(false);
+  };
+
+  const obtenerNombreEmpleado = (empId: number | string) => {
+    const empleado = empleados.find((emp) => String(emp.EMP_ID) === String(empId));
+    if (!empleado) return `Empleado #${empId}`;
+
+    return [empleado.EMP_NOMBRE, empleado.EMP_APELLIDO].filter(Boolean).join(' ') || `Empleado #${empId}`;
   };
 
   const empleadosFiltrados = empleados.filter(emp => {
@@ -200,7 +211,7 @@ function CuentaBancariaPage() {
     setModoEdicion(true);
     setCueId(cue.CUE_ID);
     setMensaje(''); setError('');
-    setEmpNombre(`Empleado #${cue.EMP_ID}`);
+    setEmpNombre(obtenerNombreEmpleado(cue.EMP_ID));
     setForm({
       ban_nombre: cue.CUE_NOMBRE || '',
       cue_numero: cue.CUE_NUMERO || '',
@@ -348,7 +359,7 @@ function CuentaBancariaPage() {
             <TableHead>
               <TableRow>
                 <TableCell><strong>ID</strong></TableCell>
-                <TableCell><strong>Emp. ID</strong></TableCell>
+                <TableCell><strong>Empleado</strong></TableCell>
                 <TableCell><strong>Banco</strong></TableCell>
                 <TableCell><strong>Número de Cuenta</strong></TableCell>
                 <TableCell><strong>Tipo</strong></TableCell>
@@ -359,7 +370,10 @@ function CuentaBancariaPage() {
               {datos.length > 0 ? datos.map(cue => (
                 <TableRow key={cue.CUE_ID} hover>
                   <TableCell>{cue.CUE_ID}</TableCell>
-                  <TableCell>{cue.EMP_ID}</TableCell>
+                  <TableCell>
+                    <Typography variant="body2">{obtenerNombreEmpleado(cue.EMP_ID)}</Typography>
+                    <Typography variant="caption" color="text.secondary">#{cue.EMP_ID}</Typography>
+                  </TableCell>
                   <TableCell>{cue.CUE_NOMBRE}</TableCell>
                   <TableCell>{cue.CUE_NUMERO}</TableCell>
                   <TableCell>{obtenerEtiquetaTipo(cue.CUE_TIPO)}</TableCell>
