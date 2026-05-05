@@ -5,7 +5,7 @@ export interface TipoContrato {
     TIC_DESCRIPCION: string;
     TIC_TIPO_JORNADA: string;
     TIC_FECHA_MODIFICACION: string;
-    EMP_ID: number;
+    EMP_ID?: number;
 }
 
 export interface TipoContratoForm {
@@ -14,5 +14,5 @@ export interface TipoContratoForm {
     tic_descripcion: string;
     tic_tipo_jornada: string;
     tic_fecha_modificacion: string;
-    emp_id: string | number;
+    emp_id?: string | number;
 }

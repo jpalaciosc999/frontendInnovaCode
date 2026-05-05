@@ -5,6 +5,7 @@ export interface EmpleadoContrato {
     TCO_ESTADO: string;
     TIC_FECHA_MODIFICACION: string;
     TIC_ID: number;
+    EMP_ID?: number;
 }
 
 export interface EmpleadoContratoForm {
@@ -13,4 +14,5 @@ export interface EmpleadoContratoForm {
     tco_estado: string;
     tic_fecha_modificacion: string;
     tic_id: string | number;
+    emp_id: string | number;
 }

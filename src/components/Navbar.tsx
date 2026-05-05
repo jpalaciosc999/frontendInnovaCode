@@ -50,7 +50,6 @@ import FolderIcon from '@mui/icons-material/Folder';
 import ExpandLess from '@mui/icons-material/ExpandLess';
 import ExpandMore from '@mui/icons-material/ExpandMore';
 import SummarizeIcon from '@mui/icons-material/Summarize';
-import EventAvailableIcon from '@mui/icons-material/EventAvailable';
 import ApprovalIcon from '@mui/icons-material/Approval';
 import {
   AUTH_USER_CHANGED_EVENT,
@@ -87,7 +86,6 @@ const viewIcons: Record<string, ReactNode> = {
   kpis: <InsightsIcon />,
   'kpi-resultado': <QueryStatsIcon />,
   'suspensiones-igss': <MedicalServicesIcon />,
-  'registro-vacaciones': <EventAvailableIcon />,
   'control-laboral': <AccessTimeIcon />,
   'empleado-contrato': <BadgeIcon />,
   'tipo-contrato': <BadgeIcon />,

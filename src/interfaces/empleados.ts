@@ -9,6 +9,10 @@ export interface Empleado {
   EMP_ESTADO: string;
   DEP_ID?: number;
   HOR_ID?: number;
+  SED_ID?: number;
+  PUE_ID?: number;
+  EMP_SUELDO?: number | string;
+  EMP_FOTO?: string;
 }
 
 export interface EmpleadoForm {
@@ -19,6 +23,10 @@ export interface EmpleadoForm {
   emp_telefono: string;
   emp_fecha_contratacion: string;
   emp_estado: string;
-  dep_id: string;
+  dep_id?: string;
   hor_id: string;
+  sed_id: string;
+  pue_id: string;
+  emp_sueldo: string;
+  emp_foto: string;
 }

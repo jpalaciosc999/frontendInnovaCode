@@ -177,7 +177,7 @@ function Home() {
             helper="Solicitudes esperando aprobacion"
             icon={<EventAvailableIcon />}
             color="#2e7d32"
-            to="/registro-vacaciones"
+            to="/control-laboral"
           />
         </Grid>
         <Grid size={{ xs: 12, md: 4 }}>

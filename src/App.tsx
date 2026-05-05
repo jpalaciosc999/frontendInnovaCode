@@ -126,7 +126,7 @@ function Layout({
           <Route path="/generar-csv" element={guarded('/generar-csv', <GenerarCSV />)} />
 
           <Route path="/resumen-marcaje" element={guarded('/resumen-marcaje', <MarcajePage />)} />
-          <Route path="/registro-vacaciones" element={guarded('/registro-vacaciones', <ControlLaboral />)} />
+          <Route path="/registro-vacaciones" element={<Navigate to="/control-laboral" replace />} />
           <Route path="/isr" element={guarded('/isr', <PendingView title="ISR" roleName="Contabilidad" />)} />
           <Route path="/irtra" element={guarded('/irtra', <PendingView title="IRTRA" roleName="Contabilidad" />)} />
           <Route path="/intecap" element={guarded('/intecap', <PendingView title="INTECAP" roleName="Contabilidad" />)} />

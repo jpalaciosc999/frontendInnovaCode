@@ -17,7 +17,7 @@ export const suggestedPermissions: SuggestedPermission[] = [
   { nombre: 'GESTIONAR_CUENTAS_BANCARIAS', modulo: 'RRHH', descripcion: 'Permite administrar cuentas bancarias de empleados.' },
   { nombre: 'VER_KPIS', modulo: 'RRHH', descripcion: 'Permite consultar indicadores KPI.' },
   { nombre: 'GESTIONAR_SUSPENSIONES_IGSS', modulo: 'RRHH', descripcion: 'Permite registrar suspensiones de IGSS.' },
-  { nombre: 'GESTIONAR_VACACIONES', modulo: 'RRHH', descripcion: 'Permite registrar vacaciones.' },
+  { nombre: 'GESTIONAR_CONTROL_LABORAL', modulo: 'RRHH', descripcion: 'Permite registrar permisos, vacaciones y controles laborales.' },
   { nombre: 'GESTIONAR_ROLES', modulo: 'Administracion', descripcion: 'Permite administrar roles.' },
   { nombre: 'GESTIONAR_PERMISOS', modulo: 'Administracion', descripcion: 'Permite administrar permisos.' },
   { nombre: 'GESTIONAR_USUARIOS', modulo: 'Administracion', descripcion: 'Permite administrar usuarios.' },
@@ -47,7 +47,7 @@ export const suggestedPermissionNamesByRole: Record<AppRole, string[]> = {
     'GESTIONAR_CUENTAS_BANCARIAS',
     'VER_KPIS',
     'GESTIONAR_SUSPENSIONES_IGSS',
-    'GESTIONAR_VACACIONES',
+    'GESTIONAR_CONTROL_LABORAL',
   ],
   ADMIN: [
     'GESTIONAR_ROLES',

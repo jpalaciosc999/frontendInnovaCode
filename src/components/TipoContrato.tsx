@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react';
 import type { TipoContrato, TipoContratoForm } from '../interfaces/tipoContrato';
+import type { Horario } from '../interfaces/horario';
 import {
   obtenerTiposContrato,
   crearTipoContrato,
   actualizarTipoContrato,
   eliminarTipoContrato
 } from '../services/tipoContrato.service';
+import { obtenerHorarios } from '../services/horario.service';
 
 import {
   Alert,
@@ -22,7 +24,8 @@ import {
   TableHead,
   TableRow,
   TextField,
-  Typography
+  Typography,
+  MenuItem
 } from '@mui/material';
 
 import SaveIcon from '@mui/icons-material/Save';
@@ -36,18 +39,25 @@ const initialForm: TipoContratoForm = {
   tic_numero: '',
   tic_descripcion: '',
   tic_tipo_jornada: '',
-  tic_fecha_modificacion: '',
-  emp_id: ''
+  tic_fecha_modificacion: ''
 };
 
 function TipoContratoCRUD() {
   const [datos, setDatos] = useState<TipoContrato[]>([]);
+  const [horarios, setHorarios] = useState<Horario[]>([]);
+  const [cargandoHorarios, setCargandoHorarios] = useState(false);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState('');
+  const [horariosError, setHorariosError] = useState('');
   const [mensaje, setMensaje] = useState('');
   const [modoEdicion, setModoEdicion] = useState(false);
   const [id, setId] = useState<number | null>(null);
   const [form, setForm] = useState<TipoContratoForm>(initialForm);
+
+  const getHorarioLabel = (horario: Horario) =>
+    `${horario.HOR_DESCRIPCION} (${horario.HOR_HORA_INICIO} - ${horario.HOR_HORA_FIN})`;
+
+  const obtenerFechaActual = () => new Date().toISOString().split('T')[0];
 
   const cargarDatos = async () => {
     try {
@@ -62,8 +72,26 @@ function TipoContratoCRUD() {
     }
   };
 
+  const cargarHorarios = async () => {
+    try {
+      setCargandoHorarios(true);
+      setHorariosError('');
+      const data = await obtenerHorarios();
+      setHorarios(data);
+    } catch (err: any) {
+      setHorarios([]);
+      setHorariosError(
+        'No se pudieron cargar horarios. ' +
+        (err.response?.data?.error || err.message)
+      );
+    } finally {
+      setCargandoHorarios(false);
+    }
+  };
+
   useEffect(() => {
     cargarDatos();
+    cargarHorarios();
   }, []);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -82,8 +110,7 @@ function TipoContratoCRUD() {
     if (
       !form.tic_nombre.trim() ||
       !form.tic_numero.trim() ||
-      !form.tic_tipo_jornada.trim() ||
-      !String(form.emp_id).trim()
+      !form.tic_tipo_jornada.trim()
     ) {
       setError('Todos los campos obligatorios deben completarse');
       return false;
@@ -98,11 +125,16 @@ function TipoContratoCRUD() {
 
       if (!validar()) return;
 
+      const payload: TipoContratoForm = {
+        ...form,
+        tic_fecha_modificacion: obtenerFechaActual()
+      };
+
       if (modoEdicion && id !== null) {
-        await actualizarTipoContrato(id, form);
+        await actualizarTipoContrato(id, payload);
         setMensaje('Tipo de contrato actualizado correctamente');
       } else {
-        await crearTipoContrato(form);
+        await crearTipoContrato(payload);
         setMensaje('Tipo de contrato creado correctamente');
       }
 
@@ -142,8 +174,7 @@ function TipoContratoCRUD() {
       tic_tipo_jornada: t.TIC_TIPO_JORNADA,
       tic_fecha_modificacion: t.TIC_FECHA_MODIFICACION
         ? String(t.TIC_FECHA_MODIFICACION).split('T')[0]
-        : '',
-      emp_id: String(t.EMP_ID)
+        : ''
     });
   };
 
@@ -215,16 +246,44 @@ function TipoContratoCRUD() {
           </Grid>
 
           <Grid size={{ xs: 12, md: 6 }}>
-            <TextField
-              fullWidth
-              label="Tipo de jornada"
-              name="tic_tipo_jornada"
-              value={form.tic_tipo_jornada}
-              onChange={handleChange}
-            />
+            {horarios.length > 0 ? (
+              <TextField
+                select
+                fullWidth
+                label="Tipo de jornada"
+                name="tic_tipo_jornada"
+                value={form.tic_tipo_jornada}
+                onChange={handleChange}
+                disabled={cargandoHorarios}
+                helperText={cargandoHorarios ? 'Cargando horarios...' : 'Selecciona el horario de la jornada'}
+                required
+              >
+                {form.tic_tipo_jornada &&
+                  !horarios.some((horario) => horario.HOR_DESCRIPCION === form.tic_tipo_jornada) && (
+                    <MenuItem value={form.tic_tipo_jornada}>
+                      {form.tic_tipo_jornada}
+                    </MenuItem>
+                  )}
+                {horarios.map((horario) => (
+                  <MenuItem key={horario.HOR_ID} value={horario.HOR_DESCRIPCION}>
+                    {getHorarioLabel(horario)}
+                  </MenuItem>
+                ))}
+              </TextField>
+            ) : (
+              <TextField
+                fullWidth
+                label="Tipo de jornada"
+                name="tic_tipo_jornada"
+                value={form.tic_tipo_jornada}
+                onChange={handleChange}
+                helperText={cargandoHorarios ? 'Cargando horarios...' : 'Ingresa el tipo de jornada'}
+                required
+              />
+            )}
           </Grid>
 
-          <Grid size={{ xs: 12, md: 6 }}>
+          <Grid size={{ xs: 12, md: 6 }} sx={{ display: 'none' }}>
             <TextField
               fullWidth
               label="Fecha de modificación"
@@ -236,16 +295,11 @@ function TipoContratoCRUD() {
             />
           </Grid>
 
-          <Grid size={{ xs: 12, md: 6 }}>
-            <TextField
-              fullWidth
-              label="Empleado ID"
-              name="emp_id"
-              type="number"
-              value={form.emp_id}
-              onChange={handleChange}
-            />
-          </Grid>
+          {horariosError && (
+            <Grid size={{ xs: 12 }}>
+              <Alert severity="warning">{horariosError}</Alert>
+            </Grid>
+          )}
 
           <Grid size={{ xs: 12 }}>
             <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mt: 1 }}>
@@ -285,8 +339,6 @@ function TipoContratoCRUD() {
                 <TableCell><strong>Número</strong></TableCell>
                 <TableCell><strong>Descripción</strong></TableCell>
                 <TableCell><strong>Tipo Jornada</strong></TableCell>
-                <TableCell><strong>Fecha Modificación</strong></TableCell>
-                <TableCell><strong>Empleado ID</strong></TableCell>
                 <TableCell><strong>Acciones</strong></TableCell>
               </TableRow>
             </TableHead>
@@ -300,12 +352,6 @@ function TipoContratoCRUD() {
                     <TableCell>{t.TIC_NUMERO}</TableCell>
                     <TableCell>{t.TIC_DESCRIPCION}</TableCell>
                     <TableCell>{obtenerChipJornada(t.TIC_TIPO_JORNADA)}</TableCell>
-                    <TableCell>
-                      {t.TIC_FECHA_MODIFICACION
-                        ? new Date(t.TIC_FECHA_MODIFICACION).toLocaleDateString('es-GT')
-                        : '—'}
-                    </TableCell>
-                    <TableCell>{t.EMP_ID}</TableCell>
                     <TableCell>
                       <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
                         <Button
@@ -332,7 +378,7 @@ function TipoContratoCRUD() {
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={8} align="center">
+                  <TableCell colSpan={6} align="center">
                     No hay tipos de contrato registrados
                   </TableCell>
                 </TableRow>

@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react';
 import type { Puesto, PuestoForm } from '../interfaces/puestos';
+import type { Departamento } from '../interfaces/departamentos';
 import {
   obtenerPuestos,
   crearPuesto,
   actualizarPuesto,
   eliminarPuesto
 } from '../services/puestos.service';
+import { obtenerDepartamentos } from '../services/departamentos.service';
 
 import {
   Alert,
@@ -48,7 +50,9 @@ const initialForm: PuestoForm = {
 
 function Puestos() {
   const [datos, setDatos] = useState<Puesto[]>([]);
+  const [departamentos, setDepartamentos] = useState<Departamento[]>([]);
   const [cargando, setCargando] = useState(true);
+  const [cargandoDepartamentos, setCargandoDepartamentos] = useState(false);
   const [error, setError] = useState('');
   const [mensaje, setMensaje] = useState('');
   const [modoEdicion, setModoEdicion] = useState(false);
@@ -68,8 +72,21 @@ function Puestos() {
     }
   };
 
+  const cargarDepartamentos = async () => {
+    try {
+      setCargandoDepartamentos(true);
+      const data = await obtenerDepartamentos();
+      setDepartamentos(data);
+    } catch (err: any) {
+      setError('Error cargando departamentos: ' + (err.response?.data?.error || err.message));
+    } finally {
+      setCargandoDepartamentos(false);
+    }
+  };
+
   useEffect(() => {
     cargarPuestos();
+    cargarDepartamentos();
   }, []);
 
   const handleChange = (
@@ -151,8 +168,13 @@ function Puestos() {
       salario_base: String(p.PUE_SALARIO_BASE || ''),
       descripcion: p.PUE_DESCRIPCION || '',
       estado: p.PUE_ESTADO || '',
-      dep_id: String((p as any).DEP_ID || '')
+      dep_id: String(p.DEP_ID || '')
     });
+  };
+
+  const obtenerNombreDepartamento = (depId: number | string | undefined) => {
+    const dep = departamentos.find((item) => String(item.DEP_ID) === String(depId));
+    return dep ? dep.DEP_NOMBRE : depId ? `Departamento #${depId}` : 'Sin departamento';
   };
 
   const obtenerChipEstado = (estado: string) => {
@@ -208,7 +230,17 @@ function Puestos() {
           </Grid>
 
           <Grid size={{ xs: 12, md: 2 }}>
-            <TextField fullWidth label="ID Dep." name="dep_id" value={form.dep_id} onChange={handleChange} />
+            <FormControl fullWidth disabled={cargandoDepartamentos}>
+              <InputLabel>Departamento</InputLabel>
+              <Select name="dep_id" value={form.dep_id} label="Departamento" onChange={handleChange}>
+                <MenuItem value="">Seleccione</MenuItem>
+                {departamentos.map((dep) => (
+                  <MenuItem key={dep.DEP_ID} value={String(dep.DEP_ID)}>
+                    {dep.DEP_NOMBRE}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
           </Grid>
 
           <Grid size={{ xs: 12, md: 2 }}>
@@ -246,6 +278,7 @@ function Puestos() {
               <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
                 <TableCell><strong>ID / Código</strong></TableCell>
                 <TableCell><strong>Nombre</strong></TableCell>
+                <TableCell><strong>Departamento</strong></TableCell>
                 <TableCell><strong>Salario</strong></TableCell>
                 <TableCell><strong>Estado</strong></TableCell>
                 <TableCell align="center"><strong>Acciones</strong></TableCell>
@@ -264,6 +297,7 @@ function Puestos() {
                       <Typography sx={{ fontWeight: 'medium' }}>{p.PUE_NOMBRE}</Typography>
                       <Typography variant="caption" sx={{ display: 'block' }}>{p.PUE_DESCRIPCION}</Typography>
                     </TableCell>
+                    <TableCell>{obtenerNombreDepartamento(p.DEP_ID)}</TableCell>
                     <TableCell>Q. {Number(p.PUE_SALARIO_BASE).toLocaleString()}</TableCell>
                     <TableCell>{obtenerChipEstado(p.PUE_ESTADO)}</TableCell>
                     <TableCell align="center">
@@ -280,7 +314,7 @@ function Puestos() {
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={5} align="center">No hay puestos registrados</TableCell>
+                  <TableCell colSpan={6} align="center">No hay puestos registrados</TableCell>
                 </TableRow>
               )}
             </TableBody>

@@ -66,7 +66,7 @@ const defaultPermissionsByRole: Record<string, string[]> = {
     'cuentabancaria',
     'kpis',
     'suspensionesigss',
-    'registrovacaciones',
+    'controllaboral',
   ],
   admin: ['roles', 'permisos', 'usuarios', 'rolpermisos'],
   administrador: ['roles', 'permisos', 'usuarios', 'rolpermisos'],

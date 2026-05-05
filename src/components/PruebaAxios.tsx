@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { Empleado, EmpleadoForm } from '../interfaces/empleados';
-import type { Departamento } from '../interfaces/departamentos';
 import type { Horario } from '../interfaces/horario';
+import type { Puesto } from '../interfaces/puestos';
+import type { Sede } from '../interfaces/sede';
 
 import {
   obtenerEmpleados,
@@ -10,17 +11,20 @@ import {
   eliminarEmpleado
 } from '../services/empleados.service';
 
-import { obtenerDepartamentos } from '../services/departamentos.service';
 import { obtenerHorarios } from '../services/horario.service';
+import { obtenerPuestos } from '../services/puestos.service';
+import { obtenerSedes } from '../services/sede.service';
 
 import {
   Alert,
+  Avatar,
   Box,
   Button,
   Chip,
   Dialog,
   DialogContent,
   DialogTitle,
+  Divider,
   FormControl,
   Grid,
   IconButton,
@@ -51,6 +55,10 @@ import SearchIcon from '@mui/icons-material/Search';
 import CloseIcon from '@mui/icons-material/Close';
 import BusinessIcon from '@mui/icons-material/Business';
 import ScheduleIcon from '@mui/icons-material/Schedule';
+import ApartmentIcon from '@mui/icons-material/Apartment';
+import BadgeIcon from '@mui/icons-material/Badge';
+import VisibilityIcon from '@mui/icons-material/Visibility';
+import PhotoCameraIcon from '@mui/icons-material/PhotoCamera';
 
 const initialForm: EmpleadoForm = {
   emp_nombre: '',
@@ -60,15 +68,19 @@ const initialForm: EmpleadoForm = {
   emp_telefono: '',
   emp_fecha_contratacion: '',
   emp_estado: '',
-  dep_id: '',
-  hor_id: ''
+  hor_id: '',
+  sed_id: '',
+  pue_id: '',
+  emp_sueldo: '',
+  emp_foto: ''
 };
 
 const initialFilters = {
   busqueda: '',
   estado: '',
-  depId: '',
-  horId: ''
+  horId: '',
+  sedId: '',
+  pueId: ''
 };
 
 function PruebaAxios() {
@@ -80,21 +92,28 @@ function PruebaAxios() {
   const [empleadoId, setEmpleadoId] = useState<number | null>(null);
   const [form, setForm] = useState<EmpleadoForm>(initialForm);
 
-  const [depNombre, setDepNombre] = useState('');
   const [horNombre, setHorNombre] = useState('');
 
-  const [modalDepartamentos, setModalDepartamentos] = useState(false);
   const [modalHorarios, setModalHorarios] = useState(false);
 
-  const [departamentos, setDepartamentos] = useState<Departamento[]>([]);
   const [horarios, setHorarios] = useState<Horario[]>([]);
+  const [puestos, setPuestos] = useState<Puesto[]>([]);
+  const [sedes, setSedes] = useState<Sede[]>([]);
 
-  const [cargandoDeps, setCargandoDeps] = useState(false);
   const [cargandoHorarios, setCargandoHorarios] = useState(false);
+  const [cargandoPuestos, setCargandoPuestos] = useState(false);
+  const [cargandoSedes, setCargandoSedes] = useState(false);
 
-  const [filtroDep, setFiltroDep] = useState('');
   const [filtroHor, setFiltroHor] = useState('');
   const [filters, setFilters] = useState(initialFilters);
+  const [perfilEmpleado, setPerfilEmpleado] = useState<Empleado | null>(null);
+  const modalDepartamentos = false;
+  const setModalDepartamentos = (_open: boolean) => {};
+  const filtroDep = '';
+  const setFiltroDep = (_value: string) => {};
+  const cargandoDeps = false;
+  const departamentosFiltrados: any[] = [];
+  const seleccionarDepartamento = (_dep: any) => {};
 
   const cargarEmpleados = async () => {
     try {
@@ -106,18 +125,6 @@ function PruebaAxios() {
       setError('Error cargando empleados: ' + (err.response?.data?.error || err.message));
     } finally {
       setCargando(false);
-    }
-  };
-
-  const cargarDepartamentos = async () => {
-    try {
-      setCargandoDeps(true);
-      const data = await obtenerDepartamentos();
-      setDepartamentos(data);
-    } catch (err: any) {
-      setError('Error cargando departamentos: ' + (err.response?.data?.error || err.message));
-    } finally {
-      setCargandoDeps(false);
     }
   };
 
@@ -133,19 +140,36 @@ function PruebaAxios() {
     }
   };
 
-  useEffect(() => {
-    cargarEmpleados();
-    cargarDepartamentos();
-    cargarHorarios();
-  }, []);
-
-  const abrirModalDepartamentos = async () => {
-    setModalDepartamentos(true);
-    setFiltroDep('');
-    if (departamentos.length === 0) {
-      await cargarDepartamentos();
+  const cargarPuestos = async () => {
+    try {
+      setCargandoPuestos(true);
+      const data = await obtenerPuestos();
+      setPuestos(data);
+    } catch (err: any) {
+      setError('Error cargando puestos: ' + (err.response?.data?.error || err.message));
+    } finally {
+      setCargandoPuestos(false);
     }
   };
+
+  const cargarSedes = async () => {
+    try {
+      setCargandoSedes(true);
+      const data = await obtenerSedes();
+      setSedes(data);
+    } catch (err: any) {
+      setError('Error cargando sedes: ' + (err.response?.data?.error || err.message));
+    } finally {
+      setCargandoSedes(false);
+    }
+  };
+
+  useEffect(() => {
+    cargarEmpleados();
+    cargarHorarios();
+    cargarPuestos();
+    cargarSedes();
+  }, []);
 
   const abrirModalHorarios = async () => {
     setModalHorarios(true);
@@ -155,26 +179,63 @@ function PruebaAxios() {
     }
   };
 
-  const seleccionarDepartamento = (dep: Departamento) => {
-    setForm((prev) => ({ ...prev, dep_id: String(dep.DEP_ID) }));
-    setDepNombre(dep.DEP_NOMBRE);
-    setModalDepartamentos(false);
-  };
-
   const seleccionarHorario = (hor: Horario) => {
     setForm((prev) => ({ ...prev, hor_id: String(hor.HOR_ID) }));
     setHorNombre(hor.HOR_DESCRIPCION);
     setModalHorarios(false);
   };
 
-  const departamentosFiltrados = departamentos.filter((dep) => {
-    const texto = filtroDep.toLowerCase();
-    return (
-      dep.DEP_NOMBRE.toLowerCase().includes(texto) ||
-      (dep.DEP_DESCRIPCION ?? '').toLowerCase().includes(texto) ||
-      String(dep.DEP_ID).includes(texto)
-    );
-  });
+  const obtenerPuestoEmpleado = (empleado: Empleado) =>
+    puestos.find((puesto) => puesto.PUE_ID === empleado.PUE_ID);
+
+  const obtenerDepartamentoPuesto = (pueId: number | string | undefined) => {
+    const puesto = puestos.find((item) => String(item.PUE_ID) === String(pueId));
+    return puesto?.DEP_ID ? `Departamento #${puesto.DEP_ID}` : 'Sin departamento asignado';
+  };
+
+  const formatearMoneda = (valor: number | string | undefined) => {
+    const numero = Number(valor || 0);
+    if (!numero) return 'Q0.00';
+
+    return new Intl.NumberFormat('es-GT', {
+      style: 'currency',
+      currency: 'GTQ'
+    }).format(numero);
+  };
+
+  const obtenerSueldoEmpleado = (empleado: Empleado) =>
+    empleado.EMP_SUELDO ?? obtenerPuestoEmpleado(empleado)?.PUE_SALARIO_BASE ?? 0;
+
+  const obtenerFotoEmpleado = (empleado: Empleado) => empleado.EMP_FOTO || '';
+
+  const obtenerInicialesEmpleado = (empleado: Pick<Empleado, 'EMP_NOMBRE' | 'EMP_APELLIDO'>) =>
+    `${empleado.EMP_NOMBRE?.[0] ?? ''}${empleado.EMP_APELLIDO?.[0] ?? ''}`.toUpperCase() || 'E';
+
+  const handleFotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const archivo = e.target.files?.[0];
+    if (!archivo) return;
+
+    if (!archivo.type.startsWith('image/')) {
+      setError('Selecciona un archivo de imagen valido');
+      return;
+    }
+
+    if (archivo.size < 100 * 1024 || archivo.size > 300 * 1024) {
+      setError('La foto debe pesar entre 100 KB y 300 KB');
+      return;
+    }
+
+    const lector = new FileReader();
+    lector.onload = () => {
+      setForm((prev) => ({ ...prev, emp_foto: String(lector.result || '') }));
+    };
+    lector.onerror = () => setError('No se pudo cargar la foto seleccionada');
+    lector.readAsDataURL(archivo);
+  };
+
+  const quitarFoto = () => {
+    setForm((prev) => ({ ...prev, emp_foto: '' }));
+  };
 
   const horariosFiltrados = horarios.filter((hor) => {
     const texto = filtroHor.toLowerCase();
@@ -190,6 +251,17 @@ function PruebaAxios() {
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement> | SelectChangeEvent
   ) => {
     const { name, value } = e.target;
+    if (name === 'pue_id') {
+      const puesto = puestos.find((item) => String(item.PUE_ID) === String(value));
+      setForm((prev) => ({
+        ...prev,
+        pue_id: value,
+        dep_id: puesto?.DEP_ID ? String(puesto.DEP_ID) : '',
+        emp_sueldo: puesto ? String(puesto.PUE_SALARIO_BASE) : prev.emp_sueldo
+      }));
+      return;
+    }
+
     setForm((prev) => ({ ...prev, [name as string]: value }));
   };
 
@@ -206,7 +278,6 @@ function PruebaAxios() {
 
   const limpiarFormulario = () => {
     setForm(initialForm);
-    setDepNombre('');
     setHorNombre('');
     setModoEdicion(false);
     setEmpleadoId(null);
@@ -222,10 +293,17 @@ function PruebaAxios() {
       !form.emp_telefono.trim() ||
       !form.emp_fecha_contratacion.trim() ||
       !form.emp_estado.trim() ||
-      !form.dep_id ||
-      !form.hor_id
+      !form.hor_id ||
+      !form.sed_id ||
+      !form.pue_id ||
+      !form.emp_sueldo
     ) {
-      setError('Todos los campos son obligatorios, incluyendo departamento y horario');
+      setError('Todos los campos son obligatorios, incluyendo horario, sede, puesto y sueldo');
+      return false;
+    }
+
+    if (Number(form.emp_sueldo) <= 0) {
+      setError('El sueldo debe ser mayor a 0');
       return false;
     }
     return true;
@@ -276,10 +354,8 @@ function PruebaAxios() {
     setMensaje('');
     setError('');
 
-    const dep = departamentos.find((d) => d.DEP_ID === empleado.DEP_ID);
     const hor = horarios.find((h) => h.HOR_ID === empleado.HOR_ID);
 
-    setDepNombre(dep ? dep.DEP_NOMBRE : empleado.DEP_ID ? `Departamento #${empleado.DEP_ID}` : '');
     setHorNombre(hor ? hor.HOR_DESCRIPCION : empleado.HOR_ID ? `Horario #${empleado.HOR_ID}` : '');
 
     setForm({
@@ -292,8 +368,12 @@ function PruebaAxios() {
         ? String(empleado.EMP_FECHA_CONTRATACION).slice(0, 10)
         : '',
       emp_estado: empleado.EMP_ESTADO || '',
-      dep_id: String(empleado.DEP_ID || ''),
-      hor_id: String(empleado.HOR_ID || '')
+      dep_id: String(empleado.DEP_ID || obtenerPuestoEmpleado(empleado)?.DEP_ID || ''),
+      hor_id: String(empleado.HOR_ID || ''),
+      sed_id: String(empleado.SED_ID || ''),
+      pue_id: String(empleado.PUE_ID || ''),
+      emp_sueldo: String(empleado.EMP_SUELDO ?? obtenerPuestoEmpleado(empleado)?.PUE_SALARIO_BASE ?? ''),
+      emp_foto: empleado.EMP_FOTO || ''
     });
   };
 
@@ -301,18 +381,6 @@ function PruebaAxios() {
     if (estado === 'A') return <Chip label="Activo" color="success" size="small" />;
     if (estado === 'I') return <Chip label="Inactivo" color="default" size="small" />;
     return <Chip label={estado || 'Sin estado'} size="small" />;
-  };
-
-  const obtenerChipDep = (depId: number) => {
-    const dep = departamentos.find((d) => d.DEP_ID === depId);
-    return (
-      <Chip
-        label={dep ? dep.DEP_NOMBRE : `Dep. #${depId}`}
-        color="info"
-        size="small"
-        icon={<BusinessIcon />}
-      />
-    );
   };
 
   const obtenerChipHorario = (horId: number) => {
@@ -339,6 +407,30 @@ function PruebaAxios() {
     return dias.join(', ');
   };
 
+  const obtenerChipSede = (sedId: number) => {
+    const sede = sedes.find((s) => s.SED_ID === sedId);
+    return (
+      <Chip
+        label={sede ? sede.SED_NOMBRE : `Sede #${sedId}`}
+        color="primary"
+        size="small"
+        icon={<ApartmentIcon />}
+      />
+    );
+  };
+
+  const obtenerChipPuesto = (pueId: number) => {
+    const puesto = puestos.find((p) => p.PUE_ID === pueId);
+    return (
+      <Chip
+        label={puesto ? puesto.PUE_NOMBRE : `Puesto #${pueId}`}
+        color="default"
+        size="small"
+        icon={<BadgeIcon />}
+      />
+    );
+  };
+
   const empleadosFiltrados = useMemo(() => {
     const texto = filters.busqueda.trim().toLowerCase();
 
@@ -348,16 +440,18 @@ function PruebaAxios() {
 
       if (texto && !nombreCompleto.includes(texto) && !identificadores.includes(texto)) return false;
       if (filters.estado && empleado.EMP_ESTADO !== filters.estado) return false;
-      if (filters.depId && String(empleado.DEP_ID ?? '') !== filters.depId) return false;
       if (filters.horId && String(empleado.HOR_ID ?? '') !== filters.horId) return false;
+      if (filters.sedId && String(empleado.SED_ID ?? '') !== filters.sedId) return false;
+      if (filters.pueId && String(empleado.PUE_ID ?? '') !== filters.pueId) return false;
 
       return true;
     });
   }, [datos, filters]);
 
   const empleadosActivos = datos.filter((empleado) => empleado.EMP_ESTADO === 'A').length;
-  const empleadosSinDepartamento = datos.filter((empleado) => !empleado.DEP_ID).length;
   const empleadosSinHorario = datos.filter((empleado) => !empleado.HOR_ID).length;
+  const empleadosSinSede = datos.filter((empleado) => !empleado.SED_ID).length;
+  const empleadosSinPuesto = datos.filter((empleado) => !empleado.PUE_ID).length;
 
   if (cargando) {
     return (
@@ -382,6 +476,41 @@ function PruebaAxios() {
         </Typography>
 
         <Grid container spacing={2}>
+          <Grid size={{ xs: 12 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
+              <Avatar
+                src={form.emp_foto || undefined}
+                sx={{ width: 88, height: 88, bgcolor: 'primary.main', fontSize: 28 }}
+              >
+                {(form.emp_nombre?.[0] ?? '') + (form.emp_apellido?.[0] ?? '')}
+              </Avatar>
+
+              <Box>
+                <Button
+                  variant="outlined"
+                  component="label"
+                  startIcon={<PhotoCameraIcon />}
+                >
+                  Agregar foto
+                  <input
+                    hidden
+                    accept="image/*"
+                    type="file"
+                    onChange={handleFotoChange}
+                  />
+                </Button>
+                {form.emp_foto && (
+                  <Button color="secondary" onClick={quitarFoto} sx={{ ml: 1 }}>
+                    Quitar
+                  </Button>
+                )}
+                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.75 }}>
+                  JPG, PNG o WEBP. Entre 100 KB y 300 KB.
+                </Typography>
+              </Box>
+            </Box>
+          </Grid>
+
           <Grid size={{ xs: 12, md: 6 }}>
             <TextField
               fullWidth
@@ -466,19 +595,18 @@ function PruebaAxios() {
             </FormControl>
           </Grid>
 
-          <Grid size={{ xs: 12, md: 6 }}>
+          <Grid size={{ xs: 12, md: 6 }} sx={{ display: 'none' }}>
             <TextField
               fullWidth
               label="Departamento"
-              value={depNombre ? `#${form.dep_id} — ${depNombre}` : ''}
+              value=""
               placeholder="Haz clic para seleccionar un departamento"
-              onClick={abrirModalDepartamentos}
               slotProps={{
                 input: {
                   readOnly: true,
                   endAdornment: (
                     <InputAdornment position="end">
-                      <IconButton onClick={abrirModalDepartamentos} edge="end">
+                      <IconButton edge="end">
                         <BusinessIcon color="primary" />
                       </IconButton>
                     </InputAdornment>
@@ -514,6 +642,73 @@ function PruebaAxios() {
             />
           </Grid>
 
+          <Grid size={{ xs: 12, md: 6 }}>
+            <FormControl fullWidth required disabled={cargandoSedes}>
+              <InputLabel>Sede</InputLabel>
+              <Select
+                name="sed_id"
+                value={form.sed_id}
+                label="Sede"
+                onChange={handleChange}
+              >
+                <MenuItem value="">Seleccione sede</MenuItem>
+                {sedes.map((sede) => (
+                  <MenuItem key={sede.SED_ID} value={String(sede.SED_ID)}>
+                    {sede.SED_NOMBRE} - {sede.SED_MUNICIPIO}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          </Grid>
+
+          <Grid size={{ xs: 12, md: 6 }}>
+            <FormControl fullWidth required disabled={cargandoPuestos}>
+              <InputLabel>Puesto</InputLabel>
+              <Select
+                name="pue_id"
+                value={form.pue_id}
+                label="Puesto"
+                onChange={handleChange}
+              >
+                <MenuItem value="">Seleccione puesto</MenuItem>
+                {puestos.map((puesto) => (
+                  <MenuItem key={puesto.PUE_ID} value={String(puesto.PUE_ID)}>
+                    {puesto.PUE_NOMBRE} - {formatearMoneda(puesto.PUE_SALARIO_BASE)} / {obtenerDepartamentoPuesto(puesto.PUE_ID)}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          </Grid>
+
+          <Grid size={{ xs: 12, md: 6 }}>
+            <TextField
+              fullWidth
+              label="Departamento del puesto"
+              value={form.pue_id ? obtenerDepartamentoPuesto(form.pue_id) : ''}
+              placeholder="Se completa al seleccionar puesto"
+              slotProps={{ input: { readOnly: true } }}
+            />
+          </Grid>
+
+          <Grid size={{ xs: 12, md: 6 }}>
+            <TextField
+              fullWidth
+              label="Sueldo"
+              name="emp_sueldo"
+              type="number"
+              value={form.emp_sueldo}
+              onChange={handleChange}
+              helperText="Se llena con el sueldo base del puesto, pero puedes modificarlo para este empleado"
+              slotProps={{
+                input: {
+                  startAdornment: <InputAdornment position="start">Q</InputAdornment>,
+                  inputProps: { min: 0, step: '0.01' }
+                }
+              }}
+              required
+            />
+          </Grid>
+
           <Grid size={{ xs: 12 }}>
             <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mt: 1 }}>
               <Button variant="contained" startIcon={<SaveIcon />} onClick={guardarEmpleado}>
@@ -540,8 +735,9 @@ function PruebaAxios() {
           </Typography>
           <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
             <Chip label={`Activos: ${empleadosActivos}`} color="success" size="small" />
-            <Chip label={`Sin depto: ${empleadosSinDepartamento}`} color="warning" size="small" />
             <Chip label={`Sin horario: ${empleadosSinHorario}`} color="warning" size="small" />
+            <Chip label={`Sin sede: ${empleadosSinSede}`} color="warning" size="small" />
+            <Chip label={`Sin puesto: ${empleadosSinPuesto}`} color="warning" size="small" />
           </Box>
         </Box>
 
@@ -576,24 +772,35 @@ function PruebaAxios() {
               </Select>
             </FormControl>
           </Grid>
-          <Grid size={{ xs: 12, md: 3 }}>
-            <FormControl fullWidth size="small">
-              <InputLabel>Departamento</InputLabel>
-              <Select name="depId" value={filters.depId} label="Departamento" onChange={handleFilterChange}>
-                <MenuItem value="">Todos</MenuItem>
-                {departamentos.map((dep) => (
-                  <MenuItem key={dep.DEP_ID} value={String(dep.DEP_ID)}>{dep.DEP_NOMBRE}</MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          </Grid>
-          <Grid size={{ xs: 12, md: 3 }}>
+          <Grid size={{ xs: 12, md: 2 }}>
             <FormControl fullWidth size="small">
               <InputLabel>Horario</InputLabel>
               <Select name="horId" value={filters.horId} label="Horario" onChange={handleFilterChange}>
                 <MenuItem value="">Todos</MenuItem>
                 {horarios.map((hor) => (
                   <MenuItem key={hor.HOR_ID} value={String(hor.HOR_ID)}>{hor.HOR_DESCRIPCION}</MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          </Grid>
+          <Grid size={{ xs: 12, md: 2 }}>
+            <FormControl fullWidth size="small">
+              <InputLabel>Sede</InputLabel>
+              <Select name="sedId" value={filters.sedId} label="Sede" onChange={handleFilterChange}>
+                <MenuItem value="">Todas</MenuItem>
+                {sedes.map((sede) => (
+                  <MenuItem key={sede.SED_ID} value={String(sede.SED_ID)}>{sede.SED_NOMBRE}</MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          </Grid>
+          <Grid size={{ xs: 12, md: 2 }}>
+            <FormControl fullWidth size="small">
+              <InputLabel>Puesto</InputLabel>
+              <Select name="pueId" value={filters.pueId} label="Puesto" onChange={handleFilterChange}>
+                <MenuItem value="">Todos</MenuItem>
+                {puestos.map((puesto) => (
+                  <MenuItem key={puesto.PUE_ID} value={String(puesto.PUE_ID)}>{puesto.PUE_NOMBRE}</MenuItem>
                 ))}
               </Select>
             </FormControl>
@@ -610,14 +817,17 @@ function PruebaAxios() {
             <TableHead>
               <TableRow>
                 <TableCell><strong>ID</strong></TableCell>
+                <TableCell><strong>Foto</strong></TableCell>
                 <TableCell><strong>Nombre</strong></TableCell>
                 <TableCell><strong>Apellido</strong></TableCell>
                 <TableCell><strong>DPI</strong></TableCell>
                 <TableCell><strong>NIT</strong></TableCell>
                 <TableCell><strong>Teléfono</strong></TableCell>
                 <TableCell><strong>F. Contratación</strong></TableCell>
-                <TableCell><strong>Departamento</strong></TableCell>
                 <TableCell><strong>Horario</strong></TableCell>
+                <TableCell><strong>Sede</strong></TableCell>
+                <TableCell><strong>Puesto</strong></TableCell>
+                <TableCell><strong>Sueldo</strong></TableCell>
                 <TableCell><strong>Estado</strong></TableCell>
                 <TableCell><strong>Acciones</strong></TableCell>
               </TableRow>
@@ -628,6 +838,14 @@ function PruebaAxios() {
                 empleadosFiltrados.map((empleado) => (
                   <TableRow key={empleado.EMP_ID} hover>
                     <TableCell>{empleado.EMP_ID}</TableCell>
+                    <TableCell>
+                      <Avatar
+                        src={obtenerFotoEmpleado(empleado) || undefined}
+                        sx={{ width: 36, height: 36, bgcolor: 'primary.main' }}
+                      >
+                        {obtenerInicialesEmpleado(empleado)}
+                      </Avatar>
+                    </TableCell>
                     <TableCell>{empleado.EMP_NOMBRE}</TableCell>
                     <TableCell>{empleado.EMP_APELLIDO}</TableCell>
                     <TableCell>{empleado.EMP_DPI}</TableCell>
@@ -639,14 +857,28 @@ function PruebaAxios() {
                         : '—'}
                     </TableCell>
                     <TableCell>
-                      {empleado.DEP_ID ? obtenerChipDep(empleado.DEP_ID) : '—'}
-                    </TableCell>
-                    <TableCell>
                       {empleado.HOR_ID ? obtenerChipHorario(empleado.HOR_ID) : '—'}
                     </TableCell>
+                    <TableCell>
+                      {empleado.SED_ID ? obtenerChipSede(empleado.SED_ID) : '—'}
+                    </TableCell>
+                    <TableCell>
+                      {empleado.PUE_ID ? obtenerChipPuesto(empleado.PUE_ID) : '—'}
+                    </TableCell>
+                    <TableCell>{formatearMoneda(obtenerSueldoEmpleado(empleado))}</TableCell>
                     <TableCell>{obtenerChipEstado(empleado.EMP_ESTADO)}</TableCell>
                     <TableCell>
                       <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          color="info"
+                          startIcon={<VisibilityIcon />}
+                          onClick={() => setPerfilEmpleado(empleado)}
+                        >
+                          Perfil
+                        </Button>
+
                         <Button
                           size="small"
                           variant="outlined"
@@ -671,7 +903,7 @@ function PruebaAxios() {
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={11} align="center">
+                  <TableCell colSpan={14} align="center">
                     No hay empleados con esos filtros
                   </TableCell>
                 </TableRow>
@@ -851,6 +1083,117 @@ function PruebaAxios() {
             </TableContainer>
           )}
         </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={!!perfilEmpleado}
+        onClose={() => setPerfilEmpleado(null)}
+        fullWidth
+        maxWidth="sm"
+        slotProps={{ paper: { sx: { borderRadius: 3 } } }}
+      >
+        <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', pb: 1 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <PeopleIcon color="primary" />
+            <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
+              Perfil del empleado
+            </Typography>
+          </Box>
+          <IconButton onClick={() => setPerfilEmpleado(null)} size="small">
+            <CloseIcon />
+          </IconButton>
+        </DialogTitle>
+
+        {perfilEmpleado && (
+          <DialogContent sx={{ pt: 1 }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 2, alignItems: 'flex-start', mb: 2 }}>
+              <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', minWidth: 0 }}>
+                <Avatar
+                  src={obtenerFotoEmpleado(perfilEmpleado) || undefined}
+                  sx={{ width: 72, height: 72, bgcolor: 'primary.main', fontSize: 24, flexShrink: 0 }}
+                >
+                  {obtenerInicialesEmpleado(perfilEmpleado)}
+                </Avatar>
+                <Box sx={{ minWidth: 0 }}>
+                <Typography variant="h5" sx={{ fontWeight: 800 }}>
+                  {perfilEmpleado.EMP_NOMBRE} {perfilEmpleado.EMP_APELLIDO}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  ID {perfilEmpleado.EMP_ID} / DPI {perfilEmpleado.EMP_DPI}
+                </Typography>
+                </Box>
+              </Box>
+              {obtenerChipEstado(perfilEmpleado.EMP_ESTADO)}
+            </Box>
+
+            <Divider sx={{ mb: 2 }} />
+
+            <Grid container spacing={2}>
+              <Grid size={{ xs: 12, md: 6 }}>
+                <Typography variant="caption" color="text.secondary">NIT</Typography>
+                <Typography>{perfilEmpleado.EMP_NIT || '—'}</Typography>
+              </Grid>
+              <Grid size={{ xs: 12, md: 6 }}>
+                <Typography variant="caption" color="text.secondary">Teléfono</Typography>
+                <Typography>{perfilEmpleado.EMP_TELEFONO || '—'}</Typography>
+              </Grid>
+              <Grid size={{ xs: 12, md: 6 }}>
+                <Typography variant="caption" color="text.secondary">Fecha de contratación</Typography>
+                <Typography>
+                  {perfilEmpleado.EMP_FECHA_CONTRATACION
+                    ? String(perfilEmpleado.EMP_FECHA_CONTRATACION).slice(0, 10)
+                    : '—'}
+                </Typography>
+              </Grid>
+              <Grid size={{ xs: 12, md: 6 }}>
+                <Typography variant="caption" color="text.secondary">Sueldo</Typography>
+                <Typography sx={{ fontWeight: 700 }}>
+                  {formatearMoneda(obtenerSueldoEmpleado(perfilEmpleado))}
+                </Typography>
+              </Grid>
+              <Grid size={{ xs: 12, md: 6 }}>
+                <Typography variant="caption" color="text.secondary">Departamento del puesto</Typography>
+                <Box sx={{ mt: 0.5 }}>
+                  {perfilEmpleado.PUE_ID ? obtenerDepartamentoPuesto(perfilEmpleado.PUE_ID) : '—'}
+                </Box>
+              </Grid>
+              <Grid size={{ xs: 12, md: 6 }}>
+                <Typography variant="caption" color="text.secondary">Horario</Typography>
+                <Box sx={{ mt: 0.5 }}>
+                  {perfilEmpleado.HOR_ID ? obtenerChipHorario(perfilEmpleado.HOR_ID) : '—'}
+                </Box>
+              </Grid>
+              <Grid size={{ xs: 12, md: 6 }}>
+                <Typography variant="caption" color="text.secondary">Sede</Typography>
+                <Box sx={{ mt: 0.5 }}>
+                  {perfilEmpleado.SED_ID ? obtenerChipSede(perfilEmpleado.SED_ID) : '—'}
+                </Box>
+              </Grid>
+              <Grid size={{ xs: 12, md: 6 }}>
+                <Typography variant="caption" color="text.secondary">Puesto</Typography>
+                <Box sx={{ mt: 0.5 }}>
+                  {perfilEmpleado.PUE_ID ? obtenerChipPuesto(perfilEmpleado.PUE_ID) : '—'}
+                </Box>
+              </Grid>
+            </Grid>
+
+            <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1, mt: 3 }}>
+              <Button
+                variant="outlined"
+                startIcon={<EditIcon />}
+                onClick={() => {
+                  handleEditar(perfilEmpleado);
+                  setPerfilEmpleado(null);
+                }}
+              >
+                Editar
+              </Button>
+              <Button variant="contained" onClick={() => setPerfilEmpleado(null)}>
+                Cerrar
+              </Button>
+            </Box>
+          </DialogContent>
+        )}
       </Dialog>
 
       <Snackbar
