@@ -1,9 +1,8 @@
-import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { Box, Container, CssBaseline } from '@mui/material';
 
-import { AuthProvider } from './context/AuthContext';
+import { AuthProvider, useAuth } from './context/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import LoginPage from './components/LoginPage';
 import Navbar from './components/Navbar';
@@ -42,43 +41,25 @@ import CalculadoraISR from './components/CalculadoraIsr';
 import GenerarCSV from './components/Generarcsv';
 import SuspensionIgss from './components/SuspensionIgss';
 
-import {
-  AUTH_USER_CHANGED_EVENT,
-  allViews,
-  canAccessPath,
-  getCurrentUserRole,
-  roleLabels,
-} from './config/roleViews';
-
 function GuardedRoute({
   path,
-  currentRole,
   children,
 }: {
   path: string;
-  currentRole: ReturnType<typeof getCurrentUserRole>;
   children: ReactNode;
 }) {
-  const view = allViews.find((item) => item.path === path);
+  const { canAccessPath } = useAuth();
 
-  if (!canAccessPath(path, currentRole)) {
-    return (
-      <AccessDenied
-        requiredRoles={view?.roles.map((role) => roleLabels[role])}
-      />
-    );
+  if (!canAccessPath(path)) {
+    return <AccessDenied />;
   }
 
   return <>{children}</>;
 }
 
-function Layout({
-  currentRole,
-}: {
-  currentRole: ReturnType<typeof getCurrentUserRole>;
-}) {
+function Layout() {
   const guarded = (path: string, element: ReactNode) => (
-    <GuardedRoute path={path} currentRole={currentRole}>
+    <GuardedRoute path={path}>
       {element}
     </GuardedRoute>
   );
@@ -140,22 +121,6 @@ function Layout({
 }
 
 function App() {
-  const [currentRole, setCurrentRole] = useState(getCurrentUserRole());
-
-  useEffect(() => {
-    const syncCurrentRole = () => {
-      setCurrentRole(getCurrentUserRole());
-    };
-
-    window.addEventListener(AUTH_USER_CHANGED_EVENT, syncCurrentRole);
-    window.addEventListener('storage', syncCurrentRole);
-
-    return () => {
-      window.removeEventListener(AUTH_USER_CHANGED_EVENT, syncCurrentRole);
-      window.removeEventListener('storage', syncCurrentRole);
-    };
-  }, []);
-
   return (
     <AuthProvider>
       <CssBaseline />
@@ -164,7 +129,7 @@ function App() {
         <Route path="/login" element={<LoginPage />} />
 
         <Route element={<ProtectedRoute />}>
-          <Route path="/*" element={<Layout currentRole={currentRole} />} />
+          <Route path="/*" element={<Layout />} />
         </Route>
 
         <Route path="*" element={<Navigate to="/login" replace />} />

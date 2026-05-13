@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useDeferredValue, useEffect, useMemo, useState } from 'react';
 import type { Empleado, EmpleadoForm } from '../interfaces/empleados';
 import type { Horario } from '../interfaces/horario';
 import type { Puesto } from '../interfaces/puestos';
 import type { Sede } from '../interfaces/sede';
+import type { TipoContrato } from '../interfaces/tipoContrato';
 
 import {
   obtenerEmpleados,
@@ -14,6 +15,7 @@ import {
 import { obtenerHorarios } from '../services/horario.service';
 import { obtenerPuestos } from '../services/puestos.service';
 import { obtenerSedes } from '../services/sede.service';
+import { obtenerTiposContrato } from '../services/tipoContrato.service';
 
 import {
   Alert,
@@ -59,6 +61,7 @@ import ApartmentIcon from '@mui/icons-material/Apartment';
 import BadgeIcon from '@mui/icons-material/Badge';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import PhotoCameraIcon from '@mui/icons-material/PhotoCamera';
+import ArticleIcon from '@mui/icons-material/Article';
 
 const initialForm: EmpleadoForm = {
   emp_nombre: '',
@@ -71,8 +74,20 @@ const initialForm: EmpleadoForm = {
   hor_id: '',
   sed_id: '',
   pue_id: '',
+  tic_id: '',
+  emp_fecha_inicio_contrato: '',
+  emp_fecha_fin_contrato: '',
+  emp_motivo_cambio_contrato: '',
   emp_sueldo: '',
   emp_foto: ''
+};
+
+const getToday = () => new Date().toISOString().slice(0, 10);
+
+type ContratoEmpleadoSnapshot = {
+  tic_id: string;
+  fecha_inicio: string;
+  fecha_fin: string;
 };
 
 const initialFilters = {
@@ -80,7 +95,60 @@ const initialFilters = {
   estado: '',
   horId: '',
   sedId: '',
-  pueId: ''
+  pueId: '',
+  ticId: ''
+};
+
+const EMPLOYEE_TABLE_LIMIT = 75;
+
+const obtenerMimeImagen = (bytes: Uint8Array) => {
+  if (bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return 'image/jpeg';
+  if (bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47) return 'image/png';
+  if (
+    bytes[0] === 0x52 &&
+    bytes[1] === 0x49 &&
+    bytes[2] === 0x46 &&
+    bytes[3] === 0x46 &&
+    bytes[8] === 0x57 &&
+    bytes[9] === 0x45 &&
+    bytes[10] === 0x42 &&
+    bytes[11] === 0x50
+  ) {
+    return 'image/webp';
+  }
+
+  return 'image/jpeg';
+};
+
+const bytesABase64 = (bytes: Uint8Array) => {
+  let binario = '';
+  bytes.forEach((byte) => {
+    binario += String.fromCharCode(byte);
+  });
+  return btoa(binario);
+};
+
+const normalizarFotoEmpleado = (foto?: Empleado['EMP_FOTO']) => {
+  if (!foto) return '';
+
+  if (typeof foto === 'string') {
+    const valor = foto.trim();
+    if (!valor) return '';
+    if (valor.startsWith('data:image/')) return valor;
+    if (valor.startsWith('http://') || valor.startsWith('https://')) return valor;
+    return `data:image/jpeg;base64,${valor}`;
+  }
+
+  if (Array.isArray(foto.data) && foto.data.length > 0) {
+    const bytes = new Uint8Array(foto.data);
+    const texto = new TextDecoder().decode(bytes).trim();
+
+    if (texto.startsWith('data:image/')) return texto;
+
+    return `data:${obtenerMimeImagen(bytes)};base64,${bytesABase64(bytes)}`;
+  }
+
+  return '';
 };
 
 function PruebaAxios() {
@@ -91,6 +159,7 @@ function PruebaAxios() {
   const [modoEdicion, setModoEdicion] = useState(false);
   const [empleadoId, setEmpleadoId] = useState<number | null>(null);
   const [form, setForm] = useState<EmpleadoForm>(initialForm);
+  const [contratoOriginal, setContratoOriginal] = useState<ContratoEmpleadoSnapshot | null>(null);
 
   const [horNombre, setHorNombre] = useState('');
 
@@ -99,10 +168,12 @@ function PruebaAxios() {
   const [horarios, setHorarios] = useState<Horario[]>([]);
   const [puestos, setPuestos] = useState<Puesto[]>([]);
   const [sedes, setSedes] = useState<Sede[]>([]);
+  const [tiposContrato, setTiposContrato] = useState<TipoContrato[]>([]);
 
   const [cargandoHorarios, setCargandoHorarios] = useState(false);
   const [cargandoPuestos, setCargandoPuestos] = useState(false);
   const [cargandoSedes, setCargandoSedes] = useState(false);
+  const [cargandoTiposContrato, setCargandoTiposContrato] = useState(false);
 
   const [filtroHor, setFiltroHor] = useState('');
   const [filters, setFilters] = useState(initialFilters);
@@ -164,11 +235,24 @@ function PruebaAxios() {
     }
   };
 
+  const cargarTiposContrato = async () => {
+    try {
+      setCargandoTiposContrato(true);
+      const data = await obtenerTiposContrato();
+      setTiposContrato(data);
+    } catch (err: any) {
+      setError('Error cargando tipos de contrato: ' + (err.response?.data?.error || err.message));
+    } finally {
+      setCargandoTiposContrato(false);
+    }
+  };
+
   useEffect(() => {
     cargarEmpleados();
     cargarHorarios();
     cargarPuestos();
     cargarSedes();
+    cargarTiposContrato();
   }, []);
 
   const abrirModalHorarios = async () => {
@@ -206,7 +290,16 @@ function PruebaAxios() {
   const obtenerSueldoEmpleado = (empleado: Empleado) =>
     empleado.EMP_SUELDO ?? obtenerPuestoEmpleado(empleado)?.PUE_SALARIO_BASE ?? 0;
 
-  const obtenerFotoEmpleado = (empleado: Empleado) => empleado.EMP_FOTO || '';
+  const obtenerTipoContrato = (ticId: number | string | undefined) =>
+    tiposContrato.find((tipo) => String(tipo.TIC_ID) === String(ticId));
+
+  const esContratoIndefinido = (ticId: number | string | undefined) => {
+    const tipo = obtenerTipoContrato(ticId);
+    return tipo?.TIC_NOMBRE.toLowerCase().includes('indefinido') ?? false;
+  };
+
+  const obtenerFotoEmpleado = (empleado: Empleado) =>
+    normalizarFotoEmpleado(empleado.EMP_FOTO) || normalizarFotoEmpleado(empleado.emp_foto);
 
   const obtenerInicialesEmpleado = (empleado: Pick<Empleado, 'EMP_NOMBRE' | 'EMP_APELLIDO'>) =>
     `${empleado.EMP_NOMBRE?.[0] ?? ''}${empleado.EMP_APELLIDO?.[0] ?? ''}`.toUpperCase() || 'E';
@@ -220,8 +313,8 @@ function PruebaAxios() {
       return;
     }
 
-    if (archivo.size < 100 * 1024 || archivo.size > 300 * 1024) {
-      setError('La foto debe pesar entre 100 KB y 300 KB');
+    if (archivo.size < 50 * 1024 || archivo.size > 300 * 1024) {
+      setError('La foto debe pesar entre 50 KB y 300 KB');
       return;
     }
 
@@ -237,20 +330,33 @@ function PruebaAxios() {
     setForm((prev) => ({ ...prev, emp_foto: '' }));
   };
 
-  const horariosFiltrados = horarios.filter((hor) => {
+  const horariosFiltrados = useMemo(() => {
     const texto = filtroHor.toLowerCase();
-    return (
+    return horarios.filter((hor) => (
       hor.HOR_DESCRIPCION.toLowerCase().includes(texto) ||
       hor.HOR_HORA_INICIO.toLowerCase().includes(texto) ||
       hor.HOR_HORA_FIN.toLowerCase().includes(texto) ||
       String(hor.HOR_ID).includes(texto)
-    );
-  });
+    ));
+  }, [filtroHor, horarios]);
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement> | SelectChangeEvent
   ) => {
     const { name, value } = e.target;
+    if (name === 'tic_id') {
+      setForm((prev) => ({
+        ...prev,
+        tic_id: value,
+        emp_fecha_inicio_contrato:
+          modoEdicion && String(value) !== String(contratoOriginal?.tic_id ?? '')
+            ? getToday()
+            : prev.emp_fecha_inicio_contrato,
+        emp_fecha_fin_contrato: esContratoIndefinido(value) ? '' : prev.emp_fecha_fin_contrato
+      }));
+      return;
+    }
+
     if (name === 'pue_id') {
       const puesto = puestos.find((item) => String(item.PUE_ID) === String(value));
       setForm((prev) => ({
@@ -281,8 +387,19 @@ function PruebaAxios() {
     setHorNombre('');
     setModoEdicion(false);
     setEmpleadoId(null);
+    setContratoOriginal(null);
     setError('');
   };
+
+  const contratoCambioPendiente = Boolean(
+    modoEdicion &&
+    contratoOriginal &&
+    (
+      String(form.tic_id || '') !== contratoOriginal.tic_id ||
+      String(form.emp_fecha_inicio_contrato || '') !== contratoOriginal.fecha_inicio ||
+      String(form.emp_fecha_fin_contrato || '') !== contratoOriginal.fecha_fin
+    )
+  );
 
   const validarFormulario = () => {
     if (
@@ -296,9 +413,41 @@ function PruebaAxios() {
       !form.hor_id ||
       !form.sed_id ||
       !form.pue_id ||
+      !form.tic_id ||
       !form.emp_sueldo
     ) {
-      setError('Todos los campos son obligatorios, incluyendo horario, sede, puesto y sueldo');
+      setError('Todos los campos son obligatorios, incluyendo horario, sede, puesto, tipo de contrato y sueldo');
+      return false;
+    }
+
+    if (!esContratoIndefinido(form.tic_id) && !form.emp_fecha_fin_contrato) {
+      setError('La fecha fin de contrato es obligatoria para contratos no indefinidos');
+      return false;
+    }
+
+    if (!form.emp_fecha_inicio_contrato) {
+      setError('La fecha de inicio de contrato es obligatoria');
+      return false;
+    }
+
+    if (
+      contratoCambioPendiente &&
+      form.emp_fecha_inicio_contrato <= contratoOriginal!.fecha_inicio
+    ) {
+      setError('La fecha de inicio del nuevo contrato debe ser posterior al contrato vigente');
+      return false;
+    }
+
+    if (contratoCambioPendiente && !form.emp_motivo_cambio_contrato?.trim()) {
+      setError('Indica el motivo del cambio de contrato');
+      return false;
+    }
+
+    if (
+      form.emp_fecha_fin_contrato &&
+      form.emp_fecha_fin_contrato < form.emp_fecha_inicio_contrato
+    ) {
+      setError('La fecha fin de contrato no puede ser anterior a la fecha de contratación');
       return false;
     }
 
@@ -316,11 +465,16 @@ function PruebaAxios() {
 
       if (!validarFormulario()) return;
 
+      const payload: EmpleadoForm = {
+        ...form,
+        emp_fecha_inicio_contrato: form.emp_fecha_inicio_contrato || form.emp_fecha_contratacion
+      };
+
       if (modoEdicion && empleadoId !== null) {
-        await actualizarEmpleado(empleadoId, form);
+        await actualizarEmpleado(empleadoId, payload);
         setMensaje('Empleado actualizado correctamente');
       } else {
-        await crearEmpleado(form);
+        await crearEmpleado(payload);
         setMensaje('Empleado creado correctamente');
       }
 
@@ -358,6 +512,22 @@ function PruebaAxios() {
 
     setHorNombre(hor ? hor.HOR_DESCRIPCION : empleado.HOR_ID ? `Horario #${empleado.HOR_ID}` : '');
 
+    const fechaInicioContrato = empleado.EMP_FECHA_INICIO_CONTRATO
+      ? String(empleado.EMP_FECHA_INICIO_CONTRATO).slice(0, 10)
+      : empleado.EMP_FECHA_CONTRATACION
+        ? String(empleado.EMP_FECHA_CONTRATACION).slice(0, 10)
+        : '';
+    const fechaFinContrato = empleado.EMP_FECHA_FIN_CONTRATO
+      ? String(empleado.EMP_FECHA_FIN_CONTRATO).slice(0, 10)
+      : '';
+    const tipoContratoId = String(empleado.TIC_ID || '');
+
+    setContratoOriginal({
+      tic_id: tipoContratoId,
+      fecha_inicio: fechaInicioContrato,
+      fecha_fin: fechaFinContrato
+    });
+
     setForm({
       emp_nombre: empleado.EMP_NOMBRE || '',
       emp_apellido: empleado.EMP_APELLIDO || '',
@@ -372,8 +542,12 @@ function PruebaAxios() {
       hor_id: String(empleado.HOR_ID || ''),
       sed_id: String(empleado.SED_ID || ''),
       pue_id: String(empleado.PUE_ID || ''),
+      tic_id: tipoContratoId,
+      emp_fecha_inicio_contrato: fechaInicioContrato,
+      emp_fecha_fin_contrato: fechaFinContrato,
+      emp_motivo_cambio_contrato: '',
       emp_sueldo: String(empleado.EMP_SUELDO ?? obtenerPuestoEmpleado(empleado)?.PUE_SALARIO_BASE ?? ''),
-      emp_foto: empleado.EMP_FOTO || ''
+      emp_foto: obtenerFotoEmpleado(empleado)
     });
   };
 
@@ -431,27 +605,53 @@ function PruebaAxios() {
     );
   };
 
+  const obtenerChipTipoContrato = (ticId: number) => {
+    const tipo = tiposContrato.find((t) => t.TIC_ID === ticId);
+    return (
+      <Chip
+        label={tipo ? `${tipo.TIC_NOMBRE} - ${tipo.TIC_TIPO_JORNADA}` : `Contrato #${ticId}`}
+        color="info"
+        size="small"
+        icon={<ArticleIcon />}
+      />
+    );
+  };
+
+  const formatearFechaSimple = (fecha?: string) =>
+    fecha ? String(fecha).slice(0, 10) : '—';
+
+  const deferredFilters = useDeferredValue(filters);
+
   const empleadosFiltrados = useMemo(() => {
-    const texto = filters.busqueda.trim().toLowerCase();
+    const texto = deferredFilters.busqueda.trim().toLowerCase();
 
     return datos.filter((empleado) => {
       const nombreCompleto = `${empleado.EMP_NOMBRE ?? ''} ${empleado.EMP_APELLIDO ?? ''}`.toLowerCase();
       const identificadores = `${empleado.EMP_ID} ${empleado.EMP_DPI ?? ''} ${empleado.EMP_NIT ?? ''}`.toLowerCase();
 
       if (texto && !nombreCompleto.includes(texto) && !identificadores.includes(texto)) return false;
-      if (filters.estado && empleado.EMP_ESTADO !== filters.estado) return false;
-      if (filters.horId && String(empleado.HOR_ID ?? '') !== filters.horId) return false;
-      if (filters.sedId && String(empleado.SED_ID ?? '') !== filters.sedId) return false;
-      if (filters.pueId && String(empleado.PUE_ID ?? '') !== filters.pueId) return false;
+      if (deferredFilters.estado && empleado.EMP_ESTADO !== deferredFilters.estado) return false;
+      if (deferredFilters.horId && String(empleado.HOR_ID ?? '') !== deferredFilters.horId) return false;
+      if (deferredFilters.sedId && String(empleado.SED_ID ?? '') !== deferredFilters.sedId) return false;
+      if (deferredFilters.pueId && String(empleado.PUE_ID ?? '') !== deferredFilters.pueId) return false;
+      if (deferredFilters.ticId && String(empleado.TIC_ID ?? '') !== deferredFilters.ticId) return false;
 
       return true;
     });
-  }, [datos, filters]);
+  }, [datos, deferredFilters]);
 
-  const empleadosActivos = datos.filter((empleado) => empleado.EMP_ESTADO === 'A').length;
-  const empleadosSinHorario = datos.filter((empleado) => !empleado.HOR_ID).length;
-  const empleadosSinSede = datos.filter((empleado) => !empleado.SED_ID).length;
-  const empleadosSinPuesto = datos.filter((empleado) => !empleado.PUE_ID).length;
+  const empleadosVisibles = useMemo(
+    () => empleadosFiltrados.slice(0, EMPLOYEE_TABLE_LIMIT),
+    [empleadosFiltrados]
+  );
+
+  const resumenEmpleados = useMemo(() => ({
+    activos: datos.filter((empleado) => empleado.EMP_ESTADO === 'A').length,
+    sinHorario: datos.filter((empleado) => !empleado.HOR_ID).length,
+    sinSede: datos.filter((empleado) => !empleado.SED_ID).length,
+    sinPuesto: datos.filter((empleado) => !empleado.PUE_ID).length,
+    sinContrato: datos.filter((empleado) => !empleado.TIC_ID).length
+  }), [datos]);
 
   if (cargando) {
     return (
@@ -505,7 +705,7 @@ function PruebaAxios() {
                   </Button>
                 )}
                 <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.75 }}>
-                  JPG, PNG o WEBP. Entre 100 KB y 300 KB.
+                  JPG, PNG o WEBP. Entre 50 KB y 300 KB.
                 </Typography>
               </Box>
             </Box>
@@ -681,6 +881,81 @@ function PruebaAxios() {
           </Grid>
 
           <Grid size={{ xs: 12, md: 6 }}>
+            <FormControl fullWidth required disabled={cargandoTiposContrato}>
+              <InputLabel>Tipo de contrato</InputLabel>
+              <Select
+                name="tic_id"
+                value={form.tic_id}
+                label="Tipo de contrato"
+                onChange={handleChange}
+              >
+                <MenuItem value="">Seleccione tipo de contrato</MenuItem>
+                {tiposContrato.map((tipo) => (
+                  <MenuItem key={tipo.TIC_ID} value={String(tipo.TIC_ID)}>
+                    {tipo.TIC_NOMBRE} - {tipo.TIC_TIPO_JORNADA}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          </Grid>
+
+          <Grid size={{ xs: 12, md: 6 }}>
+            <TextField
+              fullWidth
+              label="Inicio de contrato"
+              name="emp_fecha_inicio_contrato"
+              type="date"
+              value={form.emp_fecha_inicio_contrato || form.emp_fecha_contratacion}
+              onChange={handleChange}
+              helperText="Usa esta fecha cuando el empleado cambie a un nuevo contrato"
+              slotProps={{ inputLabel: { shrink: true } }}
+              required
+            />
+          </Grid>
+
+          <Grid size={{ xs: 12, md: 6 }}>
+            <TextField
+              fullWidth
+              label="Fin de contrato"
+              name="emp_fecha_fin_contrato"
+              type="date"
+              value={esContratoIndefinido(form.tic_id) ? '' : form.emp_fecha_fin_contrato}
+              onChange={handleChange}
+              disabled={esContratoIndefinido(form.tic_id)}
+              helperText={
+                esContratoIndefinido(form.tic_id)
+                  ? 'No aplica para contratos indefinidos'
+                  : 'Requerida para contratos temporales o con plazo'
+              }
+              slotProps={{ inputLabel: { shrink: true } }}
+              required={!esContratoIndefinido(form.tic_id)}
+            />
+          </Grid>
+
+          {contratoCambioPendiente && (
+            <Grid size={{ xs: 12 }}>
+              <Alert severity="warning">
+                Cambio de contrato detectado. El backend debe cerrar el periodo anterior y crear un nuevo registro
+                en el historial de contratos con la fecha de inicio indicada.
+              </Alert>
+            </Grid>
+          )}
+
+          {contratoCambioPendiente && (
+            <Grid size={{ xs: 12, md: 6 }}>
+              <TextField
+                fullWidth
+                label="Motivo del cambio de contrato"
+                name="emp_motivo_cambio_contrato"
+                value={form.emp_motivo_cambio_contrato || ''}
+                onChange={handleChange}
+                helperText="Ej: renovacion, cambio a indefinido, cambio de jornada"
+                required
+              />
+            </Grid>
+          )}
+
+          <Grid size={{ xs: 12, md: 6 }}>
             <TextField
               fullWidth
               label="Departamento del puesto"
@@ -734,12 +1009,19 @@ function PruebaAxios() {
             Listado de empleados: {empleadosFiltrados.length} de {datos.length}
           </Typography>
           <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-            <Chip label={`Activos: ${empleadosActivos}`} color="success" size="small" />
-            <Chip label={`Sin horario: ${empleadosSinHorario}`} color="warning" size="small" />
-            <Chip label={`Sin sede: ${empleadosSinSede}`} color="warning" size="small" />
-            <Chip label={`Sin puesto: ${empleadosSinPuesto}`} color="warning" size="small" />
+            <Chip label={`Activos: ${resumenEmpleados.activos}`} color="success" size="small" />
+            <Chip label={`Sin horario: ${resumenEmpleados.sinHorario}`} color="warning" size="small" />
+            <Chip label={`Sin sede: ${resumenEmpleados.sinSede}`} color="warning" size="small" />
+            <Chip label={`Sin puesto: ${resumenEmpleados.sinPuesto}`} color="warning" size="small" />
+            <Chip label={`Sin contrato: ${resumenEmpleados.sinContrato}`} color="warning" size="small" />
           </Box>
         </Box>
+
+        {empleadosFiltrados.length > EMPLOYEE_TABLE_LIMIT && (
+          <Alert severity="info" sx={{ mb: 2 }}>
+            Mostrando los primeros {EMPLOYEE_TABLE_LIMIT} empleados filtrados. Usa la busqueda o filtros para acotar la lista.
+          </Alert>
+        )}
 
         <Grid container spacing={2} sx={{ mb: 2 }}>
           <Grid size={{ xs: 12, md: 3 }}>
@@ -805,6 +1087,19 @@ function PruebaAxios() {
               </Select>
             </FormControl>
           </Grid>
+          <Grid size={{ xs: 12, md: 2 }}>
+            <FormControl fullWidth size="small">
+              <InputLabel>Contrato</InputLabel>
+              <Select name="ticId" value={filters.ticId} label="Contrato" onChange={handleFilterChange}>
+                <MenuItem value="">Todos</MenuItem>
+                {tiposContrato.map((tipo) => (
+                  <MenuItem key={tipo.TIC_ID} value={String(tipo.TIC_ID)}>
+                    {tipo.TIC_NOMBRE} - {tipo.TIC_TIPO_JORNADA}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          </Grid>
           <Grid size={{ xs: 12, md: 1 }}>
             <Button fullWidth variant="outlined" onClick={limpiarFiltros}>
               Limpiar
@@ -827,6 +1122,8 @@ function PruebaAxios() {
                 <TableCell><strong>Horario</strong></TableCell>
                 <TableCell><strong>Sede</strong></TableCell>
                 <TableCell><strong>Puesto</strong></TableCell>
+                <TableCell><strong>Contrato</strong></TableCell>
+                <TableCell><strong>Fin contrato</strong></TableCell>
                 <TableCell><strong>Sueldo</strong></TableCell>
                 <TableCell><strong>Estado</strong></TableCell>
                 <TableCell><strong>Acciones</strong></TableCell>
@@ -835,7 +1132,7 @@ function PruebaAxios() {
 
             <TableBody>
               {empleadosFiltrados.length > 0 ? (
-                empleadosFiltrados.map((empleado) => (
+                empleadosVisibles.map((empleado) => (
                   <TableRow key={empleado.EMP_ID} hover>
                     <TableCell>{empleado.EMP_ID}</TableCell>
                     <TableCell>
@@ -864,6 +1161,14 @@ function PruebaAxios() {
                     </TableCell>
                     <TableCell>
                       {empleado.PUE_ID ? obtenerChipPuesto(empleado.PUE_ID) : '—'}
+                    </TableCell>
+                    <TableCell>
+                      {empleado.TIC_ID ? obtenerChipTipoContrato(empleado.TIC_ID) : '—'}
+                    </TableCell>
+                    <TableCell>
+                      {empleado.TIC_ID && esContratoIndefinido(empleado.TIC_ID)
+                        ? 'Indefinido'
+                        : formatearFechaSimple(empleado.EMP_FECHA_FIN_CONTRATO)}
                     </TableCell>
                     <TableCell>{formatearMoneda(obtenerSueldoEmpleado(empleado))}</TableCell>
                     <TableCell>{obtenerChipEstado(empleado.EMP_ESTADO)}</TableCell>
@@ -903,7 +1208,7 @@ function PruebaAxios() {
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={14} align="center">
+                  <TableCell colSpan={16} align="center">
                     No hay empleados con esos filtros
                   </TableCell>
                 </TableRow>
@@ -1174,6 +1479,20 @@ function PruebaAxios() {
                 <Box sx={{ mt: 0.5 }}>
                   {perfilEmpleado.PUE_ID ? obtenerChipPuesto(perfilEmpleado.PUE_ID) : '—'}
                 </Box>
+              </Grid>
+              <Grid size={{ xs: 12, md: 6 }}>
+                <Typography variant="caption" color="text.secondary">Tipo de contrato</Typography>
+                <Box sx={{ mt: 0.5 }}>
+                  {perfilEmpleado.TIC_ID ? obtenerChipTipoContrato(perfilEmpleado.TIC_ID) : '—'}
+                </Box>
+              </Grid>
+              <Grid size={{ xs: 12, md: 6 }}>
+                <Typography variant="caption" color="text.secondary">Fin de contrato</Typography>
+                <Typography>
+                  {perfilEmpleado.TIC_ID && esContratoIndefinido(perfilEmpleado.TIC_ID)
+                    ? 'Indefinido'
+                    : formatearFechaSimple(perfilEmpleado.EMP_FECHA_FIN_CONTRATO)}
+                </Typography>
               </Grid>
             </Grid>
 

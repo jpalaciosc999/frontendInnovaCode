@@ -58,7 +58,6 @@ import {
   roleLabels,
   roleOrder,
 } from '../config/roleViews';
-import type { AppRole } from '../config/roleViews';
 import { useAuth } from '../context/AuthContext';
 
 type MenuItemType = {
@@ -114,9 +113,8 @@ const viewIcons: Record<string, ReactNode> = {
   'aprobacion-nomina': <ApprovalIcon />,
 };
 
-const buildMenuSections = (currentRole: AppRole | null): MenuSectionType[] =>
+const buildMenuSections = (): MenuSectionType[] =>
   roleOrder
-    .filter((role) => !currentRole || currentRole === 'SUPREMO' || role === currentRole)
     .map((role) => ({
       key: role,
       text: `Rol ${roleLabels[role]}`,
@@ -143,7 +141,7 @@ function Navbar() {
   });
 
   const location = useLocation();
-  const menuSections = useMemo(() => buildMenuSections(currentRole), [currentRole]);
+  const menuSections = useMemo(() => buildMenuSections(), []);
 
   useEffect(() => {
     const syncCurrentRole = () => setCurrentRole(getCurrentUserRole());

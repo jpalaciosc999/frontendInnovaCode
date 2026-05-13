@@ -45,12 +45,12 @@ export const appViews: AppView[] = [
   { key: 'empleado-contrato', text: 'Empleado Contrato', path: '/empleado-contrato', roles: ['RRHH'] },
   { key: 'tipo-contrato', text: 'Tipo Contrato', path: '/tipo-contrato', roles: ['RRHH'] },
 
-  { key: 'asignacion-roles', text: 'Asignacion de Roles', path: '/roles', roles: ['ADMIN'] },
-  { key: 'asignacion-permisos', text: 'Asignacion de Permisos', path: '/permisos', roles: ['ADMIN'] },
-  { key: 'registro-usuarios', text: 'Registros de Usuarios', path: '/usuarios', roles: ['ADMIN'] },
-  { key: 'roles-permisos', text: 'Roles Permisos', path: '/rol-permisos', roles: ['ADMIN'] },
-  { key: 'bitacora', text: 'Bitacora', path: '/bitacora', roles: ['ADMIN'] },
-  { key: 'usuario-bitacora', text: 'Usuario Bitacora', path: '/usuario-bitacora', roles: ['ADMIN'] },
+  { key: 'asignacion-roles', text: 'Roles', path: '/roles', roles: ['ADMIN'] },
+  { key: 'asignacion-permisos', text: 'Permisos', path: '/permisos', roles: ['ADMIN'] },
+  { key: 'registro-usuarios', text: 'Usuarios', path: '/usuarios', roles: ['ADMIN'] },
+  { key: 'roles-permisos', text: 'Roles y Permisos', path: '/rol-permisos', roles: ['ADMIN'] },
+  { key: 'bitacora', text: 'Bitácora', path: '/bitacora', roles: ['ADMIN'] },
+  { key: 'usuario-bitacora', text: 'Trazabilidad Usuario-Bitácora', path: '/usuario-bitacora', roles: ['ADMIN'] },
 
   { key: 'nomina', text: 'Nomina', path: '/nomina', roles: ['CONTABILIDAD'] },
   { key: 'nomina-detalle', text: 'Nomina Detalle', path: '/nomina-detalle', roles: ['CONTABILIDAD'] },

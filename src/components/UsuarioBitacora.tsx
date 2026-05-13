@@ -1,17 +1,14 @@
-import { useEffect, useState } from 'react';
-import type { UsuarioBitacora, UsuarioBitacoraForm } from '../interfaces/usuarioBitacora';
-import {
-  obtenerUsuariosBitacora,
-  crearUsuarioBitacora,
-  actualizarUsuarioBitacora,
-  eliminarUsuarioBitacora
-} from '../services/usuarioBitacora.service';
+import { useEffect, useMemo, useState } from 'react';
+import type { UsuarioBitacora } from '../interfaces/usuarioBitacora';
+import type { Usuario } from '../interfaces/usuario';
+import type { Bitacora } from '../interfaces/bitacora';
+import { obtenerAdminActividad, obtenerAdminCatalogo } from '../services/admin.service';
+import { getApiErrorMessage } from '../api/errors';
 
 import {
   Alert,
   Box,
-  Button,
-  Grid,
+  Chip,
   Paper,
   Snackbar,
   Table,
@@ -20,38 +17,63 @@ import {
   TableContainer,
   TableHead,
   TableRow,
-  TextField,
   Typography
 } from '@mui/material';
 
-import SaveIcon from '@mui/icons-material/Save';
-import CleaningServicesIcon from '@mui/icons-material/CleaningServices';
-import EditIcon from '@mui/icons-material/Edit';
-import DeleteIcon from '@mui/icons-material/Delete';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
 
-const initialForm: UsuarioBitacoraForm = {
-  usu_id: '',
-  bit_id: ''
+const formatearFecha = (fecha?: string) => {
+  if (!fecha) return '-';
+  const parsed = new Date(fecha);
+  if (Number.isNaN(parsed.getTime())) return String(fecha).slice(0, 10);
+
+  return parsed.toLocaleString('es-GT', {
+    dateStyle: 'short',
+    timeStyle: 'short',
+  });
 };
+
+const leerCampo = (item: unknown, keys: string[]) => {
+  if (!item || typeof item !== 'object') return undefined;
+  const record = item as Record<string, unknown>;
+
+  for (const key of keys) {
+    const value = record[key];
+    if (value !== undefined && value !== null && String(value).trim() !== '') return value;
+  }
+
+  return undefined;
+};
+
+const getUsuarioId = (usuario: Usuario) =>
+  String(leerCampo(usuario, ['id', 'USU_ID', 'usu_id', 'usuario_id', 'USER_ID']) ?? '');
+
+const getUsuarioNombre = (usuario: Usuario) =>
+  String(leerCampo(usuario, ['nombre_completo', 'NOMBRE_COMPLETO', 'USU_NOMBRE_COMPLETO', 'username', 'USERNAME']) ?? '');
+
+const getUsuarioCorreo = (usuario: Usuario) =>
+  String(leerCampo(usuario, ['correo', 'CORREO', 'email', 'EMAIL', 'USU_CORREO']) ?? '');
 
 function UsuarioBitacoraCRUD() {
   const [datos, setDatos] = useState<UsuarioBitacora[]>([]);
+  const [usuarios, setUsuarios] = useState<Usuario[]>([]);
+  const [bitacoras, setBitacoras] = useState<Bitacora[]>([]);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState('');
-  const [mensaje, setMensaje] = useState('');
-  const [modoEdicion, setModoEdicion] = useState(false);
-  const [id, setId] = useState<number | null>(null);
-  const [form, setForm] = useState<UsuarioBitacoraForm>(initialForm);
 
   const cargarDatos = async () => {
     try {
       setCargando(true);
       setError('');
-      const data = await obtenerUsuariosBitacora();
-      setDatos(data);
+      const [actividad, catalogo] = await Promise.all([
+        obtenerAdminActividad(),
+        obtenerAdminCatalogo(),
+      ]);
+      setDatos(actividad.usuarioBitacora);
+      setUsuarios(catalogo.usuarios);
+      setBitacoras(actividad.bitacora);
     } catch (err: any) {
-      setError('Error cargando usuario bitácora: ' + err.message);
+      setError('Error cargando trazabilidad usuario-bitácora: ' + getApiErrorMessage(err, 'No se pudo cargar la trazabilidad'));
     } finally {
       setCargando(false);
     }
@@ -61,197 +83,110 @@ function UsuarioBitacoraCRUD() {
     cargarDatos();
   }, []);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setForm((prev) => ({ ...prev, [name]: value }));
-  };
+  const usuariosPorId = useMemo(
+    () => new Map(usuarios.map((usuario) => [getUsuarioId(usuario), usuario])),
+    [usuarios]
+  );
 
-  const limpiarFormulario = () => {
-    setForm(initialForm);
-    setModoEdicion(false);
-    setId(null);
-    setError('');
-  };
+  const bitacorasPorId = useMemo(
+    () => new Map(bitacoras.map((bitacora) => [String(bitacora.BIT_ID), bitacora])),
+    [bitacoras]
+  );
 
-  const validar = () => {
-    if (!String(form.usu_id).trim() || !String(form.bit_id).trim()) {
-      setError('Todos los campos son obligatorios');
-      return false;
-    }
-    return true;
-  };
+  const registros = useMemo(
+    () =>
+      [...datos].sort((a, b) => {
+        const bitA = bitacorasPorId.get(String(a.BIT_ID));
+        const bitB = bitacorasPorId.get(String(b.BIT_ID));
+        const fechaA = new Date(bitA?.BIT_FECHA || '').getTime();
+        const fechaB = new Date(bitB?.BIT_FECHA || '').getTime();
+        return (Number.isNaN(fechaB) ? 0 : fechaB) - (Number.isNaN(fechaA) ? 0 : fechaA);
+      }),
+    [bitacorasPorId, datos]
+  );
 
-  const guardar = async () => {
-    try {
-      setError('');
-      setMensaje('');
-
-      if (!validar()) return;
-
-      if (modoEdicion && id !== null) {
-        await actualizarUsuarioBitacora(id, form);
-        setMensaje('Usuario bitácora actualizado correctamente');
-      } else {
-        await crearUsuarioBitacora(form);
-        setMensaje('Usuario bitácora creado correctamente');
-      }
-
-      limpiarFormulario();
-      await cargarDatos();
-    } catch (err: any) {
-      setError('Error guardando: ' + (err.response?.data?.error || err.message));
-    }
-  };
-
-  const handleEliminar = async (idEliminar: number) => {
-    if (!window.confirm('¿Deseas eliminar este registro?')) return;
-
-    try {
-      setError('');
-      setMensaje('');
-      await eliminarUsuarioBitacora(idEliminar);
-      setMensaje('Usuario bitácora eliminado correctamente');
-
-      if (id === idEliminar) limpiarFormulario();
-
-      await cargarDatos();
-    } catch (err: any) {
-      setError('Error eliminando: ' + (err.response?.data?.error || err.message));
-    }
-  };
-
-  const handleEditar = (u: UsuarioBitacora) => {
-    setModoEdicion(true);
-    setId(u.USB_ID);
-    setMensaje('');
-    setError('');
-    setForm({
-      usu_id: String(u.USU_ID),
-      bit_id: String(u.BIT_ID)
-    });
+  const obtenerChipAccion = (accion?: string) => {
+    const lower = accion?.toLowerCase() || '';
+    if (lower === 'insert' || lower === 'crear')
+      return <Chip label={accion} color="success" size="small" />;
+    if (lower === 'update' || lower === 'actualizar')
+      return <Chip label={accion} color="warning" size="small" />;
+    if (lower === 'delete' || lower === 'eliminar')
+      return <Chip label={accion} color="error" size="small" />;
+    return <Chip label={accion || '-'} color="info" size="small" />;
   };
 
   if (cargando) {
     return (
       <Box sx={{ p: 3 }}>
-        <Typography variant="h6">Cargando usuario bitácora...</Typography>
+        <Typography variant="h6">Cargando trazabilidad...</Typography>
       </Box>
     );
   }
 
   return (
     <Box sx={{ py: 2 }}>
-      {/* Formulario */}
       <Paper elevation={3} sx={{ p: 3, mb: 3 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 3 }}>
           <MenuBookIcon color="primary" />
           <Typography variant="h4" sx={{ fontWeight: 'bold' }}>
-            Usuario Bitácora
+            Trazabilidad Usuario-Bitácora
           </Typography>
         </Box>
 
-        <Typography variant="h6" sx={{ mb: 2 }}>
-          {modoEdicion ? 'Editar registro' : 'Nuevo registro'}
-        </Typography>
-
-        <Grid container spacing={2}>
-          <Grid size={{ xs: 12, md: 6 }}>
-            <TextField
-              fullWidth
-              label="Usuario ID"
-              name="usu_id"
-              type="number"
-              value={form.usu_id}
-              onChange={handleChange}
-            />
-          </Grid>
-
-          <Grid size={{ xs: 12, md: 6 }}>
-            <TextField
-              fullWidth
-              label="Bitácora ID"
-              name="bit_id"
-              type="number"
-              value={form.bit_id}
-              onChange={handleChange}
-            />
-          </Grid>
-
-          <Grid size={{ xs: 12 }}>
-            <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mt: 1 }}>
-              <Button
-                variant="contained"
-                startIcon={<SaveIcon />}
-                onClick={guardar}
-              >
-                {modoEdicion ? 'Actualizar' : 'Guardar'}
-              </Button>
-
-              <Button
-                variant="outlined"
-                color="secondary"
-                startIcon={<CleaningServicesIcon />}
-                onClick={limpiarFormulario}
-              >
-                Limpiar
-              </Button>
-            </Box>
-          </Grid>
-        </Grid>
+        <Alert severity="info">
+          Esta vista solo cruza usuarios con eventos de bitácora. La relación debe crearla el backend automáticamente al registrar cada acción auditada.
+        </Alert>
       </Paper>
 
-      {/* Tabla */}
       <Paper elevation={3} sx={{ p: 3 }}>
         <Typography variant="h6" sx={{ mb: 2 }}>
-          Listado de registros: {datos.length}
+          Relaciones de auditoría: {registros.length}
         </Typography>
 
-        <TableContainer>
-          <Table>
+        <TableContainer sx={{ maxHeight: 620 }}>
+          <Table stickyHeader>
             <TableHead>
               <TableRow>
                 <TableCell><strong>USB ID</strong></TableCell>
-                <TableCell><strong>Usuario ID</strong></TableCell>
-                <TableCell><strong>Bitácora ID</strong></TableCell>
-                <TableCell><strong>Acciones</strong></TableCell>
+                <TableCell><strong>Usuario</strong></TableCell>
+                <TableCell><strong>Acción</strong></TableCell>
+                <TableCell><strong>Tabla</strong></TableCell>
+                <TableCell><strong>ID Registro</strong></TableCell>
+                <TableCell><strong>Descripción</strong></TableCell>
+                <TableCell><strong>Fecha</strong></TableCell>
               </TableRow>
             </TableHead>
 
             <TableBody>
-              {datos.length > 0 ? (
-                datos.map((u) => (
-                  <TableRow key={u.USB_ID} hover>
-                    <TableCell>{u.USB_ID}</TableCell>
-                    <TableCell>{u.USU_ID}</TableCell>
-                    <TableCell>{u.BIT_ID}</TableCell>
-                    <TableCell>
-                      <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                        <Button
-                          size="small"
-                          variant="outlined"
-                          startIcon={<EditIcon />}
-                          onClick={() => handleEditar(u)}
-                        >
-                          Editar
-                        </Button>
+              {registros.length > 0 ? (
+                registros.map((relacion) => {
+                  const usuario = usuariosPorId.get(String(relacion.USU_ID));
+                  const bitacora = bitacorasPorId.get(String(relacion.BIT_ID));
 
-                        <Button
-                          size="small"
-                          variant="contained"
-                          color="error"
-                          startIcon={<DeleteIcon />}
-                          onClick={() => handleEliminar(u.USB_ID)}
-                        >
-                          Eliminar
-                        </Button>
-                      </Box>
-                    </TableCell>
-                  </TableRow>
-                ))
+                  return (
+                    <TableRow key={relacion.USB_ID} hover>
+                      <TableCell>{relacion.USB_ID}</TableCell>
+                      <TableCell>
+                        <Typography sx={{ fontWeight: 600 }}>
+                          {(usuario && getUsuarioNombre(usuario)) || `Usuario #${relacion.USU_ID}`}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          {(usuario && getUsuarioCorreo(usuario)) || `USU_ID ${relacion.USU_ID}`}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>{obtenerChipAccion(bitacora?.BIT_ACCION)}</TableCell>
+                      <TableCell>{bitacora?.BIT_TABLA_AFECTADA || '-'}</TableCell>
+                      <TableCell>{bitacora?.BIT_ID_REGISTRO || '-'}</TableCell>
+                      <TableCell sx={{ minWidth: 240 }}>{bitacora?.BIT_DESCRIPCION || '-'}</TableCell>
+                      <TableCell>{formatearFecha(bitacora?.BIT_FECHA)}</TableCell>
+                    </TableRow>
+                  );
+                })
               ) : (
                 <TableRow>
-                  <TableCell colSpan={4} align="center">
-                    No hay registros disponibles
+                  <TableCell colSpan={7} align="center">
+                    No hay relaciones usuario-bitácora registradas
                   </TableCell>
                 </TableRow>
               )}
@@ -259,18 +194,6 @@ function UsuarioBitacoraCRUD() {
           </Table>
         </TableContainer>
       </Paper>
-
-      {/* Snackbars */}
-      <Snackbar
-        open={!!mensaje}
-        autoHideDuration={3000}
-        onClose={() => setMensaje('')}
-        anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
-      >
-        <Alert severity="success" onClose={() => setMensaje('')} sx={{ width: '100%' }}>
-          {mensaje}
-        </Alert>
-      </Snackbar>
 
       <Snackbar
         open={!!error}

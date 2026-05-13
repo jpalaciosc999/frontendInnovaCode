@@ -65,6 +65,7 @@ const LoginPage = () => {
         rol: String(rolNombre ?? rolId ?? ''),
         rol_id: rolId !== undefined ? Number(rolId) : undefined,
         rol_nombre: rolNombre !== undefined ? String(rolNombre) : undefined,
+        permisos: Array.isArray(usuario.permisos) ? usuario.permisos : [],
       });
 
       navigate('/');

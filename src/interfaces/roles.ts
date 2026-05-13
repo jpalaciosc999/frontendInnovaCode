@@ -10,7 +10,7 @@ export interface Rol {
 export interface RolForm {
   rol_nombre: string;
   rol_descripcion: string;
-  rol_nivel_acceso: string;
+  rol_nivel_acceso: string | number;
   rol_estado: string;
-  rol_fecha_creacion: string;
+  rol_fecha_creacion?: string;
 }

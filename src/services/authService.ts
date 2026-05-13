@@ -17,6 +17,7 @@ export type LoginResponse = {
     correo: string;
     rol_id: number;
     emp_id: number | null;
+    permisos?: unknown[];
   };
 };
 

@@ -68,7 +68,7 @@ const TIPOS_CUENTA = [
 ];
 
 const initialForm: CuentaBancariaForm = {
-  ban_nombre: '',
+  cue_nombre: '',
   cue_numero: '',
   cue_tipo:   '',
   emp_id:     ''
@@ -161,30 +161,38 @@ function CuentaBancariaPage() {
   };
 
   const validarFormulario = () => {
-    if (!form.ban_nombre.trim() || !form.cue_numero.trim() || !form.cue_tipo || !form.emp_id) {
+    if (!(form.cue_nombre || '').trim() || !(form.cue_numero || '').trim() || !form.cue_tipo || !form.emp_id) {
       setError('Todos los campos son obligatorios');
       return false;
     }
-    if (!/^\d+$/.test(form.cue_numero)) {
+    if (!/^\d+$/.test(form.cue_numero || '')) {
       setError('El número de cuenta debe contener solo dígitos');
       return false;
     }
-    if (form.cue_numero.length > 50) {
+    if ((form.cue_numero || '').length > 50) {
       setError('El número de cuenta no puede exceder 50 caracteres');
       return false;
     }
     return true;
   };
 
+  const obtenerPayloadCuenta = (): CuentaBancariaForm => ({
+    cue_nombre: form.cue_nombre || '',
+    cue_numero: form.cue_numero || '',
+    cue_tipo: form.cue_tipo || '',
+    emp_id: form.emp_id || ''
+  });
+
   const guardarCuenta = async () => {
     try {
       setError(''); setMensaje('');
       if (!validarFormulario()) return;
+      const payload = obtenerPayloadCuenta();
       if (modoEdicion && cueId !== null) {
-        await actualizarCuenta(cueId, form);
+        await actualizarCuenta(cueId, payload);
         setMensaje('Cuenta actualizada correctamente');
       } else {
-        await crearCuenta(form);
+        await crearCuenta(payload);
         setMensaje('Cuenta creada correctamente');
       }
       limpiarFormulario();
@@ -213,7 +221,7 @@ function CuentaBancariaPage() {
     setMensaje(''); setError('');
     setEmpNombre(obtenerNombreEmpleado(cue.EMP_ID));
     setForm({
-      ban_nombre: cue.CUE_NOMBRE || '',
+      cue_nombre: cue.CUE_NOMBRE || '',
       cue_numero: cue.CUE_NUMERO || '',
       cue_tipo:   cue.CUE_TIPO   || '',
       emp_id:     String(cue.EMP_ID) || ''
@@ -289,8 +297,8 @@ function CuentaBancariaPage() {
             <TextField
               select fullWidth
               label="Nombre del Banco"
-              name="ban_nombre"
-              value={form.ban_nombre}
+              name="cue_nombre"
+              value={form.cue_nombre || ''}
               onChange={handleChange}
               required
             >

@@ -1,13 +1,8 @@
-import { useEffect, useState } from 'react';
-import type { EmpleadoContrato, EmpleadoContratoForm } from '../interfaces/empleado_contrato';
+import { useEffect, useMemo, useState } from 'react';
+import type { EmpleadoContrato } from '../interfaces/empleado_contrato';
 import type { TipoContrato } from '../interfaces/tipoContrato';
 import type { Empleado } from '../interfaces/empleados';
-import {
-    obtenerContratos,
-    crearContrato,
-    actualizarContrato,
-    eliminarContrato
-} from '../services/empleado_contrato.service';
+import { eliminarContrato, obtenerContratos } from '../services/empleado_contrato.service';
 import { obtenerTiposContrato } from '../services/tipoContrato.service';
 import { obtenerEmpleados } from '../services/empleados.service';
 
@@ -17,8 +12,8 @@ import {
     Button,
     Chip,
     Grid,
+    MenuItem,
     Paper,
-    Snackbar,
     Table,
     TableBody,
     TableCell,
@@ -26,23 +21,29 @@ import {
     TableHead,
     TableRow,
     TextField,
-    Typography,
-    MenuItem
+    Typography
 } from '@mui/material';
 
-import SaveIcon from '@mui/icons-material/Save';
-import CleaningServicesIcon from '@mui/icons-material/CleaningServices';
-import EditIcon from '@mui/icons-material/Edit';
-import DeleteIcon from '@mui/icons-material/Delete';
 import ArticleIcon from '@mui/icons-material/Article';
+import CleaningServicesIcon from '@mui/icons-material/CleaningServices';
+import DeleteIcon from '@mui/icons-material/Delete';
 
-const initialForm: EmpleadoContratoForm = {
-    tco_fecha_inicio: '',
-    tco_fecha_fin: '',
-    tco_estado: '',
-    tic_fecha_modificacion: '',
-    tic_id: '',
-    emp_id: ''
+const initialFilters = {
+    empleado: '',
+    tipoContrato: '',
+    estado: ''
+};
+
+type FilaHistorialContrato = {
+    id: string;
+    contratoId?: number;
+    fechaInicio: string;
+    fechaFin: string;
+    estado: string;
+    ticId?: number | string;
+    empId?: number | string;
+    motivoCambio?: string;
+    origen: 'historico' | 'actual';
 };
 
 function EmpleadoContratoCRUD() {
@@ -54,15 +55,30 @@ function EmpleadoContratoCRUD() {
     const [error, setError] = useState('');
     const [relacionesError, setRelacionesError] = useState('');
     const [mensaje, setMensaje] = useState('');
-    const [modoEdicion, setModoEdicion] = useState(false);
-    const [id, setId] = useState<number | null>(null);
-    const [form, setForm] = useState<EmpleadoContratoForm>(initialForm);
+    const [filters, setFilters] = useState(initialFilters);
 
     const obtenerNombreEmpleado = (empleado: Empleado) =>
         `${empleado.EMP_NOMBRE ?? ''} ${empleado.EMP_APELLIDO ?? ''}`.trim();
 
     const obtenerEmpleadoPorId = (empId: number | string | undefined) =>
         empleados.find((empleado) => String(empleado.EMP_ID) === String(empId));
+
+    const obtenerContratoEmpleadoId = (contrato: EmpleadoContrato) => {
+        const contratoConVariantes = contrato as EmpleadoContrato & {
+            emp_id?: number | string;
+            EMPID?: number | string;
+            EMPLEADO_ID?: number | string;
+            empleado_id?: number | string;
+        };
+
+        return (
+            contrato.EMP_ID ??
+            contratoConVariantes.emp_id ??
+            contratoConVariantes.EMPID ??
+            contratoConVariantes.EMPLEADO_ID ??
+            contratoConVariantes.empleado_id
+        );
+    };
 
     const obtenerNombreTipoContrato = (ticId: number | string) => {
         const tipo = tiposContrato.find((item) => String(item.TIC_ID) === String(ticId));
@@ -81,23 +97,21 @@ function EmpleadoContratoCRUD() {
 
     const obtenerDetalleEmpleado = (empId: number | string | undefined) => {
         const empleado = obtenerEmpleadoPorId(empId);
-        if (!empleado) return 'Empleado pendiente de identificar';
+        if (!empleado) return empId ? `Empleado #${empId}` : 'Empleado pendiente de identificar';
 
         return obtenerNombreEmpleado(empleado) || `Empleado #${empleado.EMP_ID}`;
     };
 
-    const obtenerFechaActual = () => new Date().toISOString().split('T')[0];
-
-    const cargarDatos = async () => {
+    const cargarDatos = async (controlarCarga = true) => {
         try {
-            setCargando(true);
+            if (controlarCarga) setCargando(true);
             setError('');
             const data = await obtenerContratos();
             setDatos(data);
         } catch (err: any) {
-            setError('Error cargando contratos: ' + err.message);
+            setError('Error cargando contratos: ' + (err.response?.data?.error || err.message));
         } finally {
-            setCargando(false);
+            if (controlarCarga) setCargando(false);
         }
     };
 
@@ -115,7 +129,7 @@ function EmpleadoContratoCRUD() {
             setTiposContrato([]);
             setEmpleados([]);
             setRelacionesError(
-                'No se pudieron cargar empleados o tipos de contrato. Puedes ingresar el ID manualmente. ' +
+                'No se pudieron cargar empleados o tipos de contrato. Se mostraran los IDs disponibles. ' +
                 (err.response?.data?.error || err.message)
             );
         } finally {
@@ -124,105 +138,14 @@ function EmpleadoContratoCRUD() {
     };
 
     useEffect(() => {
-        cargarDatos();
-        cargarRelaciones();
+        const cargarVista = async () => {
+            setCargando(true);
+            await Promise.all([cargarDatos(false), cargarRelaciones()]);
+            setCargando(false);
+        };
+
+        cargarVista();
     }, []);
-
-    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const { name, value } = e.target;
-        setForm((prev) => {
-            if (name === 'tic_id' && esContratoIndefinido(value)) {
-                return { ...prev, [name]: value, tco_fecha_fin: '' };
-            }
-
-            return { ...prev, [name]: value };
-        });
-    };
-
-    const limpiarFormulario = () => {
-        setForm(initialForm);
-        setModoEdicion(false);
-        setId(null);
-        setError('');
-    };
-
-    const validar = () => {
-        if (!form.tco_fecha_inicio || !form.tco_estado || !form.tic_id || !form.emp_id) {
-            setError('Campos obligatorios faltantes: Empleado, Tipo de contrato, Fecha de inicio y Estado son requeridos');
-            return false;
-        }
-
-        const contratoIndefinido = esContratoIndefinido(form.tic_id);
-
-        if (!contratoIndefinido && !form.tco_fecha_fin) {
-            setError('La fecha de fin es obligatoria para contratos con plazo definido');
-            return false;
-        }
-
-        if (!contratoIndefinido && form.tco_fecha_fin < form.tco_fecha_inicio) {
-            setError('La fecha de fin no puede ser anterior a la fecha de inicio');
-            return false;
-        }
-
-        return true;
-    };
-
-    const guardar = async () => {
-        try {
-            setError('');
-            setMensaje('');
-            if (!validar()) return;
-
-            const contratoIndefinido = esContratoIndefinido(form.tic_id);
-            const payload: EmpleadoContratoForm = {
-                ...form,
-                tco_fecha_fin: contratoIndefinido ? '' : form.tco_fecha_fin,
-                tic_fecha_modificacion: obtenerFechaActual()
-            };
-
-            if (modoEdicion && id !== null) {
-                await actualizarContrato(id, payload);
-                setMensaje('Contrato actualizado correctamente');
-            } else {
-                await crearContrato(payload);
-                setMensaje('Contrato creado correctamente');
-            }
-
-            limpiarFormulario();
-            await cargarDatos();
-        } catch (err: any) {
-            setError('Error al guardar: ' + (err.response?.data?.error || err.message));
-        }
-    };
-
-    const handleEliminar = async (contratoId: number) => {
-        if (!window.confirm('¿Deseas eliminar este contrato?')) return;
-        try {
-            setError('');
-            setMensaje('');
-            await eliminarContrato(contratoId);
-            setMensaje('Contrato eliminado correctamente');
-            if (id === contratoId) limpiarFormulario();
-            await cargarDatos();
-        } catch (err: any) {
-            setError('Error al eliminar: ' + (err.response?.data?.error || err.message));
-        }
-    };
-
-    const handleEditar = (c: EmpleadoContrato) => {
-        setModoEdicion(true);
-        setId(c.TCO_ID);
-        setMensaje('');
-        setError('');
-        setForm({
-            tco_fecha_inicio: c.TCO_FECHA_INICIO ? String(c.TCO_FECHA_INICIO).split('T')[0] : '',
-            tco_fecha_fin: c.TCO_FECHA_FIN ? String(c.TCO_FECHA_FIN).split('T')[0] : '',
-            tco_estado: c.TCO_ESTADO,
-            tic_fecha_modificacion: c.TIC_FECHA_MODIFICACION ? String(c.TIC_FECHA_MODIFICACION).split('T')[0] : '',
-            tic_id: c.TIC_ID,
-            emp_id: c.EMP_ID ? String(c.EMP_ID) : ''
-        });
-    };
 
     const obtenerChipEstado = (estado: string) => {
         if (estado === 'A') return <Chip label="Activo" color="success" size="small" />;
@@ -230,17 +153,96 @@ function EmpleadoContratoCRUD() {
         return <Chip label={estado} color="default" size="small" />;
     };
 
-    const formatearFecha = (fecha: string) => {
-        if (!fecha) return '—';
-        return new Date(fecha).toLocaleDateString('es-GT');
+    const formatearFecha = (fecha: string | undefined) => {
+        if (!fecha) return '-';
+
+        const [year, month, day] = String(fecha).split('T')[0].split('-').map(Number);
+        if (!year || !month || !day) return '-';
+
+        return new Date(year, month - 1, day).toLocaleDateString('es-GT');
     };
 
-    const formatearFechaFin = (contrato: EmpleadoContrato) => {
-        if (esContratoIndefinido(contrato.TIC_ID)) return 'Indefinido';
-        return formatearFecha(contrato.TCO_FECHA_FIN);
+    const handleFilterChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const { name, value } = e.target;
+        setFilters((prev) => ({ ...prev, [name]: value }));
     };
 
-    const contratoActualIndefinido = esContratoIndefinido(form.tic_id);
+    const limpiarFiltros = () => {
+        setFilters(initialFilters);
+    };
+
+    const handleEliminar = async (contratoId: number) => {
+        if (!window.confirm('Deseas eliminar este registro historico de contrato?')) return;
+
+        try {
+            setError('');
+            setMensaje('');
+            await eliminarContrato(contratoId);
+            setMensaje('Registro de contrato eliminado correctamente');
+            await cargarDatos();
+        } catch (err: any) {
+            setError('Error al eliminar contrato: ' + (err.response?.data?.error || err.message));
+        }
+    };
+
+    const filasHistorial = useMemo<FilaHistorialContrato[]>(() => {
+        const filasHistoricas: FilaHistorialContrato[] = datos.map((contrato) => ({
+            id: `historico-${contrato.TCO_ID}`,
+            contratoId: contrato.TCO_ID,
+            fechaInicio: contrato.TCO_FECHA_INICIO,
+            fechaFin: contrato.TCO_FECHA_FIN,
+            estado: contrato.TCO_ESTADO,
+            ticId: contrato.TIC_ID,
+            empId: obtenerContratoEmpleadoId(contrato),
+            motivoCambio: contrato.TCO_MOTIVO_CAMBIO,
+            origen: 'historico'
+        }));
+
+        const filasContratoActual: FilaHistorialContrato[] = empleados
+            .filter((empleado) => empleado.TIC_ID)
+            .map((empleado) => ({
+                id: `empleado-${empleado.EMP_ID}`,
+                fechaInicio: empleado.EMP_FECHA_INICIO_CONTRATO || empleado.EMP_FECHA_CONTRATACION,
+                fechaFin: empleado.EMP_FECHA_FIN_CONTRATO || '',
+                estado: empleado.EMP_ESTADO,
+                ticId: empleado.TIC_ID,
+                empId: empleado.EMP_ID,
+                motivoCambio: '',
+                origen: 'actual' as const
+            }))
+            .filter((filaActual) => {
+                const existeMismoPeriodo = filasHistoricas.some((filaHistorica) =>
+                    String(filaHistorica.empId ?? '') === String(filaActual.empId ?? '') &&
+                    String(filaHistorica.ticId ?? '') === String(filaActual.ticId ?? '') &&
+                    String(filaHistorica.fechaInicio || '').slice(0, 10) === String(filaActual.fechaInicio || '').slice(0, 10) &&
+                    String(filaHistorica.fechaFin || '').slice(0, 10) === String(filaActual.fechaFin || '').slice(0, 10)
+                );
+
+                return !existeMismoPeriodo;
+            });
+
+        return [...filasContratoActual, ...filasHistoricas].sort((a, b) => {
+            const empleadoA = String(a.empId ?? '').padStart(10, '0');
+            const empleadoB = String(b.empId ?? '').padStart(10, '0');
+            if (empleadoA !== empleadoB) return empleadoA.localeCompare(empleadoB);
+
+            return String(a.fechaInicio || '').localeCompare(String(b.fechaInicio || ''));
+        });
+    }, [datos, empleados]);
+
+    const filasFiltradas = useMemo(
+        () =>
+            filasHistorial.filter((fila) => {
+                const empleadoId = fila.empId;
+
+                if (filters.empleado && String(empleadoId ?? '') !== filters.empleado) return false;
+                if (filters.tipoContrato && String(fila.ticId ?? '') !== filters.tipoContrato) return false;
+                if (filters.estado && fila.estado !== filters.estado) return false;
+
+                return true;
+            }),
+        [filasHistorial, filters]
+    );
 
     if (cargando) {
         return (
@@ -252,265 +254,181 @@ function EmpleadoContratoCRUD() {
 
     return (
         <Box sx={{ py: 2 }}>
-            {/* Formulario */}
             <Paper elevation={3} sx={{ p: 3, mb: 3 }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 3 }}>
                     <ArticleIcon color="primary" />
                     <Typography variant="h4" sx={{ fontWeight: 'bold' }}>
-                        Contratos de Empleado
+                        Historial de Contratos
                     </Typography>
                 </Box>
 
+                <Alert severity="info">
+                    Esta vista muestra cada periodo de contrato asignado por empleado. Si un empleado cambia de contrato,
+                    debe verse una fila para el contrato anterior y otra para el nuevo periodo.
+                </Alert>
+            </Paper>
+
+            <Paper elevation={3} sx={{ p: 3 }}>
                 <Typography variant="h6" sx={{ mb: 2 }}>
-                    {modoEdicion ? 'Editar contrato' : 'Nuevo contrato'}
+                    Registros de contratos: {filasFiltradas.length} de {filasHistorial.length}
                 </Typography>
 
-                <Grid container spacing={2}>
-                    <Grid size={{ xs: 12, md: 6 }}>
-                        <TextField
-                            fullWidth
-                            label="Fecha de inicio"
-                            name="tco_fecha_inicio"
-                            type="date"
-                            value={form.tco_fecha_inicio}
-                            onChange={handleChange}
-                            slotProps={{ inputLabel: { shrink: true } }}
-                            required
-                        />
-                    </Grid>
+                {error && (
+                    <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>
+                        {error}
+                    </Alert>
+                )}
 
-                    <Grid size={{ xs: 12, md: 6 }}>
-                        <TextField
-                            fullWidth
-                            label="Fecha de fin"
-                            name="tco_fecha_fin"
-                            type="date"
-                            value={contratoActualIndefinido ? '' : form.tco_fecha_fin}
-                            onChange={handleChange}
-                            disabled={contratoActualIndefinido}
-                            helperText={
-                                contratoActualIndefinido
-                                    ? 'No aplica para contratos indefinidos'
-                                    : 'Requerida para contratos con plazo definido'
-                            }
-                            slotProps={{ inputLabel: { shrink: true } }}
-                            required={!contratoActualIndefinido}
-                        />
-                    </Grid>
+                {mensaje && (
+                    <Alert severity="success" sx={{ mb: 2 }} onClose={() => setMensaje('')}>
+                        {mensaje}
+                    </Alert>
+                )}
 
-                    <Grid size={{ xs: 12, md: 6 }}>
+                {relacionesError && (
+                    <Alert severity="warning" sx={{ mb: 2 }}>
+                        {relacionesError}
+                    </Alert>
+                )}
+
+                <Grid container spacing={2} sx={{ mb: 2 }}>
+                    <Grid size={{ xs: 12, md: 4 }}>
                         <TextField
                             select
                             fullWidth
-                            label="Estado"
-                            name="tco_estado"
-                            value={form.tco_estado}
-                            onChange={handleChange}
-                            required
+                            size="small"
+                            label="Empleado"
+                            name="empleado"
+                            value={filters.empleado}
+                            onChange={handleFilterChange}
+                            disabled={cargandoRelaciones}
                         >
+                            <MenuItem value="">Todos</MenuItem>
+                            {empleados.map((empleado) => (
+                                <MenuItem key={empleado.EMP_ID} value={String(empleado.EMP_ID)}>
+                                    {obtenerNombreEmpleado(empleado) || `Empleado #${empleado.EMP_ID}`}
+                                </MenuItem>
+                            ))}
+                        </TextField>
+                    </Grid>
+
+                    <Grid size={{ xs: 12, md: 3 }}>
+                        <TextField
+                            select
+                            fullWidth
+                            size="small"
+                            label="Tipo de contrato"
+                            name="tipoContrato"
+                            value={filters.tipoContrato}
+                            onChange={handleFilterChange}
+                            disabled={cargandoRelaciones}
+                        >
+                            <MenuItem value="">Todos</MenuItem>
+                            {tiposContrato.map((tipo) => (
+                                <MenuItem key={tipo.TIC_ID} value={String(tipo.TIC_ID)}>
+                                    {tipo.TIC_NOMBRE} - {tipo.TIC_TIPO_JORNADA}
+                                </MenuItem>
+                            ))}
+                        </TextField>
+                    </Grid>
+
+                    <Grid size={{ xs: 12, md: 3 }}>
+                        <TextField
+                            select
+                            fullWidth
+                            size="small"
+                            label="Estado"
+                            name="estado"
+                            value={filters.estado}
+                            onChange={handleFilterChange}
+                        >
+                            <MenuItem value="">Todos</MenuItem>
                             <MenuItem value="A">Activo</MenuItem>
                             <MenuItem value="I">Inactivo</MenuItem>
                         </TextField>
                     </Grid>
 
-                    <Grid size={{ xs: 12, md: 6 }} sx={{ display: 'none' }}>
-                        <TextField
+                    <Grid size={{ xs: 12, md: 2 }}>
+                        <Button
                             fullWidth
-                            label="Fecha de modificación"
-                            name="tic_fecha_modificacion"
-                            type="date"
-                            value={form.tic_fecha_modificacion}
-                            onChange={handleChange}
-                            slotProps={{ inputLabel: { shrink: true } }}
-                        />
-                    </Grid>
-
-                    <Grid size={{ xs: 12, md: 6 }}>
-                        {empleados.length > 0 ? (
-                            <TextField
-                                select
-                                fullWidth
-                                label="Empleado"
-                                name="emp_id"
-                                value={form.emp_id}
-                                onChange={handleChange}
-                                disabled={cargandoRelaciones}
-                                helperText="Selecciona el empleado al que se asigna el contrato"
-                                required
-                            >
-                                {empleados.map((empleado) => (
-                                    <MenuItem key={empleado.EMP_ID} value={String(empleado.EMP_ID)}>
-                                        {obtenerNombreEmpleado(empleado) || `Empleado #${empleado.EMP_ID}`} - ID {empleado.EMP_ID}
-                                    </MenuItem>
-                                ))}
-                            </TextField>
-                        ) : (
-                            <TextField
-                                fullWidth
-                                label="Empleado ID"
-                                name="emp_id"
-                                type="number"
-                                value={form.emp_id}
-                                onChange={handleChange}
-                                helperText={cargandoRelaciones ? 'Cargando empleados...' : 'Ingresa el ID del empleado'}
-                                required
-                            />
-                        )}
-                    </Grid>
-
-                    <Grid size={{ xs: 12, md: 6 }}>
-                        {tiposContrato.length > 0 ? (
-                            <TextField
-                                select
-                                fullWidth
-                                label="Tipo de contrato"
-                                name="tic_id"
-                                value={form.tic_id}
-                                onChange={handleChange}
-                                disabled={cargandoRelaciones}
-                                helperText="Selecciona la modalidad de contrato"
-                                required
-                            >
-                                {form.tic_id &&
-                                    !tiposContrato.some((tipo) => String(tipo.TIC_ID) === String(form.tic_id)) && (
-                                        <MenuItem value={String(form.tic_id)}>
-                                            Tipo de contrato #{form.tic_id}
-                                        </MenuItem>
-                                    )}
-                                {tiposContrato.map((tipo) => (
-                                    <MenuItem key={tipo.TIC_ID} value={String(tipo.TIC_ID)}>
-                                        {tipo.TIC_NOMBRE} - {tipo.TIC_TIPO_JORNADA}
-                                    </MenuItem>
-                                ))}
-                            </TextField>
-                        ) : (
-                            <TextField
-                                fullWidth
-                                label="Tipo de contrato ID"
-                                name="tic_id"
-                                type="number"
-                                value={form.tic_id}
-                                onChange={handleChange}
-                                helperText={cargandoRelaciones ? 'Cargando tipos de contrato...' : 'Ingresa el ID del tipo de contrato'}
-                                required
-                            />
-                        )}
-                    </Grid>
-
-                    {relacionesError && (
-                        <Grid size={{ xs: 12 }}>
-                            <Alert severity="warning">{relacionesError}</Alert>
-                        </Grid>
-                    )}
-
-                    {form.tic_id && (
-                        <Grid size={{ xs: 12 }}>
-                            <Paper variant="outlined" sx={{ p: 2, bgcolor: 'grey.50' }}>
-                                <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>
-                                    Asignación seleccionada
-                                </Typography>
-                                <Typography variant="body2">
-                                    {obtenerNombreTipoContrato(form.tic_id)}
-                                </Typography>
-                                <Typography variant="body2" color="text.secondary">
-                                    {obtenerDetalleEmpleado(form.emp_id)}
-                                </Typography>
-                            </Paper>
-                        </Grid>
-                    )}
-                    <Grid size={{ xs: 12 }}>
-                        <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mt: 1 }}>
-                            <Button
-                                variant="contained"
-                                startIcon={<SaveIcon />}
-                                onClick={guardar}
-                            >
-                                {modoEdicion ? 'Actualizar' : 'Guardar'}
-                            </Button>
-
-                            <Button
-                                variant="outlined"
-                                color="secondary"
-                                startIcon={<CleaningServicesIcon />}
-                                onClick={limpiarFormulario}
-                            >
-                                Limpiar / Cancelar
-                            </Button>
-                        </Box>
+                            variant="outlined"
+                            startIcon={<CleaningServicesIcon />}
+                            onClick={limpiarFiltros}
+                        >
+                            Limpiar
+                        </Button>
                     </Grid>
                 </Grid>
-            </Paper>
-
-            {/* Tabla */}
-            <Paper elevation={3} sx={{ p: 3 }}>
-                <Typography variant="h6" sx={{ mb: 2 }}>
-                    Listado de contratos: {datos.length}
-                </Typography>
 
                 <TableContainer>
                     <Table>
                         <TableHead>
                             <TableRow>
-                                <TableCell><strong>ID</strong></TableCell>
-                                <TableCell><strong>Inicio</strong></TableCell>
-                                <TableCell><strong>Fin</strong></TableCell>
-                                <TableCell><strong>Estado</strong></TableCell>
-                                <TableCell><strong>Tipo de contrato</strong></TableCell>
                                 <TableCell><strong>Empleado</strong></TableCell>
+                                <TableCell><strong>Tipo de contrato</strong></TableCell>
+                                <TableCell><strong>Estado</strong></TableCell>
+                                <TableCell><strong>Fecha inicio</strong></TableCell>
+                                <TableCell><strong>Fecha fin</strong></TableCell>
+                                <TableCell><strong>Motivo cambio</strong></TableCell>
                                 <TableCell><strong>Acciones</strong></TableCell>
                             </TableRow>
                         </TableHead>
 
                         <TableBody>
-                            {datos.length > 0 ? (
-                                datos.map((c) => (
-                                    <TableRow key={c.TCO_ID} hover>
-                                        <TableCell>{c.TCO_ID}</TableCell>
-                                        <TableCell>{formatearFecha(c.TCO_FECHA_INICIO)}</TableCell>
-                                        <TableCell>{formatearFechaFin(c)}</TableCell>
-                                        <TableCell>{obtenerChipEstado(c.TCO_ESTADO)}</TableCell>
-                                        <TableCell>
-                                            <Typography variant="body2">{obtenerNombreTipoContrato(c.TIC_ID)}</Typography>
-                                            <Typography variant="caption" color="text.secondary">
-                                                ID {c.TIC_ID}
-                                            </Typography>
-                                        </TableCell>
-                                        <TableCell>
-                                            <Typography variant="body2">{obtenerDetalleEmpleado(c.EMP_ID)}</Typography>
-                                            {c.EMP_ID && (
-                                                <Typography variant="caption" color="text.secondary">
-                                                    ID {c.EMP_ID}
+                            {filasFiltradas.length > 0 ? (
+                                filasFiltradas.map((fila) => {
+                                    return (
+                                        <TableRow key={fila.id} hover>
+                                            <TableCell>
+                                                <Typography variant="body2">{obtenerDetalleEmpleado(fila.empId)}</Typography>
+                                                {fila.empId && (
+                                                    <Typography variant="caption" color="text.secondary">
+                                                        ID {fila.empId}
+                                                    </Typography>
+                                                )}
+                                            </TableCell>
+                                            <TableCell>
+                                                <Typography variant="body2">
+                                                    {fila.ticId ? obtenerNombreTipoContrato(fila.ticId) : 'Sin contrato asignado'}
                                                 </Typography>
-                                            )}
-                                        </TableCell>
-                                        <TableCell>
-                                            <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                                                <Button
-                                                    size="small"
-                                                    variant="outlined"
-                                                    startIcon={<EditIcon />}
-                                                    onClick={() => handleEditar(c)}
-                                                >
-                                                    Editar
-                                                </Button>
-
-                                                <Button
-                                                    size="small"
-                                                    variant="contained"
-                                                    color="error"
-                                                    startIcon={<DeleteIcon />}
-                                                    onClick={() => handleEliminar(c.TCO_ID)}
-                                                >
-                                                    Eliminar
-                                                </Button>
-                                            </Box>
-                                        </TableCell>
-                                    </TableRow>
-                                ))
+                                                {fila.ticId && (
+                                                    <Typography variant="caption" color="text.secondary">
+                                                        ID {fila.ticId}
+                                                    </Typography>
+                                                )}
+                                            </TableCell>
+                                            <TableCell>{obtenerChipEstado(fila.estado)}</TableCell>
+                                            <TableCell>{formatearFecha(fila.fechaInicio)}</TableCell>
+                                            <TableCell>
+                                                {fila.ticId && esContratoIndefinido(fila.ticId)
+                                                    ? 'Indefinido'
+                                                    : formatearFecha(fila.fechaFin)}
+                                            </TableCell>
+                                            <TableCell>{fila.motivoCambio || '-'}</TableCell>
+                                            <TableCell>
+                                                {fila.contratoId ? (
+                                                    <Button
+                                                        size="small"
+                                                        variant="contained"
+                                                        color="error"
+                                                        startIcon={<DeleteIcon />}
+                                                        onClick={() => handleEliminar(fila.contratoId!)}
+                                                    >
+                                                        Eliminar
+                                                    </Button>
+                                                ) : (
+                                                    <Typography variant="caption" color="text.secondary">
+                                                        Editar en empleados
+                                                    </Typography>
+                                                )}
+                                            </TableCell>
+                                        </TableRow>
+                                    );
+                                })
                             ) : (
                                 <TableRow>
                                     <TableCell colSpan={7} align="center">
-                                        No hay contratos registrados
+                                        No hay registros de contratos
                                     </TableCell>
                                 </TableRow>
                             )}
@@ -518,29 +436,6 @@ function EmpleadoContratoCRUD() {
                     </Table>
                 </TableContainer>
             </Paper>
-
-            {/* Snackbars */}
-            <Snackbar
-                open={!!mensaje}
-                autoHideDuration={3000}
-                onClose={() => setMensaje('')}
-                anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
-            >
-                <Alert severity="success" onClose={() => setMensaje('')} sx={{ width: '100%' }}>
-                    {mensaje}
-                </Alert>
-            </Snackbar>
-
-            <Snackbar
-                open={!!error}
-                autoHideDuration={4000}
-                onClose={() => setError('')}
-                anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
-            >
-                <Alert severity="error" onClose={() => setError('')} sx={{ width: '100%' }}>
-                    {error}
-                </Alert>
-            </Snackbar>
         </Box>
     );
 }
