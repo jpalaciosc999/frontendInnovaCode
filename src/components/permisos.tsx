@@ -1,18 +1,24 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { Permiso, PermisoForm } from '../interfaces/permisos';
+import type { RolPermiso } from '../interfaces/rolPermisos';
 import {
-  obtenerPermisos,
   crearPermiso,
   actualizarPermiso,
   eliminarPermiso
 } from '../services/permisos.service';
+import { obtenerAdminCatalogo } from '../services/admin.service';
 
 import {
   Alert,
   Box,
   Button,
+  Chip,
+  FormControl,
   Grid,
+  InputLabel,
+  MenuItem,
   Paper,
+  Select,
   Snackbar,
   Table,
   TableBody,
@@ -23,6 +29,7 @@ import {
   TextField,
   Typography
 } from '@mui/material';
+import type { SelectChangeEvent } from '@mui/material/Select';
 
 import SaveIcon from '@mui/icons-material/Save';
 import CleaningServicesIcon from '@mui/icons-material/CleaningServices';
@@ -31,11 +38,43 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import KeyIcon from '@mui/icons-material/Key';
 import AutoFixHighIcon from '@mui/icons-material/AutoFixHigh';
 import { suggestedPermissions } from '../config/permissionSuggestions';
+import { getApiErrorMessage } from '../api/errors';
 
 const initialForm: PermisoForm = {
   per_nombre_permiso: '',
   per_modulo: '',
   per_descripcion: ''
+};
+
+const MODULOS_PERMISO = ['ADMIN', 'AUDITORIA', 'RRHH', 'NOMINA', 'MARCAJE', 'REPORTES', 'GERENCIA', 'CONTABILIDAD'];
+
+const normalizarNombrePermiso = (valor: string) =>
+  valor
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+const normalizar = (valor: unknown) =>
+  String(valor ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+
+const normalizarModulo = (valor: unknown) =>
+  String(valor ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toUpperCase()
+    .replace(/[\s-]+/g, '_');
+
+const getPermisoKey = (nombre: unknown, modulo: unknown) =>
+  `${normalizarModulo(modulo)}::${normalizarNombrePermiso(String(nombre ?? ''))}`;
+
+const esErrorDuplicado = (err: unknown) => {
+  const message = getApiErrorMessage(err, '').toLowerCase();
+  return message.includes('ya existe') || message.includes('duplicado');
 };
 
 function Permisos() {
@@ -46,13 +85,17 @@ function Permisos() {
   const [modoEdicion, setModoEdicion] = useState(false);
   const [permisoId, setPermisoId] = useState<number | null>(null);
   const [form, setForm] = useState<PermisoForm>(initialForm);
+  const [rolPermisos, setRolPermisos] = useState<RolPermiso[]>([]);
+  const [busqueda, setBusqueda] = useState('');
+  const [filtroModulo, setFiltroModulo] = useState('');
 
   const cargarPermisos = async () => {
     try {
       setCargando(true);
       setError('');
-      const data = await obtenerPermisos();
-      setDatos(data);
+      const catalogo = await obtenerAdminCatalogo();
+      setDatos(catalogo.permisos);
+      setRolPermisos(catalogo.rolPermisos);
     } catch (err: any) {
       setError('Error cargando permisos: ' + err.message);
     } finally {
@@ -64,9 +107,18 @@ function Permisos() {
     cargarPermisos();
   }, []);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement> | SelectChangeEvent
+  ) => {
     const { name, value } = e.target;
-    setForm((prev) => ({ ...prev, [name]: value }));
+    if (modoEdicion && permisoAsignado && ['per_nombre_permiso', 'per_modulo'].includes(name as string)) {
+      return;
+    }
+
+    setForm((prev) => ({
+      ...prev,
+      [name]: name === 'per_nombre_permiso' ? normalizarNombrePermiso(value) : value,
+    }));
   };
 
   const limpiarFormulario = () => {
@@ -85,6 +137,19 @@ function Permisos() {
       setError('Todos los campos son obligatorios');
       return false;
     }
+
+    const permisoRepetido = datos.some(
+      (permiso) =>
+        permiso.PERMISOS_ID !== permisoId &&
+        getPermisoKey(permiso.PER_NOMBRE_PERMISO, permiso.PER_MODULO) ===
+          getPermisoKey(form.per_nombre_permiso, form.per_modulo)
+    );
+
+    if (permisoRepetido) {
+      setError('Ya existe ese permiso para el modulo indicado');
+      return false;
+    }
+
     return true;
   };
 
@@ -95,12 +160,18 @@ function Permisos() {
 
       if (!validarFormulario()) return;
 
+      const payload: PermisoForm = {
+        per_nombre_permiso: normalizarNombrePermiso(form.per_nombre_permiso),
+        per_modulo: form.per_modulo.trim(),
+        per_descripcion: form.per_descripcion.trim(),
+      };
+
       if (modoEdicion && permisoId !== null) {
-        await actualizarPermiso(permisoId, form);
-        setMensaje('Permiso actualizado correctamente');
+        await actualizarPermiso(permisoId, payload);
+        setMensaje('Permiso actualizado correctamente. Cierra sesión y vuelve a entrar para refrescar el menú.');
       } else {
-        await crearPermiso(form);
-        setMensaje('Permiso creado correctamente');
+        await crearPermiso(payload);
+        setMensaje('Permiso creado correctamente. Cierra sesión y vuelve a entrar para refrescar el menú.');
       }
 
       limpiarFormulario();
@@ -116,11 +187,11 @@ function Permisos() {
       setMensaje('');
 
       const permisosExistentes = new Set(
-        datos.map((permiso) => permiso.PER_NOMBRE_PERMISO.trim().toUpperCase())
+        datos.map((permiso) => getPermisoKey(permiso.PER_NOMBRE_PERMISO, permiso.PER_MODULO))
       );
 
       const faltantes = suggestedPermissions.filter(
-        (permiso) => !permisosExistentes.has(permiso.nombre)
+        (permiso) => !permisosExistentes.has(getPermisoKey(permiso.nombre, permiso.modulo))
       );
 
       if (faltantes.length === 0) {
@@ -128,17 +199,25 @@ function Permisos() {
         return;
       }
 
-      await Promise.all(
-        faltantes.map((permiso) =>
-          crearPermiso({
+      let creados = 0;
+      let omitidos = 0;
+
+      for (const permiso of faltantes) {
+        try {
+          await crearPermiso({
             per_nombre_permiso: permiso.nombre,
             per_modulo: permiso.modulo,
             per_descripcion: permiso.descripcion,
-          })
-        )
-      );
+          });
+          creados += 1;
+        } catch (err) {
+          if (!esErrorDuplicado(err)) throw err;
+          omitidos += 1;
+        }
+      }
 
-      setMensaje(`Permisos sugeridos creados: ${faltantes.length}`);
+      const detalleOmitidos = omitidos ? ` Omitidos por existir: ${omitidos}.` : '';
+      setMensaje(`Permisos sugeridos creados: ${creados}.${detalleOmitidos} Cierra sesión y vuelve a entrar para refrescar el menú.`);
       await cargarPermisos();
     } catch (err: any) {
       setError('Error creando permisos sugeridos: ' + (err.response?.data?.error || err.message));
@@ -158,18 +237,57 @@ function Permisos() {
   };
 
   const handleEliminar = async (id: number) => {
-    if (!window.confirm('¿Deseas eliminar este permiso?')) return;
+    if (!window.confirm('¿Deseas inactivar este permiso?')) return;
 
     try {
       setError('');
       setMensaje('');
       await eliminarPermiso(id);
-      setMensaje('Permiso eliminado correctamente');
+      setMensaje('Permiso inactivado correctamente. Cierra sesión y vuelve a entrar para refrescar el menú.');
       await cargarPermisos();
     } catch (err: any) {
       setError('Error eliminando permiso: ' + (err.response?.data?.error || err.message));
     }
   };
+
+  const permisosFiltrados = useMemo(() => {
+    const texto = normalizar(busqueda);
+
+    return datos.filter((permiso) => {
+      const contenido = normalizar(
+        `${permiso.PER_NOMBRE_PERMISO} ${permiso.PER_MODULO} ${permiso.PER_DESCRIPCION}`
+      );
+      if (filtroModulo && permiso.PER_MODULO !== filtroModulo) return false;
+      if (texto && !contenido.includes(texto)) return false;
+      return true;
+    });
+  }, [busqueda, datos, filtroModulo]);
+
+  const permisosPorModulo = useMemo(
+    () =>
+      MODULOS_PERMISO.map((modulo) => ({
+        modulo,
+        total: datos.filter((permiso) => permiso.PER_MODULO === modulo).length,
+      })),
+    [datos]
+  );
+
+  const permisosSugeridosPendientes = useMemo(() => {
+    const existentes = new Set(
+      datos.map((permiso) => getPermisoKey(permiso.PER_NOMBRE_PERMISO, permiso.PER_MODULO))
+    );
+    return suggestedPermissions.filter((permiso) => !existentes.has(getPermisoKey(permiso.nombre, permiso.modulo))).length;
+  }, [datos]);
+
+  const permisoAsignado = useMemo(
+    () =>
+      permisoId !== null &&
+      rolPermisos.some(
+        (item) =>
+          String((item as unknown as Record<string, unknown>).PERMISOS_ID ?? item.PER_ID) === String(permisoId)
+      ),
+    [permisoId, rolPermisos]
+  );
 
   if (cargando) {
     return (
@@ -194,8 +312,25 @@ function Permisos() {
         </Typography>
 
         <Alert severity="info" sx={{ mb: 2 }}>
-          Puedes crear permisos manualmente o generar el catalogo sugerido para los roles del sistema.
+          Puedes crear permisos manualmente o generar el catálogo sugerido para los roles del sistema.
         </Alert>
+
+        {modoEdicion && permisoAsignado && (
+          <Alert severity="warning" sx={{ mb: 2 }}>
+            Este permiso ya esta asignado a uno o mas roles. Solo puedes editar su descripcion.
+          </Alert>
+        )}
+
+        <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mb: 3 }}>
+          <Chip label={`Total: ${datos.length}`} color="primary" />
+          <Chip
+            label={`Sugeridos pendientes: ${permisosSugeridosPendientes}`}
+            color={permisosSugeridosPendientes ? 'warning' : 'success'}
+          />
+          {permisosPorModulo.map((item) => (
+            <Chip key={item.modulo} label={`${item.modulo}: ${item.total}`} variant="outlined" />
+          ))}
+        </Box>
 
         <Grid container spacing={2}>
           <Grid size={{ xs: 12, md: 6 }}>
@@ -205,17 +340,27 @@ function Permisos() {
               name="per_nombre_permiso"
               value={form.per_nombre_permiso}
               onChange={handleChange}
+              disabled={modoEdicion && permisoAsignado}
             />
           </Grid>
 
           <Grid size={{ xs: 12, md: 6 }}>
-            <TextField
-              fullWidth
-              label="Módulo"
-              name="per_modulo"
-              value={form.per_modulo}
-              onChange={handleChange}
-            />
+            <FormControl fullWidth>
+              <InputLabel>Módulo</InputLabel>
+              <Select
+                name="per_modulo"
+                value={form.per_modulo}
+                label="Módulo"
+                onChange={handleChange}
+                disabled={modoEdicion && permisoAsignado}
+              >
+                {MODULOS_PERMISO.map((modulo) => (
+                  <MenuItem key={modulo} value={modulo}>
+                    {modulo}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
           </Grid>
 
           <Grid size={{ xs: 12 }}>
@@ -261,8 +406,35 @@ function Permisos() {
 
       <Paper elevation={3} sx={{ p: 3 }}>
         <Typography variant="h6" sx={{ mb: 2 }}>
-          Listado de permisos registrados: {datos.length}
+          Catálogo de permisos: {permisosFiltrados.length} de {datos.length}
         </Typography>
+
+        <Grid container spacing={2} sx={{ mb: 2 }}>
+          <Grid size={{ xs: 12, md: 8 }}>
+            <TextField
+              fullWidth
+              size="small"
+              label="Buscar permiso"
+              value={busqueda}
+              onChange={(event) => setBusqueda(event.target.value)}
+            />
+          </Grid>
+          <Grid size={{ xs: 12, md: 4 }}>
+            <FormControl fullWidth size="small">
+              <InputLabel>Módulo</InputLabel>
+              <Select
+                value={filtroModulo}
+                label="Módulo"
+                onChange={(event) => setFiltroModulo(event.target.value)}
+              >
+                <MenuItem value="">Todos</MenuItem>
+                {MODULOS_PERMISO.map((modulo) => (
+                  <MenuItem key={modulo} value={modulo}>{modulo}</MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          </Grid>
+        </Grid>
 
         <TableContainer>
           <Table>
@@ -276,12 +448,14 @@ function Permisos() {
               </TableRow>
             </TableHead>
             <TableBody>
-              {datos.length > 0 ? (
-                datos.map((permiso) => (
+              {permisosFiltrados.length > 0 ? (
+                permisosFiltrados.map((permiso) => (
                   <TableRow key={permiso.PERMISOS_ID} hover>
                     <TableCell>{permiso.PERMISOS_ID}</TableCell>
                     <TableCell sx={{ fontWeight: 'medium' }}>{permiso.PER_NOMBRE_PERMISO}</TableCell>
-                    <TableCell>{permiso.PER_MODULO}</TableCell>
+                    <TableCell>
+                      <Chip label={permiso.PER_MODULO} size="small" color="info" />
+                    </TableCell>
                     <TableCell>{permiso.PER_DESCRIPCION}</TableCell>
                     <TableCell align="center">
                       <Box sx={{ display: 'flex', gap: 1, justifyContent: 'center' }}>
@@ -300,7 +474,7 @@ function Permisos() {
                           startIcon={<DeleteIcon />}
                           onClick={() => handleEliminar(permiso.PERMISOS_ID)}
                         >
-                          Eliminar
+                          Inactivar
                         </Button>
                       </Box>
                     </TableCell>

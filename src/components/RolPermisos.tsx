@@ -4,13 +4,11 @@ import type { RolPermiso, RolPermisoForm } from '../interfaces/rolPermisos';
 import type { Rol } from '../interfaces/roles';
 import type { Permiso } from '../interfaces/permisos';
 import {
-  obtenerRolPermisos,
   crearRolPermiso,
   actualizarRolPermiso,
   eliminarRolPermiso
 } from '../services/rolPermisos.service';
-import { obtenerRoles } from '../services/roles.service';
-import { obtenerPermisos } from '../services/permisos.service';
+import { obtenerAdminCatalogo } from '../services/admin.service';
 
 import {
   Alert,
@@ -30,6 +28,7 @@ import {
   TableContainer,
   TableHead,
   TableRow,
+  TextField,
   Typography
 } from '@mui/material';
 
@@ -41,13 +40,37 @@ import SecurityIcon from '@mui/icons-material/Security';
 import AutoFixHighIcon from '@mui/icons-material/AutoFixHigh';
 import { normalizeRole } from '../config/roleViews';
 import { suggestedPermissionNamesByRole } from '../config/permissionSuggestions';
+import { useAuth } from '../context/AuthContext';
 
 const initialForm: RolPermisoForm = {
   per_id: '',
   rol_id: ''
 };
+const normalizar = (valor: unknown) =>
+  String(valor ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+
+const leerCampo = (item: unknown, keys: string[]) => {
+  if (!item || typeof item !== 'object') return undefined;
+  const record = item as Record<string, unknown>;
+
+  for (const key of keys) {
+    const value = record[key];
+    if (value !== undefined && value !== null && String(value).trim() !== '') return value;
+  }
+
+  return undefined;
+};
+
+const toFiniteNumber = (value: unknown) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : undefined;
+};
 
 function RolPermisosView() {
+  const { user } = useAuth();
   const [datos, setDatos] = useState<RolPermiso[]>([]);
   const [roles, setRoles] = useState<Rol[]>([]);
   const [permisos, setPermisos] = useState<Permiso[]>([]);
@@ -57,19 +80,18 @@ function RolPermisosView() {
   const [modoEdicion, setModoEdicion] = useState(false);
   const [rpeId, setRpeId] = useState<number | null>(null);
   const [form, setForm] = useState<RolPermisoForm>(initialForm);
+  const [busqueda, setBusqueda] = useState('');
+  const [filtroRol, setFiltroRol] = useState('');
+  const [filtroModulo, setFiltroModulo] = useState('');
 
   const cargarDatos = async () => {
     try {
       setCargando(true);
       setError('');
-      const [relacionesData, rolesData, permisosData] = await Promise.all([
-        obtenerRolPermisos(),
-        obtenerRoles(),
-        obtenerPermisos(),
-      ]);
-      setDatos(relacionesData);
-      setRoles(rolesData);
-      setPermisos(permisosData);
+      const catalogo = await obtenerAdminCatalogo();
+      setDatos(catalogo.rolPermisos);
+      setRoles(catalogo.roles);
+      setPermisos(catalogo.permisos);
     } catch (err: any) {
       setError('Error cargando roles, permisos o relaciones: ' + err.message);
     } finally {
@@ -90,6 +112,31 @@ function RolPermisosView() {
     () => new Map(permisos.map((permiso) => [String(permiso.PERMISOS_ID), permiso])),
     [permisos]
   );
+
+  const currentUserRolId = useMemo(
+    () => toFiniteNumber(leerCampo(user, ['rol_id', 'ROL_ID'])),
+    [user]
+  );
+  const currentRole = useMemo(
+    () => roles.find((rol) => String(rol.ROL_ID) === String(currentUserRolId)),
+    [currentUserRolId, roles]
+  );
+  const currentRoleLevel = toFiniteNumber(currentRole?.ROL_NIVEL_ACCESO);
+  const currentRoleName = normalizar(
+    leerCampo(user, ['rol_nombre', 'ROL_NOMBRE', 'rol', 'role']) ?? currentRole?.ROL_NOMBRE
+  );
+  const currentRoleIsSupremo = ['supremo', 'root', 'superadmin'].includes(currentRoleName);
+
+  const puedeGestionarRolId = (rolId: string | number | undefined) => {
+    if (currentRoleIsSupremo) return true;
+    if (rolId === undefined || rolId === '') return false;
+
+    const rol = rolesPorId.get(String(rolId));
+    const targetLevel = toFiniteNumber(rol?.ROL_NIVEL_ACCESO);
+    if (currentRoleLevel === undefined || targetLevel === undefined) return false;
+
+    return targetLevel < currentRoleLevel;
+  };
 
   const permisoYaAsignado = (rolId: string, permisoId: string) =>
     datos.some(
@@ -117,6 +164,11 @@ function RolPermisosView() {
       return false;
     }
 
+    if (!puedeGestionarRolId(form.rol_id)) {
+      setError('No puedes modificar permisos de roles de nivel igual o superior al tuyo');
+      return false;
+    }
+
     if (permisoYaAsignado(form.rol_id, form.per_id)) {
       setError('Ese permiso ya esta asignado al rol seleccionado');
       return false;
@@ -134,10 +186,10 @@ function RolPermisosView() {
 
       if (modoEdicion && rpeId !== null) {
         await actualizarRolPermiso(rpeId, form);
-        setMensaje('Relacion actualizada correctamente');
+        setMensaje('Relación actualizada correctamente. Cierra sesión y vuelve a entrar para refrescar el menú.');
       } else {
         await crearRolPermiso(form);
-        setMensaje('Permiso asignado correctamente');
+        setMensaje('Permiso asignado correctamente. Cierra sesión y vuelve a entrar para refrescar el menú.');
       }
 
       limpiarFormulario();
@@ -157,6 +209,11 @@ function RolPermisosView() {
         return;
       }
 
+      if (!puedeGestionarRolId(form.rol_id)) {
+        setError('No puedes asignar permisos a roles de nivel igual o superior al tuyo');
+        return;
+      }
+
       const rol = rolesPorId.get(form.rol_id);
       const rolNormalizado = normalizeRole(rol?.ROL_NOMBRE);
 
@@ -165,7 +222,7 @@ function RolPermisosView() {
         return;
       }
 
-      const nombresSugeridos = suggestedPermissionNamesByRole[rolNormalizado];
+      const nombresSugeridos = suggestedPermissionNamesByRole[rolNormalizado] ?? [];
       const permisosSugeridos = permisos.filter((permiso) =>
         nombresSugeridos.includes(permiso.PER_NOMBRE_PERMISO.trim().toUpperCase())
       );
@@ -188,7 +245,7 @@ function RolPermisosView() {
         )
       );
 
-      setMensaje(`Permisos sugeridos asignados: ${faltantes.length}`);
+      setMensaje(`Permisos sugeridos asignados: ${faltantes.length}. Cierra sesión y vuelve a entrar para refrescar el menú.`);
       limpiarFormulario();
       await cargarDatos();
     } catch (err: any) {
@@ -197,6 +254,11 @@ function RolPermisosView() {
   };
 
   const handleEditar = (item: RolPermiso) => {
+    if (!puedeGestionarRolId(item.ROL_ID)) {
+      setError('No puedes editar permisos de roles de nivel igual o superior al tuyo');
+      return;
+    }
+
     setModoEdicion(true);
     setRpeId(item.RPE_ID);
     setMensaje('');
@@ -208,13 +270,19 @@ function RolPermisosView() {
   };
 
   const handleEliminar = async (id: number) => {
-    if (!window.confirm('Deseas eliminar esta relacion rol-permiso?')) return;
+    const relacion = datos.find((item) => item.RPE_ID === id);
+    if (relacion && !puedeGestionarRolId(relacion.ROL_ID)) {
+      setError('No puedes quitar permisos de roles de nivel igual o superior al tuyo');
+      return;
+    }
+
+    if (!window.confirm('¿Deseas quitar esta relación rol-permiso?')) return;
 
     try {
       setError('');
       setMensaje('');
       await eliminarRolPermiso(id);
-      setMensaje('Relacion eliminada correctamente');
+      setMensaje('Relación eliminada correctamente. Cierra sesión y vuelve a entrar para refrescar el menú.');
       await cargarDatos();
     } catch (err: any) {
       setError('Error eliminando: ' + (err.response?.data?.error || err.message));
@@ -226,6 +294,34 @@ function RolPermisosView() {
 
   const obtenerPermiso = (permisoId: number | string) =>
     permisosPorId.get(String(permisoId));
+
+  const relacionesFiltradas = useMemo(() => {
+    const texto = normalizar(busqueda);
+
+    return datos.filter((item) => {
+      const permiso = obtenerPermiso(item.PER_ID);
+      const rol = obtenerNombreRol(item.ROL_ID);
+      const contenido = normalizar(`${rol} ${permiso?.PER_NOMBRE_PERMISO} ${permiso?.PER_MODULO}`);
+      if (filtroRol && String(item.ROL_ID) !== filtroRol) return false;
+      if (filtroModulo && permiso?.PER_MODULO !== filtroModulo) return false;
+      if (texto && !contenido.includes(texto)) return false;
+      return true;
+    });
+  }, [busqueda, datos, filtroModulo, filtroRol, permisosPorId, rolesPorId]);
+
+  const modulos = useMemo(
+    () => Array.from(new Set(permisos.map((permiso) => permiso.PER_MODULO).filter(Boolean))).sort(),
+    [permisos]
+  );
+
+  const coberturaRoles = useMemo(
+    () =>
+      roles.map((rol) => ({
+        rol,
+        permisos: datos.filter((item) => String(item.ROL_ID) === String(rol.ROL_ID)).length,
+      })),
+    [datos, roles]
+  );
 
   if (cargando) {
     return (
@@ -241,16 +337,27 @@ function RolPermisosView() {
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 3 }}>
           <SecurityIcon color="primary" fontSize="large" />
           <Typography variant="h4" sx={{ fontWeight: 'bold' }}>
-            Asignacion de Permisos por Rol
+            Asignación de Permisos por Rol
           </Typography>
         </Box>
 
         <Alert severity="info" sx={{ mb: 2 }}>
-          Selecciona un rol y un permiso para asignarlos. Tambien puedes aplicar los permisos sugeridos del rol.
+          Selecciona un rol y un permiso para asignarlos. También puedes aplicar los permisos sugeridos del rol.
         </Alert>
 
+        <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mb: 3 }}>
+          <Chip label={`Relaciones: ${datos.length}`} color="primary" />
+          <Chip
+            label={`Roles sin permisos: ${coberturaRoles.filter((item) => item.permisos === 0).length}`}
+            color="warning"
+          />
+          {coberturaRoles.map((item) => (
+            <Chip key={item.rol.ROL_ID} label={`${item.rol.ROL_NOMBRE}: ${item.permisos}`} variant="outlined" />
+          ))}
+        </Box>
+
         <Typography variant="h6" sx={{ mb: 2 }}>
-          {modoEdicion ? 'Editar asignacion' : 'Nueva asignacion'}
+          {modoEdicion ? 'Editar asignación' : 'Nueva asignación'}
         </Typography>
 
         <Grid container spacing={2}>
@@ -258,11 +365,16 @@ function RolPermisosView() {
             <FormControl fullWidth>
               <InputLabel>Rol</InputLabel>
               <Select name="rol_id" value={form.rol_id} label="Rol" onChange={handleChange}>
-                {roles.map((rol) => (
-                  <MenuItem key={rol.ROL_ID} value={String(rol.ROL_ID)}>
-                    {rol.ROL_NOMBRE}
-                  </MenuItem>
-                ))}
+                {roles.map((rol) => {
+                  const rolBloqueado = !puedeGestionarRolId(rol.ROL_ID);
+
+                  return (
+                    <MenuItem key={rol.ROL_ID} value={String(rol.ROL_ID)} disabled={rolBloqueado}>
+                      {rol.ROL_NOMBRE}
+                      {rolBloqueado ? ' - Nivel protegido' : ''}
+                    </MenuItem>
+                  );
+                })}
               </Select>
             </FormControl>
           </Grid>
@@ -311,8 +423,42 @@ function RolPermisosView() {
 
       <Paper elevation={3} sx={{ p: 3 }}>
         <Typography variant="h6" sx={{ mb: 2 }}>
-          Relaciones registradas: {datos.length}
+          Matriz rol-permiso: {relacionesFiltradas.length} de {datos.length}
         </Typography>
+
+        <Grid container spacing={2} sx={{ mb: 2 }}>
+          <Grid size={{ xs: 12, md: 5 }}>
+            <TextField
+              fullWidth
+              size="small"
+              label="Buscar relación"
+              value={busqueda}
+              onChange={(event) => setBusqueda(event.target.value)}
+            />
+          </Grid>
+          <Grid size={{ xs: 12, md: 4 }}>
+            <FormControl fullWidth size="small">
+              <InputLabel>Rol</InputLabel>
+              <Select value={filtroRol} label="Rol" onChange={(event) => setFiltroRol(event.target.value)}>
+                <MenuItem value="">Todos</MenuItem>
+                {roles.map((rol) => (
+                  <MenuItem key={rol.ROL_ID} value={String(rol.ROL_ID)}>{rol.ROL_NOMBRE}</MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          </Grid>
+          <Grid size={{ xs: 12, md: 3 }}>
+            <FormControl fullWidth size="small">
+              <InputLabel>Módulo</InputLabel>
+              <Select value={filtroModulo} label="Módulo" onChange={(event) => setFiltroModulo(event.target.value)}>
+                <MenuItem value="">Todos</MenuItem>
+                {modulos.map((modulo) => (
+                  <MenuItem key={modulo} value={modulo}>{modulo}</MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          </Grid>
+        </Grid>
 
         <TableContainer>
           <Table>
@@ -326,9 +472,10 @@ function RolPermisosView() {
               </TableRow>
             </TableHead>
             <TableBody>
-              {datos.length > 0 ? (
-                datos.map((item) => {
+              {relacionesFiltradas.length > 0 ? (
+                relacionesFiltradas.map((item) => {
                   const permiso = obtenerPermiso(item.PER_ID);
+                  const rolProtegido = !puedeGestionarRolId(item.ROL_ID);
 
                   return (
                     <TableRow key={item.RPE_ID} hover>
@@ -344,6 +491,7 @@ function RolPermisosView() {
                             size="small"
                             variant="outlined"
                             startIcon={<EditIcon />}
+                            disabled={rolProtegido}
                             onClick={() => handleEditar(item)}
                           >
                             Editar
@@ -353,9 +501,10 @@ function RolPermisosView() {
                             variant="contained"
                             color="error"
                             startIcon={<DeleteIcon />}
+                            disabled={rolProtegido}
                             onClick={() => handleEliminar(item.RPE_ID)}
                           >
-                            Eliminar
+                            Quitar
                           </Button>
                         </Box>
                       </TableCell>

@@ -50,7 +50,6 @@ import FolderIcon from '@mui/icons-material/Folder';
 import ExpandLess from '@mui/icons-material/ExpandLess';
 import ExpandMore from '@mui/icons-material/ExpandMore';
 import SummarizeIcon from '@mui/icons-material/Summarize';
-import EventAvailableIcon from '@mui/icons-material/EventAvailable';
 import ApprovalIcon from '@mui/icons-material/Approval';
 import {
   AUTH_USER_CHANGED_EVENT,
@@ -59,7 +58,6 @@ import {
   roleLabels,
   roleOrder,
 } from '../config/roleViews';
-import type { AppRole } from '../config/roleViews';
 import { useAuth } from '../context/AuthContext';
 
 type MenuItemType = {
@@ -87,7 +85,6 @@ const viewIcons: Record<string, ReactNode> = {
   kpis: <InsightsIcon />,
   'kpi-resultado': <QueryStatsIcon />,
   'suspensiones-igss': <MedicalServicesIcon />,
-  'registro-vacaciones': <EventAvailableIcon />,
   'control-laboral': <AccessTimeIcon />,
   'empleado-contrato': <BadgeIcon />,
   'tipo-contrato': <BadgeIcon />,
@@ -116,9 +113,8 @@ const viewIcons: Record<string, ReactNode> = {
   'aprobacion-nomina': <ApprovalIcon />,
 };
 
-const buildMenuSections = (currentRole: AppRole | null): MenuSectionType[] =>
+const buildMenuSections = (): MenuSectionType[] =>
   roleOrder
-    .filter((role) => !currentRole || currentRole === 'SUPREMO' || role === currentRole)
     .map((role) => ({
       key: role,
       text: `Rol ${roleLabels[role]}`,
@@ -145,7 +141,7 @@ function Navbar() {
   });
 
   const location = useLocation();
-  const menuSections = useMemo(() => buildMenuSections(currentRole), [currentRole]);
+  const menuSections = useMemo(() => buildMenuSections(), []);
 
   useEffect(() => {
     const syncCurrentRole = () => setCurrentRole(getCurrentUserRole());

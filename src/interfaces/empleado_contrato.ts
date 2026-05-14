@@ -5,6 +5,11 @@ export interface EmpleadoContrato {
     TCO_ESTADO: string;
     TIC_FECHA_MODIFICACION: string;
     TIC_ID: number;
+    EMP_ID?: number;
+    TCO_MOTIVO_CAMBIO?: string;
+    TCO_ES_ACTUAL?: boolean | number | string;
+    TCO_FECHA_CREACION?: string;
+    TCO_FECHA_ACTUALIZACION?: string;
 }
 
 export interface EmpleadoContratoForm {
@@ -13,4 +18,5 @@ export interface EmpleadoContratoForm {
     tco_estado: string;
     tic_fecha_modificacion: string;
     tic_id: string | number;
+    emp_id: string | number;
 }

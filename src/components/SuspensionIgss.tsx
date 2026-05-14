@@ -30,6 +30,15 @@ import MedicalServicesIcon from '@mui/icons-material/MedicalServices';
 
 import { obtenerEmpleados } from '../services/empleados.service';
 import type { Empleado } from '../interfaces/empleados';
+import { obtenerPuestos } from '../services/puestos.service';
+import type { Puesto } from '../interfaces/puestos';
+import type { SuspensionIgss, SuspensionIgssForm } from '../interfaces/suspensionIgss';
+import {
+  actualizarSuspensionIgss,
+  crearSuspensionIgss,
+  eliminarSuspensionIgss,
+  obtenerSuspensionesIgss
+} from '../services/suspensionIgss.service';
 
 // Regla IGSS: días 1-3 empleador paga 100%, días 4+ IGSS paga 66.67%
 const calcularImpacto = (salarioDiario: number, dias: number) => {
@@ -44,51 +53,49 @@ const calcularImpacto = (salarioDiario: number, dias: number) => {
   return { dias_empleador, dias_igss, pago_empleador, pago_igss, descuento_salario, detalle };
 };
 
-interface Suspension {
-  SUS_ID: number;
-  EMP_ID: number;
-  EMP_NOMBRE: string;
-  SUS_NO_CERTIFICADO: string;
-  SUS_FECHA_INICIO: string;
-  SUS_FECHA_FIN: string;
-  SUS_DIAS: number;
-  SUS_SALARIO_DIARIO: number;
-  SUS_TIPO: string;
-  SUS_ESTADO: string;
-  SUS_OBSERVACION: string;
-}
-
-interface SuspensionForm {
-  emp_id: string;
-  sus_no_certificado: string;
-  sus_fecha_inicio: string;
-  sus_fecha_fin: string;
-  sus_salario_diario: string;
-  sus_tipo: string;
-  sus_estado: string;
-  sus_observacion: string;
-}
-
-const initialForm: SuspensionForm = {
+const initialForm: SuspensionIgssForm = {
   emp_id: '', sus_no_certificado: '', sus_fecha_inicio: '',
   sus_fecha_fin: '', sus_salario_diario: '',
   sus_tipo: 'ENFERMEDAD', sus_estado: 'A', sus_observacion: ''
 };
 
 function SuspensionIGSS() {
-  const [datos, setDatos] = useState<Suspension[]>([]);
+  const [datos, setDatos] = useState<SuspensionIgss[]>([]);
   const [empleados, setEmpleados] = useState<Empleado[]>([]);
+  const [puestos, setPuestos] = useState<Puesto[]>([]);
+  const [cargando, setCargando] = useState(true);
   const [error, setError] = useState('');
   const [mensaje, setMensaje] = useState('');
   const [modoEdicion, setModoEdicion] = useState(false);
   const [id, setId] = useState<number | null>(null);
-  const [form, setForm] = useState<SuspensionForm>(initialForm);
+  const [form, setForm] = useState<SuspensionIgssForm>(initialForm);
 
-  // Cargar empleados activos al montar
+  const cargarDatos = async () => {
+    try {
+      setCargando(true);
+      setError('');
+      const data = await obtenerSuspensionesIgss();
+      setDatos(data);
+    } catch (err: any) {
+      setError('Error cargando suspensiones: ' + (err.response?.data?.error || err.message));
+    } finally {
+      setCargando(false);
+    }
+  };
+
+  const cargarRelaciones = async () => {
+    try {
+      const [empleadosData, puestosData] = await Promise.all([obtenerEmpleados(), obtenerPuestos()]);
+      setEmpleados(empleadosData.filter((e: Empleado) => e.EMP_ESTADO === 'A'));
+      setPuestos(puestosData);
+    } catch (err: any) {
+      setError('Error cargando empleados o puestos: ' + (err.response?.data?.error || err.message));
+    }
+  };
+
   useEffect(() => {
-    obtenerEmpleados()
-      .then((data) => setEmpleados(data.filter((e: Empleado) => e.EMP_ESTADO === 'A')))
-      .catch((err) => setError('Error cargando empleados: ' + err.message));
+    cargarDatos();
+    cargarRelaciones();
   }, []);
 
   // Días calculados automáticamente
@@ -105,11 +112,31 @@ function SuspensionIGSS() {
     ? calcularImpacto(Number(form.sus_salario_diario), diasSuspension)
     : null;
 
+  const obtenerSalarioDiario = (empId: string) => {
+    const empleado = empleados.find((e) => String(e.EMP_ID) === String(empId));
+    const puesto = puestos.find((p) => String(p.PUE_ID) === String(empleado?.PUE_ID));
+    const sueldoMensual = Number(empleado?.EMP_SUELDO ?? puesto?.PUE_SALARIO_BASE ?? 0);
+
+    if (!sueldoMensual || sueldoMensual <= 0) return '';
+
+    return (sueldoMensual / 30).toFixed(2);
+  };
+
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement> | SelectChangeEvent
   ) => {
     const { name, value } = e.target;
-    setForm((prev) => ({ ...prev, [name as string]: value }));
+    setForm((prev) => {
+      if (name === 'emp_id') {
+        return {
+          ...prev,
+          emp_id: value,
+          sus_salario_diario: obtenerSalarioDiario(value)
+        };
+      }
+
+      return { ...prev, [name as string]: value };
+    });
   };
 
   const limpiarFormulario = () => {
@@ -133,56 +160,49 @@ function SuspensionIGSS() {
     return true;
   };
 
-  const guardar = () => {
-    setError('');
-    setMensaje('');
-    if (!validar()) return;
+  const guardar = async () => {
+    try {
+      setError('');
+      setMensaje('');
+      if (!validar()) return;
 
-    const emp = empleados.find((e) => e.EMP_ID === Number(form.emp_id));
-    const nombreEmp = emp ? `${emp.EMP_NOMBRE} ${emp.EMP_APELLIDO}` : `Emp. ${form.emp_id}`;
+      const payload: SuspensionIgssForm = {
+        ...form,
+        emp_id: Number(form.emp_id),
+        sus_dias: diasSuspension,
+        sus_salario_diario: Number(form.sus_salario_diario)
+      };
 
-    if (modoEdicion && id !== null) {
-      setDatos((prev) => prev.map((s) => s.SUS_ID === id ? {
-        ...s,
-        EMP_ID: Number(form.emp_id),
-        EMP_NOMBRE: nombreEmp,
-        SUS_NO_CERTIFICADO: form.sus_no_certificado,
-        SUS_FECHA_INICIO: form.sus_fecha_inicio,
-        SUS_FECHA_FIN: form.sus_fecha_fin,
-        SUS_DIAS: diasSuspension,
-        SUS_SALARIO_DIARIO: Number(form.sus_salario_diario),
-        SUS_TIPO: form.sus_tipo,
-        SUS_ESTADO: form.sus_estado,
-        SUS_OBSERVACION: form.sus_observacion
-      } : s));
-      setMensaje('Suspensión actualizada correctamente');
-    } else {
-      setDatos((prev) => [...prev, {
-        SUS_ID: prev.length + 1,
-        EMP_ID: Number(form.emp_id),
-        EMP_NOMBRE: nombreEmp,
-        SUS_NO_CERTIFICADO: form.sus_no_certificado,
-        SUS_FECHA_INICIO: form.sus_fecha_inicio,
-        SUS_FECHA_FIN: form.sus_fecha_fin,
-        SUS_DIAS: diasSuspension,
-        SUS_SALARIO_DIARIO: Number(form.sus_salario_diario),
-        SUS_TIPO: form.sus_tipo,
-        SUS_ESTADO: form.sus_estado,
-        SUS_OBSERVACION: form.sus_observacion
-      }]);
-      setMensaje('Suspensión registrada correctamente');
+      if (modoEdicion && id !== null) {
+        await actualizarSuspensionIgss(id, payload);
+        setMensaje('Suspensión actualizada correctamente');
+      } else {
+        await crearSuspensionIgss(payload);
+        setMensaje('Suspensión registrada correctamente');
+      }
+
+      limpiarFormulario();
+      await cargarDatos();
+    } catch (err: any) {
+      setError('Error al guardar: ' + (err.response?.data?.error || err.message));
     }
-    limpiarFormulario();
   };
 
-  const handleEliminar = (idEliminar: number) => {
+  const handleEliminar = async (idEliminar: number) => {
     if (!window.confirm('¿Deseas eliminar esta suspensión?')) return;
-    setDatos((prev) => prev.filter((s) => s.SUS_ID !== idEliminar));
-    setMensaje('Suspensión eliminada');
-    if (id === idEliminar) limpiarFormulario();
+    try {
+      setError('');
+      setMensaje('');
+      await eliminarSuspensionIgss(idEliminar);
+      setMensaje('Suspensión eliminada');
+      if (id === idEliminar) limpiarFormulario();
+      await cargarDatos();
+    } catch (err: any) {
+      setError('Error al eliminar: ' + (err.response?.data?.error || err.message));
+    }
   };
 
-  const handleEditar = (s: Suspension) => {
+  const handleEditar = (s: SuspensionIgss) => {
     setModoEdicion(true);
     setId(s.SUS_ID);
     setMensaje('');
@@ -209,6 +229,14 @@ function SuspensionIGSS() {
   const fmt = (v: number) =>
     `Q ${v.toLocaleString('es-GT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
+  if (cargando) {
+    return (
+      <Box sx={{ p: 3 }}>
+        <Typography variant="h6">Cargando suspensiones...</Typography>
+      </Box>
+    );
+  }
+
   return (
     <Box sx={{ py: 2 }}>
       <Paper elevation={3} sx={{ p: 3, mb: 3 }}>
@@ -231,7 +259,7 @@ function SuspensionIGSS() {
           <Grid size={{ xs: 12, md: 4 }}>
             <FormControl fullWidth>
               <InputLabel>Empleado</InputLabel>
-              <Select name="emp_id" value={form.emp_id}
+              <Select name="emp_id" value={String(form.emp_id)}
                 label="Empleado" onChange={handleChange}>
                 <MenuItem value="">Seleccione empleado</MenuItem>
                 {empleados.map((e) => (
@@ -282,8 +310,11 @@ function SuspensionIGSS() {
 
           <Grid size={{ xs: 12, md: 4 }}>
             <TextField fullWidth label="Salario diario (Q)" name="sus_salario_diario"
-              type="number" value={form.sus_salario_diario} onChange={handleChange}
-              placeholder="Salario mensual ÷ 30" />
+              type="number" value={form.sus_salario_diario}
+              placeholder="Salario mensual ÷ 30"
+              helperText="Se calcula automáticamente desde el sueldo del empleado"
+              slotProps={{ input: { readOnly: true } }}
+              sx={{ backgroundColor: '#f5f5f5' }} />
           </Grid>
 
           <Grid size={{ xs: 12, md: 4 }}>

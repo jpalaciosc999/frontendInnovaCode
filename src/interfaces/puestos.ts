@@ -4,6 +4,7 @@ export interface Puesto {
   PUE_SALARIO_BASE: number;
   PUE_DESCRIPCION: string;
   PUE_ESTADO: string;
+  DEP_ID?: number;
   PUE_FECHA_CREACION: Date;
   PUE_MODIFICACION: Date;
 }

@@ -1,6 +1,7 @@
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { Box, CircularProgress } from '@mui/material';
 import { useAuth } from '../context/AuthContext';
+import AccessDenied from './common/AccessDenied';
 
 const ProtectedRoute = () => {
   const location = useLocation();
@@ -16,7 +17,7 @@ const ProtectedRoute = () => {
     );
   }
 
-  return canAccessPath(location.pathname) ? <Outlet /> : <Navigate to="/" replace />;
+  return canAccessPath(location.pathname) ? <Outlet /> : <AccessDenied />;
 };
 
 export default ProtectedRoute;

@@ -8,7 +8,7 @@ export interface CuentaBancaria {
 }
 
 export interface CuentaBancariaForm {
-  ban_nombre: string;
+  cue_nombre: string;
   cue_numero: string;
   cue_tipo: string;
   emp_id: string;
