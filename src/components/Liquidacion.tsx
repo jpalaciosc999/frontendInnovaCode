@@ -1,11 +1,15 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { Liquidacion, LiquidacionForm } from '../interfaces/liquidacion';
+import type { Empleado } from '../interfaces/empleados';
 import {
   obtenerLiquidaciones,
   crearLiquidacion,
   actualizarLiquidacion,
   eliminarLiquidacion
 } from '../services/liquidacion.service';
+import { obtenerEmpleados } from '../services/empleados.service';
+import { getApiErrorMessage } from '../api/errors';
+import { formatearMoneda, obtenerNombreEmpleado } from '../utils/relations';
 
 import {
   Alert,
@@ -58,15 +62,20 @@ function LiquidacionCRUD() {
   const [modoEdicion, setModoEdicion] = useState(false);
   const [liqId, setLiqId] = useState<number | null>(null);
   const [form, setForm] = useState<LiquidacionForm>(initialForm);
+  const [empleados, setEmpleados] = useState<Empleado[]>([]);
 
   const cargarDatos = async () => {
     try {
       setCargando(true);
       setError('');
-      const data = await obtenerLiquidaciones();
-      setDatos(data);
-    } catch (err: any) {
-      setError('Error cargando liquidaciones: ' + err.message);
+      const [liquidacionesData, empleadosData] = await Promise.all([
+        obtenerLiquidaciones(),
+        obtenerEmpleados(),
+      ]);
+      setDatos(liquidacionesData);
+      setEmpleados(empleadosData);
+    } catch (err: unknown) {
+      setError(getApiErrorMessage(err, 'Error cargando liquidaciones'));
     } finally {
       setCargando(false);
     }
@@ -75,6 +84,11 @@ function LiquidacionCRUD() {
   useEffect(() => {
     cargarDatos();
   }, []);
+
+  const empleadosPorId = useMemo(
+    () => new Map(empleados.map((empleado) => [String(empleado.EMP_ID), empleado])),
+    [empleados]
+  );
 
   // Cálculo automático del total de liquidación
   useEffect(() => {
@@ -140,8 +154,8 @@ function LiquidacionCRUD() {
 
       limpiarFormulario();
       await cargarDatos();
-    } catch (err: any) {
-      setError('Error guardando: ' + (err.response?.data?.error || err.message));
+    } catch (err: unknown) {
+      setError(getApiErrorMessage(err, 'Error guardando liquidacion'));
     }
   };
 
@@ -157,8 +171,8 @@ function LiquidacionCRUD() {
       if (liqId === idEliminar) limpiarFormulario();
 
       await cargarDatos();
-    } catch (err: any) {
-      setError('Error eliminando: ' + (err.response?.data?.error || err.message));
+    } catch (err: unknown) {
+      setError(getApiErrorMessage(err, 'Error eliminando liquidacion'));
     }
   };
 
@@ -314,14 +328,17 @@ function LiquidacionCRUD() {
           </Grid>
 
           <Grid size={{ xs: 12, md: 6 }}>
-            <TextField
-              fullWidth
-              label="Empleado ID"
-              name="emp_id"
-              type="number"
-              value={form.emp_id}
-              onChange={handleChange}
-            />
+            <FormControl fullWidth>
+              <InputLabel>Empleado</InputLabel>
+              <Select name="emp_id" value={String(form.emp_id)} label="Empleado" onChange={handleChange}>
+                <MenuItem value="">Seleccione empleado</MenuItem>
+                {empleados.map((empleado) => (
+                  <MenuItem key={empleado.EMP_ID} value={String(empleado.EMP_ID)}>
+                    {obtenerNombreEmpleado(empleado)}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
           </Grid>
 
           {/* Total calculado automáticamente */}
@@ -369,7 +386,7 @@ function LiquidacionCRUD() {
             <TableHead>
               <TableRow>
                 <TableCell><strong>ID</strong></TableCell>
-                <TableCell><strong>Empleado ID</strong></TableCell>
+                <TableCell><strong>Empleado</strong></TableCell>
                 <TableCell><strong>Tipo Retiro</strong></TableCell>
                 <TableCell><strong>Días Trabajados</strong></TableCell>
                 <TableCell><strong>Total Liquidación</strong></TableCell>
@@ -380,14 +397,20 @@ function LiquidacionCRUD() {
 
             <TableBody>
               {datos.length > 0 ? (
-                datos.map((l) => (
+                datos.map((l) => {
+                  const empleado = empleadosPorId.get(String(l.EMP_ID));
+
+                  return (
                   <TableRow key={l.LIQ_ID} hover>
                     <TableCell>{l.LIQ_ID}</TableCell>
-                    <TableCell>{l.EMP_ID}</TableCell>
+                    <TableCell>
+                      <Typography variant="body2">{obtenerNombreEmpleado(empleado) || `Empleado #${l.EMP_ID}`}</Typography>
+                      <Typography variant="caption" color="text.secondary">ID: {l.EMP_ID}</Typography>
+                    </TableCell>
                     <TableCell>{obtenerChipTipoRetiro(l.LIQ_TIPO_RETIRO)}</TableCell>
                     <TableCell>{l.LIQ_DIAS_TRABAJADO}</TableCell>
                     <TableCell>
-                      Q{Number(l.LIQ_LIQUIDACION).toLocaleString('es-GT')}
+                      {formatearMoneda(l.LIQ_LIQUIDACION)}
                     </TableCell>
                     <TableCell>
                       {l.LIQ_FECHA_SALIDA
@@ -417,7 +440,8 @@ function LiquidacionCRUD() {
                       </Box>
                     </TableCell>
                   </TableRow>
-                ))
+                  );
+                })
               ) : (
                 <TableRow>
                   <TableCell colSpan={7} align="center">

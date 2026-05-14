@@ -21,10 +21,12 @@ import DownloadIcon from '@mui/icons-material/Download';
 
 import { obtenerEmpleados } from '../services/empleados.service';
 import type { Empleado } from '../interfaces/empleados';
-
-const TASA_LABORAL = 0.0483;
-const TASA_PATRONAL = 0.1267;
-const SALARIO_BASE_DEFAULT = 4000; // reemplazar cuando tengas endpoint de salarios
+import { getApiErrorMessage } from '../api/errors';
+import {
+  obtenerSueldoMensual,
+  TASA_IGSS_LABORAL,
+  TASA_IGSS_PATRONAL
+} from '../utils/payroll';
 
 interface FilaIGSS {
   emp_id: number;
@@ -49,20 +51,20 @@ function CalculadoraIGSS() {
         const filas = data
           .filter((e: Empleado) => e.EMP_ESTADO === 'A')
           .map((e: Empleado) => {
-            const salario = SALARIO_BASE_DEFAULT;
+            const salario = obtenerSueldoMensual(e);
             return {
               emp_id: e.EMP_ID,
               nombre: e.EMP_NOMBRE,
               apellido: e.EMP_APELLIDO,
               salario,
-              cuota_laboral: salario * TASA_LABORAL,
-              cuota_patronal: salario * TASA_PATRONAL,
-              total_igss: salario * (TASA_LABORAL + TASA_PATRONAL)
+              cuota_laboral: salario * TASA_IGSS_LABORAL,
+              cuota_patronal: salario * TASA_IGSS_PATRONAL,
+              total_igss: salario * (TASA_IGSS_LABORAL + TASA_IGSS_PATRONAL)
             };
           });
         setEmpleados(filas);
-      } catch (err: any) {
-        setError('Error cargando empleados: ' + err.message);
+      } catch (err: unknown) {
+        setError(getApiErrorMessage(err, 'Error cargando empleados'));
       } finally {
         setCargando(false);
       }
@@ -70,8 +72,8 @@ function CalculadoraIGSS() {
     cargar();
   }, []);
 
-  const cuotaLaboral = Number(salarioBase) * TASA_LABORAL;
-  const cuotaPatronal = Number(salarioBase) * TASA_PATRONAL;
+  const cuotaLaboral = Number(salarioBase) * TASA_IGSS_LABORAL;
+  const cuotaPatronal = Number(salarioBase) * TASA_IGSS_PATRONAL;
   const totalIGSS = cuotaLaboral + cuotaPatronal;
 
   const fmt = (v: number) =>

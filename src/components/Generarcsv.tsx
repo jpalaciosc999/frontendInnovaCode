@@ -3,6 +3,7 @@ import {
   Alert,
   Box,
   Button,
+  Chip,
   Divider,
   FormControl,
   Grid,
@@ -22,20 +23,37 @@ import {
 import type { SelectChangeEvent } from '@mui/material/Select';
 import DownloadIcon from '@mui/icons-material/Download';
 import SummarizeIcon from '@mui/icons-material/Summarize';
+import SendIcon from '@mui/icons-material/Send';
 
-import { obtenerEmpleados } from '../services/empleados.service';
-import { obtenerPeriodos } from '../services/periodo.service';
-import type { Empleado } from '../interfaces/empleados';
-import type { Periodo } from '../interfaces/periodo';
 import api from '../api/axios';
+import { getApiErrorMessage } from '../api/errors';
+import type { Empleado } from '../interfaces/empleados';
+import type { Nomina } from '../interfaces/nomina';
+import type { Periodo } from '../interfaces/periodo';
+import { obtenerEmpleados } from '../services/empleados.service';
+import { actualizarNomina, obtenerNominas } from '../services/nomina.service';
+import { obtenerPeriodos } from '../services/periodo.service';
+import { formatearFecha, formatearMoneda, obtenerNombreEmpleado } from '../utils/relations';
 
-// ─── Interfaz cuenta bancaria ─────────────────────────────────────────────────
 interface CuentaBancaria {
   CUE_ID: number;
-  CUE_NOMBRE: string;  // Nombre del banco
-  CUE_NUMERO: string;  // Número de cuenta
+  CUE_NOMBRE: string;
+  CUE_NUMERO: string;
   CUE_TIPO: string;
   EMP_ID: number;
+}
+
+interface FilaNomina {
+  nom_id: number;
+  emp_id: number;
+  empleado: string;
+  banco: string;
+  cuenta_numero: string;
+  cuenta_tipo: string;
+  ingresos: number;
+  descuentos: number;
+  liquido_depositar: number;
+  estado: string;
 }
 
 const obtenerCuentas = async (): Promise<CuentaBancaria[]> => {
@@ -43,56 +61,44 @@ const obtenerCuentas = async (): Promise<CuentaBancaria[]> => {
   return res.data;
 };
 
-// ─── Constantes de cálculo ────────────────────────────────────────────────────
-const TASA_IGSS_LABORAL = 0.0483;
-
-const calcularISRMensual = (salarioMensual: number): number => {
-  const anual = salarioMensual * 12;
-  const imponible = Math.max(0, anual - 60_000 - 48_000);
-  if (imponible <= 0) return 0;
-  const isrAnual = imponible <= 300_000
-    ? imponible * 0.05
-    : 15_000 + (imponible - 300_000) * 0.07;
-  return isrAnual / 12;
+const obtenerEtiquetaEstado = (estado: string) => {
+  if (estado === 'A') return <Chip label="Aprobada" color="success" size="small" />;
+  if (estado === 'P') return <Chip label="Pendiente gerente" color="warning" size="small" />;
+  if (estado === 'I') return <Chip label="Rechazada" color="error" size="small" />;
+  if (estado === 'B') return <Chip label="Borrador" color="default" size="small" />;
+  return <Chip label={estado || 'Sin estado'} size="small" />;
 };
 
-// ─── Tipo fila de planilla ────────────────────────────────────────────────────
-interface FilaNomina {
-  emp_id: number;
-  nombre: string;
-  apellido: string;
-  banco: string;
-  cuenta_numero: string;
-  cuenta_tipo: string;
-  salario_base: number;
-  igss_laboral: number;
-  isr_mensual: number;
-  total_descuentos: number;
-  liquido_depositar: number;
-}
-
-// NOTA: Salario base temporal hasta tener endpoint de salarios.
-// Reemplaza SALARIO_BASE_DEFAULT con tu llamada real cuando esté disponible.
-const SALARIO_BASE_DEFAULT = 4000;
+const crearPayloadNomina = (nomina: Nomina, estado: string) => ({
+  nom_total_ingresos: nomina.NOM_TOTAL_INGRESOS,
+  nom_total_descuento: nomina.NOM_TOTAL_DESCUENTO,
+  nom_salario_liquido: nomina.NOM_SALARIO_LIQUIDO,
+  nom_fecha_generacion: formatearFecha(nomina.NOM_FECHA_GENERACION),
+  per_id: nomina.PER_ID,
+  empleado_id: nomina.EMP_ID,
+  liq_id: nomina.LIQ_ID ?? null,
+  nom_estado: estado,
+});
 
 function GenerarCSV() {
   const [periodos, setPeriodos] = useState<Periodo[]>([]);
   const [periodoId, setPeriodoId] = useState('');
   const [datos, setDatos] = useState<FilaNomina[]>([]);
+  const [nominasPeriodo, setNominasPeriodo] = useState<Nomina[]>([]);
   const [cargando, setCargando] = useState(false);
   const [generado, setGenerado] = useState(false);
   const [error, setError] = useState('');
+  const [mensaje, setMensaje] = useState('');
   const [periodosListos, setPeriodosListos] = useState(false);
 
-  // Carga períodos solo cuando el usuario abre el Select
   const cargarPeriodos = async () => {
     if (periodosListos) return;
     try {
       const data = await obtenerPeriodos();
       setPeriodos(data);
       setPeriodosListos(true);
-    } catch (err: any) {
-      setError('Error cargando períodos: ' + err.message);
+    } catch (err: unknown) {
+      setError(getApiErrorMessage(err, 'Error cargando periodos'));
     }
   };
 
@@ -105,94 +111,141 @@ function GenerarCSV() {
     setPeriodoId(e.target.value);
     setGenerado(false);
     setDatos([]);
+    setNominasPeriodo([]);
     setError('');
+    setMensaje('');
   };
 
-  // ─── Generar planilla con datos reales ───────────────────────────────────────
-  const generarPlanilla = async () => {
+  const construirFilas = (
+    nominas: Nomina[],
+    empleados: Empleado[],
+    cuentas: CuentaBancaria[]
+  ): FilaNomina[] => {
+    const empleadosPorId = new Map(empleados.map((empleado) => [String(empleado.EMP_ID), empleado]));
+    const cuentasPorEmp = new Map<number, CuentaBancaria>();
+
+    cuentas.forEach((cuenta) => {
+      if (!cuentasPorEmp.has(cuenta.EMP_ID)) cuentasPorEmp.set(cuenta.EMP_ID, cuenta);
+    });
+
+    return nominas.map((nomina) => {
+      const empleado = empleadosPorId.get(String(nomina.EMP_ID));
+      const cuenta = cuentasPorEmp.get(nomina.EMP_ID);
+
+      return {
+        nom_id: nomina.NOM_ID,
+        emp_id: nomina.EMP_ID,
+        empleado: obtenerNombreEmpleado(empleado) || `Empleado #${nomina.EMP_ID}`,
+        banco: cuenta?.CUE_NOMBRE ?? 'Sin banco',
+        cuenta_numero: cuenta?.CUE_NUMERO ?? 'Sin cuenta',
+        cuenta_tipo: cuenta?.CUE_TIPO ?? '-',
+        ingresos: Number(nomina.NOM_TOTAL_INGRESOS || 0),
+        descuentos: Number(nomina.NOM_TOTAL_DESCUENTO || 0),
+        liquido_depositar: Number(nomina.NOM_SALARIO_LIQUIDO || 0),
+        estado: nomina.NOM_ESTADO,
+      };
+    });
+  };
+
+  const cargarPlanilla = async () => {
     if (!periodoId) return;
     try {
       setCargando(true);
       setError('');
+      setMensaje('');
 
-      // Llamadas paralelas al backend
-      const [empleados, cuentas] = await Promise.all([
+      const [nominas, empleados, cuentas] = await Promise.all([
+        obtenerNominas(),
         obtenerEmpleados(),
         obtenerCuentas()
       ]);
 
-      // Indexar cuentas por EMP_ID (quedarse con la primera si hay varias)
-      const cuentasPorEmp = new Map<number, CuentaBancaria>();
-      cuentas.forEach((c) => {
-        if (!cuentasPorEmp.has(c.EMP_ID)) cuentasPorEmp.set(c.EMP_ID, c);
-      });
+      const nominasFiltradas = nominas.filter((nomina) => String(nomina.PER_ID) === String(periodoId));
 
-      // Solo empleados activos
-      const filas: FilaNomina[] = empleados
-        .filter((e: Empleado) => e.EMP_ESTADO === 'A')
-        .map((emp: Empleado) => {
-          const cuenta = cuentasPorEmp.get(emp.EMP_ID);
-          const salario = SALARIO_BASE_DEFAULT; // ← reemplazar con API real
+      if (nominasFiltradas.length === 0) {
+        setDatos([]);
+        setNominasPeriodo([]);
+        setGenerado(true);
+        setError('No hay nominas registradas para este periodo. Primero crea la cabecera y su detalle.');
+        return;
+      }
 
-          const igss_laboral = salario * TASA_IGSS_LABORAL;
-          const isr_mensual = calcularISRMensual(salario);
-          const total_descuentos = igss_laboral + isr_mensual;
-
-          return {
-            emp_id: emp.EMP_ID,
-            nombre: emp.EMP_NOMBRE,
-            apellido: emp.EMP_APELLIDO,
-            banco: cuenta?.CUE_NOMBRE ?? 'Sin banco',
-            cuenta_numero: cuenta?.CUE_NUMERO ?? 'Sin cuenta',
-            cuenta_tipo: cuenta?.CUE_TIPO ?? '—',
-            salario_base: salario,
-            igss_laboral,
-            isr_mensual,
-            total_descuentos,
-            liquido_depositar: Math.max(0, salario - total_descuentos)
-          };
-        });
-
-      setDatos(filas);
+      setNominasPeriodo(nominasFiltradas);
+      setDatos(construirFilas(nominasFiltradas, empleados, cuentas));
       setGenerado(true);
-    } catch (err: any) {
-      setError('Error generando planilla: ' + (err.response?.data?.error || err.message));
+    } catch (err: unknown) {
+      setError(getApiErrorMessage(err, 'Error generando planilla'));
     } finally {
       setCargando(false);
     }
   };
 
-  // ─── Exportar CSV ─────────────────────────────────────────────────────────
+  const enviarPeriodoAGerente = async () => {
+    if (!periodoId) return;
+    try {
+      setCargando(true);
+      setError('');
+      setMensaje('');
+
+      const nominas = nominasPeriodo.length > 0
+        ? nominasPeriodo
+        : (await obtenerNominas()).filter((nomina) => String(nomina.PER_ID) === String(periodoId));
+      const enviables = nominas.filter((nomina) => ['B', 'I'].includes(nomina.NOM_ESTADO));
+
+      if (enviables.length === 0) {
+        setMensaje('No hay nominas en borrador o rechazadas para enviar.');
+        return;
+      }
+
+      await Promise.all(enviables.map((nomina) => actualizarNomina(nomina.NOM_ID, crearPayloadNomina(nomina, 'P'))));
+      setMensaje('Planilla enviada al gerente. Queda pendiente de aprobacion.');
+      await cargarPlanilla();
+    } catch (err: unknown) {
+      setError(getApiErrorMessage(err, 'Error enviando planilla a gerente'));
+    } finally {
+      setCargando(false);
+    }
+  };
+
+  const puedeExportar = generado && datos.length > 0 && datos.every((fila) => fila.estado === 'A');
+  const hayPendientes = generado && datos.some((fila) => fila.estado === 'P' || fila.estado === 'B');
+  const hayRechazadas = generado && datos.some((fila) => fila.estado === 'I');
+
   const exportarCSV = () => {
-    if (!datos.length) return;
+    if (!puedeExportar) return;
 
     const headers = [
-      'EMP_ID', 'Nombre', 'Apellido',
-      'Banco', 'No. Cuenta', 'Tipo Cuenta',
-      'Salario Base',
-      'IGSS Laboral (4.83%)',
-      'ISR Mensual',
+      'NOM_ID',
+      'EMP_ID',
+      'Empleado',
+      'Banco',
+      'No. Cuenta',
+      'Tipo Cuenta',
+      'Total Ingresos',
       'Total Descuentos',
-      'LIQUIDO A DEPOSITAR'
+      'Liquido a Depositar',
+      'Estado'
     ];
 
     const filas = datos.map((d) => [
-      d.emp_id, d.nombre, d.apellido,
-      d.banco, d.cuenta_numero, d.cuenta_tipo,
-      d.salario_base.toFixed(2),
-      d.igss_laboral.toFixed(2),
-      d.isr_mensual.toFixed(2),
-      d.total_descuentos.toFixed(2),
-      d.liquido_depositar.toFixed(2)
+      d.nom_id,
+      d.emp_id,
+      d.empleado,
+      d.banco,
+      d.cuenta_numero,
+      d.cuenta_tipo,
+      d.ingresos.toFixed(2),
+      d.descuentos.toFixed(2),
+      d.liquido_depositar.toFixed(2),
+      'Aprobada'
     ]);
 
     const totalFila = [
       'TOTALES', '', '', '', '', '',
-      datos.reduce((s, d) => s + d.salario_base, 0).toFixed(2),
-      datos.reduce((s, d) => s + d.igss_laboral, 0).toFixed(2),
-      datos.reduce((s, d) => s + d.isr_mensual, 0).toFixed(2),
-      datos.reduce((s, d) => s + d.total_descuentos, 0).toFixed(2),
-      datos.reduce((s, d) => s + d.liquido_depositar, 0).toFixed(2)
+      datos.reduce((s, d) => s + d.ingresos, 0).toFixed(2),
+      datos.reduce((s, d) => s + d.descuentos, 0).toFixed(2),
+      datos.reduce((s, d) => s + d.liquido_depositar, 0).toFixed(2),
+      ''
     ];
 
     const periodo = periodoSeleccionado
@@ -200,9 +253,9 @@ function GenerarCSV() {
       : '';
 
     const csvContent = [
-      [`Planilla de depósitos — Período: ${periodo}`],
+      [`Planilla de depositos - Periodo: ${periodo}`],
       [`Fecha de pago: ${periodoSeleccionado?.PER_FECHA_PAGO ?? ''}`],
-      [`Empleados activos: ${datos.length}`],
+      [`Nominas aprobadas: ${datos.length}`],
       [],
       headers,
       ...filas,
@@ -210,8 +263,7 @@ function GenerarCSV() {
       totalFila
     ].map((r) => r.join(',')).join('\n');
 
-    const BOM = '\uFEFF'; // Excel lee tildes correctamente
-    const blob = new Blob([BOM + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -221,10 +273,8 @@ function GenerarCSV() {
   };
 
   const totales = {
-    ingresos: datos.reduce((s, d) => s + d.salario_base, 0),
-    igss: datos.reduce((s, d) => s + d.igss_laboral, 0),
-    isr: datos.reduce((s, d) => s + d.isr_mensual, 0),
-    descuentos: datos.reduce((s, d) => s + d.total_descuentos, 0),
+    ingresos: datos.reduce((s, d) => s + d.ingresos, 0),
+    descuentos: datos.reduce((s, d) => s + d.descuentos, 0),
     liquido: datos.reduce((s, d) => s + d.liquido_depositar, 0),
   };
 
@@ -234,27 +284,25 @@ function GenerarCSV() {
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 3 }}>
           <SummarizeIcon color="primary" />
           <Typography variant="h4" sx={{ fontWeight: 'bold' }}>
-            Generación de Planilla — Depósito Bancario
+            Generacion de Planilla - Deposito Bancario
           </Typography>
         </Box>
 
         <Alert severity="info" sx={{ mb: 3 }}>
-          Genera el CSV con el líquido a depositar por empleado activo.
-          Incluye <strong>IGSS 4.83%</strong> e <strong>ISR (Decreto 10-2012)</strong>.
-          Datos obtenidos del sistema en tiempo real.
+          La planilla se arma con las nominas del periodo. Si aun no estan aprobadas por gerencia, queda pendiente y no se descarga el CSV de deposito.
         </Alert>
 
         <Grid container spacing={2} sx={{ alignItems: 'center' }}>
           <Grid size={{ xs: 12, md: 5 }}>
             <FormControl fullWidth>
-              <InputLabel>Período de nómina</InputLabel>
-              <Select value={periodoId} label="Período de nómina"
+              <InputLabel>Periodo de nomina</InputLabel>
+              <Select value={periodoId} label="Periodo de nomina"
                 onChange={handlePeriodo} onOpen={cargarPeriodos}>
-                <MenuItem value="">Seleccione un período</MenuItem>
+                <MenuItem value="">Seleccione un periodo</MenuItem>
                 {periodos.map((p) => (
                   <MenuItem key={p.PER_ID} value={String(p.PER_ID)}>
-                    {p.PER_FECHA_INICIO} → {p.PER_FECHA_FIN}
-                    {p.PER_ESTADO === 'A' ? ' ✓ Activo' : ''}
+                    {formatearFecha(p.PER_FECHA_INICIO)} al {formatearFecha(p.PER_FECHA_FIN)}
+                    {p.PER_ESTADO === 'A' ? ' - Activo' : ''}
                   </MenuItem>
                 ))}
               </Select>
@@ -264,48 +312,63 @@ function GenerarCSV() {
           <Grid size={{ xs: 12, md: 3 }}>
             <Button fullWidth variant="contained" size="large"
               startIcon={<SummarizeIcon />}
-              onClick={generarPlanilla}
+              onClick={cargarPlanilla}
               disabled={!periodoId || cargando}>
-              {cargando ? 'Generando...' : 'Generar Planilla'}
+              {cargando ? 'Cargando...' : 'Ver Planilla'}
             </Button>
           </Grid>
 
-          {generado && (
-            <Grid size={{ xs: 12, md: 4 }}>
-              <Button fullWidth variant="contained" color="success" size="large"
-                startIcon={<DownloadIcon />} onClick={exportarCSV}>
-                Descargar CSV
-              </Button>
-            </Grid>
-          )}
+          <Grid size={{ xs: 12, md: 2 }}>
+            <Button fullWidth variant="outlined" size="large"
+              startIcon={<SendIcon />}
+              onClick={enviarPeriodoAGerente}
+              disabled={!periodoId || cargando}>
+              Enviar
+            </Button>
+          </Grid>
+
+          <Grid size={{ xs: 12, md: 2 }}>
+            <Button fullWidth variant="contained" color="success" size="large"
+              startIcon={<DownloadIcon />} onClick={exportarCSV}
+              disabled={!puedeExportar}>
+              CSV
+            </Button>
+          </Grid>
         </Grid>
 
+        {mensaje && <Alert severity="success" sx={{ mt: 2 }}>{mensaje}</Alert>}
         {error && <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>}
+        {hayPendientes && (
+          <Alert severity="warning" sx={{ mt: 2 }}>
+            Hay nominas pendientes o en borrador. Envia la planilla al gerente y espera aprobacion para descargar el CSV.
+          </Alert>
+        )}
+        {hayRechazadas && (
+          <Alert severity="error" sx={{ mt: 2 }}>
+            Hay nominas rechazadas. Corrige el detalle, recalcula y vuelve a enviarlas al gerente.
+          </Alert>
+        )}
 
-        {/* Tarjetas resumen */}
-        {generado && (
+        {generado && datos.length > 0 && (
           <>
             <Divider sx={{ my: 3 }} />
             <Typography variant="h6" sx={{ mb: 2 }}>
-              Resumen — {datos.length} empleados activos &nbsp;|&nbsp;
-              Fecha pago: <strong>{periodoSeleccionado?.PER_FECHA_PAGO}</strong>
+              Resumen - {datos.length} nominas | Fecha pago: <strong>{formatearFecha(periodoSeleccionado?.PER_FECHA_PAGO)}</strong>
             </Typography>
             <Grid container spacing={2}>
               {[
-                { label: 'Total Salarios', valor: totales.ingresos, color: '#1976d2' },
-                { label: 'IGSS (4.83%)', valor: totales.igss, color: '#d32f2f' },
-                { label: 'ISR Total', valor: totales.isr, color: '#d32f2f' },
+                { label: 'Total Ingresos', valor: totales.ingresos, color: '#1976d2' },
                 { label: 'Total Descuentos', valor: totales.descuentos, color: '#c62828' },
-                { label: 'TOTAL A DEPOSITAR', valor: totales.liquido, color: '#2e7d32' },
+                { label: 'Total a Depositar', valor: totales.liquido, color: '#2e7d32' },
               ].map((card) => (
-                <Grid key={card.label} size={{ xs: 6, md: 2 }}>
+                <Grid key={card.label} size={{ xs: 12, md: 4 }}>
                   <Paper variant="outlined"
                     sx={{ p: 2, textAlign: 'center', borderColor: card.color }}>
                     <Typography variant="caption" color="text.secondary">
                       {card.label}
                     </Typography>
                     <Typography variant="h6"
-                      sx={{ color: card.color, fontWeight: 'bold', fontSize: '0.9rem' }}>
+                      sx={{ color: card.color, fontWeight: 'bold', fontSize: '1rem' }}>
                       Q{fmt(card.valor)}
                     </Typography>
                   </Paper>
@@ -316,14 +379,14 @@ function GenerarCSV() {
         )}
       </Paper>
 
-      {/* Tabla detalle */}
-      {generado && (
+      {generado && datos.length > 0 && (
         <Paper elevation={3} sx={{ p: 3 }}>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-            <Typography variant="h6">Detalle por empleado</Typography>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2, gap: 2, flexWrap: 'wrap' }}>
+            <Typography variant="h6">Detalle por nomina</Typography>
             <Button variant="outlined" color="success"
-              startIcon={<DownloadIcon />} onClick={exportarCSV}>
-              Descargar CSV
+              startIcon={<DownloadIcon />} onClick={exportarCSV}
+              disabled={!puedeExportar}>
+              Descargar CSV aprobado
             </Button>
           </Box>
 
@@ -331,24 +394,23 @@ function GenerarCSV() {
             <Table size="small">
               <TableHead>
                 <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
+                  <TableCell><strong>Nomina</strong></TableCell>
                   <TableCell><strong>Empleado</strong></TableCell>
                   <TableCell><strong>Banco</strong></TableCell>
                   <TableCell><strong>No. Cuenta</strong></TableCell>
-                  <TableCell align="right"><strong>Salario Base</strong></TableCell>
-                  <TableCell align="right"><strong>IGSS 4.83%</strong></TableCell>
-                  <TableCell align="right"><strong>ISR</strong></TableCell>
-                  <TableCell align="right"><strong>Total Desc.</strong></TableCell>
-                  <TableCell align="right" sx={{ backgroundColor: '#e8f5e9' }}>
-                    <strong>LÍQUIDO</strong>
-                  </TableCell>
+                  <TableCell align="right"><strong>Ingresos</strong></TableCell>
+                  <TableCell align="right"><strong>Descuentos</strong></TableCell>
+                  <TableCell align="right"><strong>Liquido</strong></TableCell>
+                  <TableCell><strong>Estado</strong></TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
                 {datos.map((d) => (
-                  <TableRow key={d.emp_id} hover>
+                  <TableRow key={d.nom_id} hover>
+                    <TableCell>#{d.nom_id}</TableCell>
                     <TableCell>
                       <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
-                        {d.nombre} {d.apellido}
+                        {d.empleado}
                       </Typography>
                       <Typography variant="caption" color="text.secondary">
                         ID: {d.emp_id}
@@ -361,44 +423,27 @@ function GenerarCSV() {
                         {d.cuenta_tipo}
                       </Typography>
                     </TableCell>
-                    <TableCell align="right">Q{fmt(d.salario_base)}</TableCell>
+                    <TableCell align="right">{formatearMoneda(d.ingresos)}</TableCell>
                     <TableCell align="right" sx={{ color: 'error.main' }}>
-                      -Q{fmt(d.igss_laboral)}
+                      -{formatearMoneda(d.descuentos)}
                     </TableCell>
-                    <TableCell align="right" sx={{ color: 'error.main' }}>
-                      -Q{fmt(d.isr_mensual)}
+                    <TableCell align="right" sx={{ backgroundColor: '#e8f5e9', fontWeight: 'bold', color: 'success.main' }}>
+                      {formatearMoneda(d.liquido_depositar)}
                     </TableCell>
-                    <TableCell align="right" sx={{ color: 'error.main', fontWeight: 'bold' }}>
-                      -Q{fmt(d.total_descuentos)}
-                    </TableCell>
-                    <TableCell align="right"
-                      sx={{ backgroundColor: '#e8f5e9', fontWeight: 'bold', color: 'success.main' }}>
-                      Q{fmt(d.liquido_depositar)}
-                    </TableCell>
+                    <TableCell>{obtenerEtiquetaEstado(d.estado)}</TableCell>
                   </TableRow>
                 ))}
 
-                {/* Fila totales */}
                 <TableRow sx={{ backgroundColor: '#eeeeee' }}>
-                  <TableCell colSpan={3}>
-                    <strong>TOTALES — {datos.length} empleados</strong>
+                  <TableCell colSpan={4}>
+                    <strong>TOTALES - {datos.length} nominas</strong>
                   </TableCell>
-                  <TableCell align="right">
-                    <strong>Q{fmt(totales.ingresos)}</strong>
+                  <TableCell align="right"><strong>{formatearMoneda(totales.ingresos)}</strong></TableCell>
+                  <TableCell align="right" sx={{ color: 'error.main' }}><strong>-{formatearMoneda(totales.descuentos)}</strong></TableCell>
+                  <TableCell align="right" sx={{ backgroundColor: '#c8e6c9', color: 'success.main', fontSize: '1rem' }}>
+                    <strong>{formatearMoneda(totales.liquido)}</strong>
                   </TableCell>
-                  <TableCell align="right" sx={{ color: 'error.main' }}>
-                    <strong>-Q{fmt(totales.igss)}</strong>
-                  </TableCell>
-                  <TableCell align="right" sx={{ color: 'error.main' }}>
-                    <strong>-Q{fmt(totales.isr)}</strong>
-                  </TableCell>
-                  <TableCell align="right" sx={{ color: 'error.main' }}>
-                    <strong>-Q{fmt(totales.descuentos)}</strong>
-                  </TableCell>
-                  <TableCell align="right"
-                    sx={{ backgroundColor: '#c8e6c9', color: 'success.main', fontSize: '1rem' }}>
-                    <strong>Q{fmt(totales.liquido)}</strong>
-                  </TableCell>
+                  <TableCell />
                 </TableRow>
               </TableBody>
             </Table>

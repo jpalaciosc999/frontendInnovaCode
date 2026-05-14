@@ -9,10 +9,10 @@ export interface NominaDetalle {
 }
 
 export interface NominaDetalleForm {
-    det_referencia: number | null;
-    det_monto: number | null;
-    nom_id: number | null;
-    tis_id: number | null;
-    tds_id: number | null;
-    kre_id: number | null;
+    det_referencia: string | number | null;
+    det_monto: string | number | null;
+    nom_id: string | number | null;
+    tis_id: string | number | null;
+    tds_id: string | number | null;
+    kre_id: string | number | null;
 }

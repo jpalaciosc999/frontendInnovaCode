@@ -6,6 +6,7 @@ import {
   actualizarDescuento,
   eliminarDescuento
 } from '../services/descuentos.service';
+import { getApiErrorMessage } from '../api/errors';
 
 import {
   Alert,
@@ -50,6 +51,160 @@ const initialForm: DescuentoForm = {
   tds_modificacion: ''
 };
 
+const conceptosEstandar: Array<{
+  label: string;
+  helper: string;
+  data: DescuentoForm;
+}> = [
+  {
+    label: 'IGSS laboral',
+    helper: 'Descuento al empleado sobre salario afecto',
+    data: {
+      ...initialForm,
+      tds_codigo: 'IGSS-LAB',
+      tds_nombre: 'IGSS laboral',
+      tds_descripcion: 'Cuota laboral IGSS 4.83%. Se descuenta al empleado en nomina.',
+      tds_tipo_calculo: 'PORCENTAJE',
+      tds_porcentaje: 4.83,
+      tds_es_obligatorio: 'S'
+    }
+  },
+  {
+    label: 'ISR',
+    helper: 'Retencion calculada segun rango anual',
+    data: {
+      ...initialForm,
+      tds_codigo: 'ISR',
+      tds_nombre: 'ISR',
+      tds_descripcion: 'Retencion ISR calculada sobre renta imponible del empleado.',
+      tds_tipo_calculo: 'MIXTO',
+      tds_es_obligatorio: 'S'
+    }
+  },
+  {
+    label: 'IRTRA patronal',
+    helper: 'Aporte patronal de referencia',
+    data: {
+      ...initialForm,
+      tds_codigo: 'IRTRA-PAT',
+      tds_nombre: 'IRTRA patronal',
+      tds_descripcion: 'Aporte patronal IRTRA 1%. No debe descontarse al empleado.',
+      tds_tipo_calculo: 'PORCENTAJE',
+      tds_porcentaje: 1,
+      tds_es_obligatorio: 'S'
+    }
+  },
+  {
+    label: 'INTECAP patronal',
+    helper: 'Aporte patronal de referencia',
+    data: {
+      ...initialForm,
+      tds_codigo: 'INTECAP-PAT',
+      tds_nombre: 'INTECAP patronal',
+      tds_descripcion: 'Aporte patronal INTECAP 1%. No debe descontarse al empleado.',
+      tds_tipo_calculo: 'PORCENTAJE',
+      tds_porcentaje: 1,
+      tds_es_obligatorio: 'S'
+    }
+  },
+  {
+    label: 'Prestamo',
+    helper: 'Cuota pactada de prestamo interno o bancario',
+    data: {
+      ...initialForm,
+      tds_codigo: 'PRESTAMO',
+      tds_nombre: 'Cuota de prestamo',
+      tds_descripcion: 'Descuento de cuota de prestamo asociado al empleado.',
+      tds_tipo_calculo: 'FIJO',
+      tds_es_obligatorio: 'N'
+    }
+  },
+  {
+    label: 'Anticipo',
+    helper: 'Recuperacion de anticipo salarial',
+    data: {
+      ...initialForm,
+      tds_codigo: 'ANTICIPO',
+      tds_nombre: 'Anticipo salarial',
+      tds_descripcion: 'Descuento por anticipo de salario autorizado al empleado.',
+      tds_tipo_calculo: 'FIJO',
+      tds_es_obligatorio: 'N'
+    }
+  },
+  {
+    label: 'Ausencia',
+    helper: 'Descuento por dias u horas no laboradas',
+    data: {
+      ...initialForm,
+      tds_codigo: 'AUSENCIA',
+      tds_nombre: 'Ausencia no justificada',
+      tds_descripcion: 'Descuento por ausencias no justificadas en el periodo.',
+      tds_tipo_calculo: 'FIJO',
+      tds_es_obligatorio: 'N'
+    }
+  },
+  {
+    label: 'Suspension IGSS',
+    helper: 'Ajuste de salario por suspension',
+    data: {
+      ...initialForm,
+      tds_codigo: 'SUSP-IGSS',
+      tds_nombre: 'Suspension IGSS',
+      tds_descripcion: 'Descuento o ajuste por dias de suspension IGSS.',
+      tds_tipo_calculo: 'FIJO',
+      tds_es_obligatorio: 'N'
+    }
+  },
+  {
+    label: 'Embargo judicial',
+    helper: 'Retencion por orden judicial',
+    data: {
+      ...initialForm,
+      tds_codigo: 'EMB-JUD',
+      tds_nombre: 'Embargo judicial',
+      tds_descripcion: 'Retencion por orden judicial aplicada en nomina.',
+      tds_tipo_calculo: 'FIJO',
+      tds_es_obligatorio: 'S'
+    }
+  },
+  {
+    label: 'Pension alimenticia',
+    helper: 'Retencion legal por pension',
+    data: {
+      ...initialForm,
+      tds_codigo: 'PENSION-ALIM',
+      tds_nombre: 'Pension alimenticia',
+      tds_descripcion: 'Retencion de pension alimenticia ordenada legalmente.',
+      tds_tipo_calculo: 'FIJO',
+      tds_es_obligatorio: 'S'
+    }
+  },
+  {
+    label: 'Cuota sindical',
+    helper: 'Deduccion recurrente autorizada',
+    data: {
+      ...initialForm,
+      tds_codigo: 'CUOTA-SIND',
+      tds_nombre: 'Cuota sindical',
+      tds_descripcion: 'Deduccion sindical autorizada por el empleado.',
+      tds_tipo_calculo: 'FIJO',
+      tds_es_obligatorio: 'N'
+    }
+  },
+  {
+    label: 'Seguro privado',
+    helper: 'Deduccion por beneficio contratado',
+    data: {
+      ...initialForm,
+      tds_codigo: 'SEG-PRIV',
+      tds_nombre: 'Seguro privado',
+      tds_descripcion: 'Deduccion por seguro privado o beneficio contratado.',
+      tds_tipo_calculo: 'FIJO',
+      tds_es_obligatorio: 'N'
+    }
+  }
+];
+
 function DescuentoCRUD() {
   const [datos, setDatos] = useState<Descuento[]>([]);
   const [cargando, setCargando] = useState(true);
@@ -65,8 +220,8 @@ function DescuentoCRUD() {
       setError('');
       const data = await obtenerDescuentos();
       setDatos(data);
-    } catch (err: any) {
-      setError('Error cargando descuentos: ' + err.message);
+    } catch (err: unknown) {
+      setError(getApiErrorMessage(err, 'Error cargando descuentos'));
     } finally {
       setCargando(false);
     }
@@ -86,6 +241,17 @@ function DescuentoCRUD() {
     setModoEdicion(false);
     setId(null);
     setError('');
+  };
+
+  const aplicarConceptoEstandar = (data: DescuentoForm) => {
+    setForm({
+      ...data,
+      tds_modificacion: new Date().toISOString().slice(0, 10),
+    });
+    setModoEdicion(false);
+    setId(null);
+    setError('');
+    setMensaje('');
   };
 
   const validar = () => {
@@ -112,8 +278,8 @@ function DescuentoCRUD() {
 
       limpiarFormulario();
       await cargarDatos();
-    } catch (err: any) {
-      setError('Error guardando: ' + (err.response?.data?.error || err.message));
+    } catch (err: unknown) {
+      setError(getApiErrorMessage(err, 'Error guardando descuento'));
     }
   };
 
@@ -126,8 +292,8 @@ function DescuentoCRUD() {
       setMensaje('Descuento eliminado correctamente');
       if (id === idEliminar) limpiarFormulario();
       await cargarDatos();
-    } catch (err: any) {
-      setError('Error eliminando: ' + (err.response?.data?.error || err.message));
+    } catch (err: unknown) {
+      setError(getApiErrorMessage(err, 'Error eliminando descuento'));
     }
   };
 
@@ -177,12 +343,30 @@ function DescuentoCRUD() {
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 3 }}>
           <PercentIcon color="primary" />
           <Typography variant="h4" sx={{ fontWeight: 'bold' }}>
-            Tipos de Descuento
+            Descuentos y Aportes
           </Typography>
         </Box>
 
+        <Alert severity="info" sx={{ mb: 2 }}>
+          ISR, IGSS, IRTRA e INTECAP se administran aqui como conceptos. Luego se aplican a una nomina desde Detalle de Nomina, sin tener vistas separadas.
+        </Alert>
+
+        <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', mb: 3 }}>
+          {conceptosEstandar.map((concepto) => (
+            <Button
+              key={concepto.data.tds_codigo}
+              size="small"
+              variant="outlined"
+              title={concepto.helper}
+              onClick={() => aplicarConceptoEstandar(concepto.data)}
+            >
+              {concepto.label}
+            </Button>
+          ))}
+        </Box>
+
         <Typography variant="h6" sx={{ mb: 2 }}>
-          {modoEdicion ? 'Editar descuento' : 'Nuevo descuento'}
+          {modoEdicion ? 'Editar concepto' : 'Nuevo concepto'}
         </Typography>
 
         <Grid container spacing={2}>

@@ -1,14 +1,18 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type {
   PrestamoDetalle,
   PrestamoDetalleForm
 } from '../interfaces/prestamoDetalle';
+import type { Prestamo } from '../interfaces/prestamos';
 import {
   obtenerPrestamoDetalles,
   crearPrestamoDetalle,
   actualizarPrestamoDetalle,
   eliminarPrestamoDetalle
 } from '../services/prestamoDetalle.service';
+import { actualizarPrestamo, obtenerPrestamos } from '../services/prestamos.service';
+import { getApiErrorMessage } from '../api/errors';
+import { formatearFecha, formatearMoneda } from '../utils/relations';
 
 import {
   Alert,
@@ -49,6 +53,8 @@ const initialForm: PrestamoDetalleForm = {
   pre_id: ''
 };
 
+const numero = (valor: number | string | undefined) => Number(valor || 0);
+
 function PrestamoDetalleView() {
   const [datos, setDatos] = useState<PrestamoDetalle[]>([]);
   const [cargando, setCargando] = useState(true);
@@ -57,15 +63,20 @@ function PrestamoDetalleView() {
   const [modoEdicion, setModoEdicion] = useState(false);
   const [detalleId, setDetalleId] = useState<number | null>(null);
   const [form, setForm] = useState<PrestamoDetalleForm>(initialForm);
+  const [prestamos, setPrestamos] = useState<Prestamo[]>([]);
 
   const cargarPrestamoDetalles = async () => {
     try {
       setCargando(true);
       setError('');
-      const data = await obtenerPrestamoDetalles();
-      setDatos(data);
-    } catch (err: any) {
-      setError('Error cargando detalles: ' + err.message);
+      const [detallesData, prestamosData] = await Promise.all([
+        obtenerPrestamoDetalles(),
+        obtenerPrestamos()
+      ]);
+      setDatos(detallesData);
+      setPrestamos(prestamosData);
+    } catch (err: unknown) {
+      setError(getApiErrorMessage(err, 'Error cargando detalles'));
     } finally {
       setCargando(false);
     }
@@ -75,10 +86,88 @@ function PrestamoDetalleView() {
     cargarPrestamoDetalles();
   }, []);
 
+  const prestamosPorId = useMemo(
+    () => new Map(prestamos.map((prestamo) => [String(prestamo.PRE_ID), prestamo])),
+    [prestamos]
+  );
+
+  const obtenerEtiquetaPrestamo = (prestamo?: Prestamo) =>
+    prestamo
+      ? `Prestamo #${prestamo.PRE_ID} - ${formatearMoneda(prestamo.PRE_MONTO_TOTAL)} - saldo ${formatearMoneda(prestamo.PRE_SALDO_PENDIENTE)}`
+      : '';
+
+  const detallesDePrestamo = (preId: string | number) =>
+    datos.filter((detalle) => String(detalle.PRE_ID) === String(preId));
+
+  const calcularSiguienteCuota = (preId: string | number) => {
+    const cuotas = detallesDePrestamo(preId).map((detalle) => numero(detalle.PDE_NUMERO_CUOTA));
+    return cuotas.length > 0 ? Math.max(...cuotas) + 1 : 1;
+  };
+
+  const calcularSaldoDespuesDePago = (prestamo: Prestamo, monto: number) =>
+    Math.max(0, numero(prestamo.PRE_SALDO_PENDIENTE) - monto);
+
+  const crearPayloadPrestamo = (prestamo: Prestamo, cuotasPagadas: number, saldoPendiente: number) => {
+    const totalCuotas = numero(prestamo.PRE_TOTAL_CUOTAS ?? prestamo.PRE_PLAZO);
+
+    return {
+      emp_id: prestamo.EMP_ID ? String(prestamo.EMP_ID) : '',
+      pre_monto_total: String(prestamo.PRE_MONTO_TOTAL),
+      pre_interes: String(prestamo.PRE_INTERES ?? '0'),
+      pre_plazo: String(prestamo.PRE_PLAZO ?? totalCuotas),
+      pre_cuota_mensual: String(prestamo.PRE_CUOTA_MENSUAL),
+      pre_total_cuotas: String(totalCuotas),
+      pre_cuotas_pagadas: String(cuotasPagadas),
+      pre_saldo_pendiente: saldoPendiente.toFixed(2),
+      pre_fecha_inicio: formatearFecha(prestamo.PRE_FECHA_INICIO),
+      pre_estado: saldoPendiente <= 0 || cuotasPagadas >= totalCuotas ? 'F' : 'A',
+      pre_descripcion: prestamo.PRE_DESCRIPCION ?? ''
+    };
+  };
+
+  const sincronizarPrestamo = async (preId: string | number) => {
+    const prestamo = prestamosPorId.get(String(preId));
+    if (!prestamo) return;
+
+    const detallesActualizados = await obtenerPrestamoDetalles();
+    const pagosCancelados = detallesActualizados.filter(
+      (detalle) => String(detalle.PRE_ID) === String(preId) && detalle.PDE_ESTADO === 'C'
+    );
+    const totalPagado = pagosCancelados.reduce((total, detalle) => total + numero(detalle.PDE_MONTO), 0);
+    const saldoPendiente = Math.max(0, numero(prestamo.PRE_MONTO_TOTAL) - totalPagado);
+
+    await actualizarPrestamo(prestamo.PRE_ID, crearPayloadPrestamo(prestamo, pagosCancelados.length, saldoPendiente));
+  };
+
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement> | SelectChangeEvent
   ) => {
     const { name, value } = e.target;
+    if (name === 'pre_id') {
+      const prestamo = prestamosPorId.get(String(value));
+      const montoCuota = numero(prestamo?.PRE_CUOTA_MENSUAL);
+      setForm((prev) => ({
+        ...prev,
+        pre_id: value,
+        pde_numero_cuota: value ? String(calcularSiguienteCuota(value)) : '',
+        pde_monto: montoCuota ? montoCuota.toFixed(2) : '',
+        pde_saldo_restante: prestamo ? calcularSaldoDespuesDePago(prestamo, montoCuota).toFixed(2) : '',
+        pde_estado: 'C'
+      }));
+      return;
+    }
+
+    if (name === 'pde_monto') {
+      const prestamo = prestamosPorId.get(String(form.pre_id));
+      const monto = numero(value);
+      setForm((prev) => ({
+        ...prev,
+        pde_monto: value,
+        pde_saldo_restante: prestamo ? calcularSaldoDespuesDePago(prestamo, monto).toFixed(2) : prev.pde_saldo_restante
+      }));
+      return;
+    }
+
     setForm((prev) => ({ ...prev, [name as string]: value }));
   };
 
@@ -104,6 +193,10 @@ function PrestamoDetalleView() {
       setMensaje('');
       if (!validarFormulario()) return;
 
+      const detalleAnterior = detalleId !== null
+        ? datos.find((detalle) => detalle.PDE_ID === detalleId)
+        : undefined;
+
       if (modoEdicion && detalleId !== null) {
         await actualizarPrestamoDetalle(detalleId, form);
         setMensaje('Cuota actualizada correctamente');
@@ -112,10 +205,15 @@ function PrestamoDetalleView() {
         setMensaje('Cuota registrada correctamente');
       }
 
+      const prestamosASincronizar = Array.from(
+        new Set([detalleAnterior?.PRE_ID, form.pre_id].filter(Boolean).map(String))
+      );
+      await Promise.all(prestamosASincronizar.map((preId) => sincronizarPrestamo(preId)));
+
       limpiarFormulario();
       await cargarPrestamoDetalles();
-    } catch (err: any) {
-      setError('Error al guardar: ' + (err.response?.data?.error || err.message));
+    } catch (err: unknown) {
+      setError(getApiErrorMessage(err, 'Error al guardar'));
     }
   };
 
@@ -124,12 +222,14 @@ function PrestamoDetalleView() {
     try {
       setError('');
       setMensaje('');
+      const detalleAnterior = datos.find((detalle) => detalle.PDE_ID === id);
       await eliminarPrestamoDetalle(id);
+      if (detalleAnterior?.PRE_ID) await sincronizarPrestamo(detalleAnterior.PRE_ID);
       setMensaje('Detalle eliminado correctamente');
       if (detalleId === id) limpiarFormulario();
       await cargarPrestamoDetalles();
-    } catch (err: any) {
-      setError('Error al eliminar: ' + (err.response?.data?.error || err.message));
+    } catch (err: unknown) {
+      setError(getApiErrorMessage(err, 'Error al eliminar'));
     }
   };
 
@@ -140,7 +240,7 @@ function PrestamoDetalleView() {
     setError('');
     setForm({
       pde_numero_cuota: String(detalle.PDE_NUMERO_CUOTA || ''),
-      pde_fecha_pago: detalle.PDE_FECHA_PAGO ? String(detalle.PDE_FECHA_PAGO).slice(0, 10) : '',
+      pde_fecha_pago: detalle.PDE_FECHA_PAGO ? formatearFecha(detalle.PDE_FECHA_PAGO) : '',
       pde_monto: String(detalle.PDE_MONTO || ''),
       pde_saldo_restante: String(detalle.PDE_SALDO_RESTANTE || ''),
       pde_estado: detalle.PDE_ESTADO || '',
@@ -178,7 +278,17 @@ function PrestamoDetalleView() {
 
         <Grid container spacing={2}>
           <Grid size={{ xs: 12, md: 3 }}>
-            <TextField fullWidth type="number" label="ID Préstamo" name="pre_id" value={form.pre_id} onChange={handleChange} />
+            <FormControl fullWidth>
+              <InputLabel>Prestamo</InputLabel>
+              <Select name="pre_id" value={form.pre_id} label="Prestamo" onChange={handleChange}>
+                <MenuItem value="">Seleccione prestamo</MenuItem>
+                {prestamos.map((prestamo) => (
+                  <MenuItem key={prestamo.PRE_ID} value={String(prestamo.PRE_ID)}>
+                    {obtenerEtiquetaPrestamo(prestamo)}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
           </Grid>
           <Grid size={{ xs: 12, md: 3 }}>
             <TextField fullWidth type="number" label="No. Cuota" name="pde_numero_cuota" value={form.pde_numero_cuota} onChange={handleChange} />
@@ -240,11 +350,13 @@ function PrestamoDetalleView() {
                 datos.map((detalle) => (
                   <TableRow key={detalle.PDE_ID} hover>
                     <TableCell>{detalle.PDE_ID}</TableCell>
-                    <TableCell sx={{ fontWeight: 'bold', color: 'primary.main' }}>#{detalle.PRE_ID}</TableCell>
+                    <TableCell sx={{ fontWeight: 'bold', color: 'primary.main' }}>
+                      {obtenerEtiquetaPrestamo(prestamosPorId.get(String(detalle.PRE_ID))) || `Prestamo #${detalle.PRE_ID}`}
+                    </TableCell>
                     <TableCell>{detalle.PDE_NUMERO_CUOTA}</TableCell>
                     <TableCell>{detalle.PDE_FECHA_PAGO ? String(detalle.PDE_FECHA_PAGO).slice(0, 10) : ''}</TableCell>
-                    <TableCell>Q. {Number(detalle.PDE_MONTO).toLocaleString()}</TableCell>
-                    <TableCell>Q. {Number(detalle.PDE_SALDO_RESTANTE).toLocaleString()}</TableCell>
+                    <TableCell>{formatearMoneda(detalle.PDE_MONTO)}</TableCell>
+                    <TableCell>{formatearMoneda(detalle.PDE_SALDO_RESTANTE)}</TableCell>
                     <TableCell>{obtenerChipEstado(detalle.PDE_ESTADO)}</TableCell>
                     <TableCell align="center">
                       <Box sx={{ display: 'flex', gap: 1, justifyContent: 'center' }}>

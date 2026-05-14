@@ -6,7 +6,7 @@ export interface Nomina {
     NOM_FECHA_GENERACION: string;
     PER_ID: number;
     EMP_ID: number;
-    LIQ_ID: number;
+    LIQ_ID: number | null;
     NOM_ESTADO: string;
 }
 
@@ -17,6 +17,6 @@ export interface NominaForm {
     nom_fecha_generacion: string;
     per_id: string | number;
     empleado_id: string | number;
-    liq_id: string | number;
+    liq_id: string | number | null;
     nom_estado: string;
 }

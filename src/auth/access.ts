@@ -107,13 +107,8 @@ const pathToVista: Record<string, keyof typeof permisosVista> = {
   '/periodo': 'periodos',
   '/tipo-ingresos': 'ingresos',
   '/descuentos': 'descuentos',
-  '/tipos-descuento': 'descuentos',
-  '/isr': 'descuentos',
-  '/irtra': 'descuentos',
-  '/intecap': 'descuentos',
   '/prestamos': 'prestamos',
   '/prestamo-detalle': 'prestamos',
-  '/prestamos-banco': 'prestamos',
   '/liquidacion': 'liquidaciones',
   '/aprobacion-nomina': 'nominas',
 };

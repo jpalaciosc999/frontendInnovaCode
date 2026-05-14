@@ -7,6 +7,7 @@ import {
   actualizarPeriodo,
   eliminarPeriodo
 } from '../services/periodo.service';
+import { getApiErrorMessage } from '../api/errors';
 
 import {
   Alert,
@@ -45,6 +46,18 @@ const initialForm: PeriodoForm = {
   estado: ''
 };
 
+const toInputDate = (value?: string) => {
+  if (!value) return '';
+
+  const isoMatch = String(value).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (isoMatch) return `${isoMatch[1]}-${isoMatch[2]}-${isoMatch[3]}`;
+
+  const oracleMatch = String(value).match(/^(\d{2})\/(\d{2})\/(\d{4})/);
+  if (oracleMatch) return `${oracleMatch[3]}-${oracleMatch[2]}-${oracleMatch[1]}`;
+
+  return String(value).slice(0, 10);
+};
+
 function Periodos() {
   const [datos, setDatos] = useState<Periodo[]>([]);
   const [cargando, setCargando] = useState(true);
@@ -60,8 +73,8 @@ function Periodos() {
       setError('');
       const data = await obtenerPeriodos();
       setDatos(data);
-    } catch (err: any) {
-      setError('Error cargando periodos: ' + err.message);
+    } catch (err: unknown) {
+      setError(getApiErrorMessage(err, 'Error cargando periodos'));
     } finally {
       setCargando(false);
     }
@@ -110,8 +123,8 @@ function Periodos() {
       }
       limpiarFormulario();
       await cargarPeriodos();
-    } catch (err: any) {
-      setError('Error guardando periodo: ' + (err.response?.data?.error || err.message));
+    } catch (err: unknown) {
+      setError(getApiErrorMessage(err, 'Error guardando periodo'));
     }
   };
 
@@ -124,8 +137,8 @@ function Periodos() {
       setMensaje('Periodo eliminado correctamente');
       if (perId === id) limpiarFormulario();
       await cargarPeriodos();
-    } catch (err: any) {
-      setError('Error eliminando periodo: ' + (err.response?.data?.error || err.message));
+    } catch (err: unknown) {
+      setError(getApiErrorMessage(err, 'Error eliminando periodo'));
     }
   };
 
@@ -135,9 +148,9 @@ function Periodos() {
     setMensaje('');
     setError('');
     setForm({
-      fecha_inicio: per.PER_FECHA_INICIO?.slice(0, 10) || '',
-      fecha_fin: per.PER_FECHA_FIN?.slice(0, 10) || '',
-      fecha_pago: per.PER_FECHA_PAGO?.slice(0, 10) || '',
+      fecha_inicio: toInputDate(per.PER_FECHA_INICIO),
+      fecha_fin: toInputDate(per.PER_FECHA_FIN),
+      fecha_pago: toInputDate(per.PER_FECHA_PAGO),
       estado: per.PER_ESTADO || ''
     });
   };
