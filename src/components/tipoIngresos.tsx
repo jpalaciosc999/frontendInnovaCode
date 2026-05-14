@@ -6,6 +6,7 @@ import {
     actualizarIngreso,
     eliminarIngreso
 } from '../services/tipoIngresos.service';
+import { getApiErrorMessage } from '../api/errors';
 
 import {
     Alert,
@@ -50,6 +51,157 @@ const initialForm: IngresoForm = {
     fecha_modificacion: ''
 };
 
+const conceptosEstandar: Array<{
+    label: string;
+    helper: string;
+    data: IngresoForm;
+}> = [
+    {
+        label: 'Salario base',
+        helper: 'Ingreso principal recurrente del empleado',
+        data: {
+            ...initialForm,
+            tis_codigo: 'SALARIO',
+            tis_nombre: 'Salario base',
+            tis_descripcion: 'Sueldo ordinario mensual del empleado. El monto real puede venir del contrato o empleado.',
+            tis_valor_base: 0,
+            tis_es_recurrente: 'S'
+        }
+    },
+    {
+        label: 'Bonificacion incentivo',
+        helper: 'Bonificacion mensual vigente en Guatemala',
+        data: {
+            ...initialForm,
+            tis_codigo: 'BONIF-INC',
+            tis_nombre: 'Bonificacion incentivo',
+            tis_descripcion: 'Bonificacion incentivo mensual. Ajusta el valor si la politica interna lo requiere.',
+            tis_valor_base: 250,
+            tis_es_recurrente: 'S'
+        }
+    },
+    {
+        label: 'Horas extra',
+        helper: 'Pago variable por tiempo extraordinario',
+        data: {
+            ...initialForm,
+            tis_codigo: 'HORA-EXTRA',
+            tis_nombre: 'Horas extra',
+            tis_descripcion: 'Pago variable por horas extraordinarias registradas en el periodo.',
+            tis_valor_base: 0,
+            tis_es_recurrente: 'N'
+        }
+    },
+    {
+        label: 'Comisiones',
+        helper: 'Ingreso variable por ventas u objetivos',
+        data: {
+            ...initialForm,
+            tis_codigo: 'COMISION',
+            tis_nombre: 'Comisiones',
+            tis_descripcion: 'Ingreso variable por comisiones de ventas, metas u objetivos.',
+            tis_valor_base: 0,
+            tis_es_recurrente: 'N'
+        }
+    },
+    {
+        label: 'Bono KPI',
+        helper: 'Bono de productividad conectado a resultados KPI',
+        data: {
+            ...initialForm,
+            tis_codigo: 'BONO-KPI',
+            tis_nombre: 'Bono de productividad KPI',
+            tis_descripcion: 'Bono variable calculado desde resultados KPI del empleado.',
+            tis_valor_base: 0,
+            tis_es_recurrente: 'N'
+        }
+    },
+    {
+        label: 'Bono meta',
+        helper: 'Bono variable por cumplimiento',
+        data: {
+            ...initialForm,
+            tis_codigo: 'BONO-META',
+            tis_nombre: 'Bono por cumplimiento de meta',
+            tis_descripcion: 'Bono variable por cumplimiento de metas operativas o comerciales.',
+            tis_valor_base: 0,
+            tis_es_recurrente: 'N'
+        }
+    },
+    {
+        label: 'Aguinaldo',
+        helper: 'Prestacion anual proporcional o completa',
+        data: {
+            ...initialForm,
+            tis_codigo: 'AGUINALDO',
+            tis_nombre: 'Aguinaldo',
+            tis_descripcion: 'Prestacion laboral de aguinaldo, completa o proporcional.',
+            tis_valor_base: 0,
+            tis_es_recurrente: 'N'
+        }
+    },
+    {
+        label: 'Bono 14',
+        helper: 'Prestacion anual proporcional o completa',
+        data: {
+            ...initialForm,
+            tis_codigo: 'BONO14',
+            tis_nombre: 'Bono 14',
+            tis_descripcion: 'Prestacion laboral Bono 14, completa o proporcional.',
+            tis_valor_base: 0,
+            tis_es_recurrente: 'N'
+        }
+    },
+    {
+        label: 'Vacaciones pagadas',
+        helper: 'Pago por vacaciones liquidadas',
+        data: {
+            ...initialForm,
+            tis_codigo: 'VAC-PAG',
+            tis_nombre: 'Vacaciones pagadas',
+            tis_descripcion: 'Pago de vacaciones gozadas o compensadas segun liquidacion.',
+            tis_valor_base: 0,
+            tis_es_recurrente: 'N'
+        }
+    },
+    {
+        label: 'Reintegro',
+        helper: 'Devolucion o ajuste a favor del empleado',
+        data: {
+            ...initialForm,
+            tis_codigo: 'REINTEGRO',
+            tis_nombre: 'Reintegro',
+            tis_descripcion: 'Reintegro o ajuste positivo a favor del empleado.',
+            tis_valor_base: 0,
+            tis_es_recurrente: 'N'
+        }
+    },
+    {
+        label: 'Viaticos',
+        helper: 'Pago de viaticos o gastos autorizados',
+        data: {
+            ...initialForm,
+            tis_codigo: 'VIATICOS',
+            tis_nombre: 'Viaticos',
+            tis_descripcion: 'Pago de viaticos o gastos autorizados segun politica interna.',
+            tis_valor_base: 0,
+            tis_es_recurrente: 'N'
+        }
+    },
+    {
+        label: 'Indemnizacion',
+        helper: 'Pago por terminacion laboral',
+        data: {
+            ...initialForm,
+            tis_codigo: 'INDEMNIZ',
+            tis_nombre: 'Indemnizacion',
+            tis_descripcion: 'Pago de indemnizacion por terminacion de relacion laboral.',
+            tis_valor_base: 0,
+            tis_es_recurrente: 'N'
+        }
+    }
+];
+
 function TipoIngresos() {
     const [datos, setDatos] = useState<Ingreso[]>([]);
     const [cargando, setCargando] = useState(true);
@@ -65,8 +217,8 @@ function TipoIngresos() {
             setError('');
             const data = await obtenerIngresos();
             setDatos(data);
-        } catch (err: any) {
-            setError('Error cargando ingresos: ' + err.message);
+        } catch (err: unknown) {
+            setError(getApiErrorMessage(err, 'Error cargando ingresos'));
         } finally {
             setCargando(false);
         }
@@ -93,14 +245,25 @@ function TipoIngresos() {
         setError('');
     };
 
+    const aplicarConceptoEstandar = (data: IngresoForm) => {
+        setForm({
+            ...data,
+            fecha_modificacion: new Date().toISOString().slice(0, 10)
+        });
+        setModoEdicion(false);
+        setIngresoId(null);
+        setError('');
+        setMensaje('');
+    };
+
     const validarFormulario = () => {
         if (
             !form.tis_codigo.trim() ||
             !form.tis_nombre.trim() ||
-            form.tis_valor_base <= 0 ||
+            form.tis_valor_base < 0 ||
             !form.tis_es_recurrente.trim()
         ) {
-            setError('Código, Nombre, Valor y Recurrencia son obligatorios');
+            setError('Codigo, nombre, valor no negativo y recurrencia son obligatorios');
             return false;
         }
         return true;
@@ -123,8 +286,8 @@ function TipoIngresos() {
 
             limpiarFormulario();
             await cargarIngresos();
-        } catch (err: any) {
-            setError('Error al guardar: ' + (err.response?.data?.error || err.message));
+        } catch (err: unknown) {
+            setError(getApiErrorMessage(err, 'Error al guardar ingreso'));
         }
     };
 
@@ -135,8 +298,8 @@ function TipoIngresos() {
             await eliminarIngreso(id);
             setMensaje('Ingreso eliminado correctamente');
             await cargarIngresos();
-        } catch (err: any) {
-            setError('Error al eliminar: ' + (err.response?.data?.error || err.message));
+        } catch (err: unknown) {
+            setError(getApiErrorMessage(err, 'Error al eliminar ingreso'));
         }
     };
 
@@ -164,6 +327,24 @@ function TipoIngresos() {
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 3 }}>
                         <PaidIcon color="primary" fontSize="large" />
                         <Typography variant="h4" sx={{ fontWeight: 'bold' }}>Conceptos de Ingreso</Typography>
+                    </Box>
+
+                    <Alert severity="info" sx={{ mb: 2 }}>
+                        Salario, bonificaciones, horas extra, comisiones y prestaciones se administran aqui como conceptos. Luego se aplican a una nomina desde Detalle de Nomina.
+                    </Alert>
+
+                    <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', mb: 3 }}>
+                        {conceptosEstandar.map((concepto) => (
+                            <Button
+                                key={concepto.data.tis_codigo}
+                                size="small"
+                                variant="outlined"
+                                title={concepto.helper}
+                                onClick={() => aplicarConceptoEstandar(concepto.data)}
+                            >
+                                {concepto.label}
+                            </Button>
+                        ))}
                     </Box>
 
                     <Grid container spacing={3}>

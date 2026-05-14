@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   Box,
@@ -29,64 +29,73 @@ import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AccountBalanceIcon from '@mui/icons-material/AccountBalance';
 
-// ─── Interfaces locales ───────────────────────────────────────────────────────
-interface Prestamo {
-  PRE_ID: number;
-  EMP_ID: number;
-  PRE_MONTO_TOTAL: number;
-  PRE_CUOTA_MENSUAL: number;
-  PRE_TOTAL_CUOTAS: number;
-  PRE_CUOTAS_PAGADAS: number;
-  PRE_SALDO_PENDIENTE: number;
-  PRE_FECHA_INICIO: string;
-  PRE_ESTADO: string; // 'A' = Activo, 'F' = Finalizado, 'S' = Suspendido
-  PRE_DESCRIPCION: string;
-}
-
-interface PrestamoForm {
-  emp_id: string;
-  pre_monto_total: string;
-  pre_total_cuotas: string;
-  pre_fecha_inicio: string;
-  pre_estado: string;
-  pre_descripcion: string;
-}
+import type { Prestamo, PrestamoForm } from '../interfaces/prestamos';
+import type { Empleado } from '../interfaces/empleados';
+import {
+  obtenerPrestamos,
+  crearPrestamo,
+  actualizarPrestamo,
+  eliminarPrestamo
+} from '../services/prestamos.service';
+import { obtenerEmpleados } from '../services/empleados.service';
+import { getApiErrorMessage } from '../api/errors';
+import { formatearFecha, formatearMoneda, obtenerNombreEmpleado } from '../utils/relations';
 
 const initialForm: PrestamoForm = {
   emp_id: '',
   pre_monto_total: '',
+  pre_interes: '0',
+  pre_plazo: '',
+  pre_cuota_mensual: '',
   pre_total_cuotas: '',
+  pre_cuotas_pagadas: '0',
+  pre_saldo_pendiente: '',
   pre_fecha_inicio: '',
   pre_estado: 'A',
   pre_descripcion: ''
 };
 
-// ─── Datos de ejemplo — reemplazar con tu API ─────────────────────────────────
-const datosEjemplo: Prestamo[] = [
-  {
-    PRE_ID: 1, EMP_ID: 1, PRE_MONTO_TOTAL: 12000, PRE_CUOTA_MENSUAL: 1000,
-    PRE_TOTAL_CUOTAS: 12, PRE_CUOTAS_PAGADAS: 4, PRE_SALDO_PENDIENTE: 8000,
-    PRE_FECHA_INICIO: '2024-01-01', PRE_ESTADO: 'A', PRE_DESCRIPCION: 'Préstamo personal'
-  },
-  {
-    PRE_ID: 2, EMP_ID: 2, PRE_MONTO_TOTAL: 6000, PRE_CUOTA_MENSUAL: 500,
-    PRE_TOTAL_CUOTAS: 12, PRE_CUOTAS_PAGADAS: 12, PRE_SALDO_PENDIENTE: 0,
-    PRE_FECHA_INICIO: '2023-06-01', PRE_ESTADO: 'F', PRE_DESCRIPCION: 'Préstamo emergencia'
-  }
-];
+const numero = (valor: number | string | undefined) => Number(valor || 0);
 
 function PrestamoCRUD() {
-  const [datos, setDatos] = useState<Prestamo[]>(datosEjemplo);
+  const [datos, setDatos] = useState<Prestamo[]>([]);
+  const [empleados, setEmpleados] = useState<Empleado[]>([]);
+  const [cargando, setCargando] = useState(true);
   const [error, setError] = useState('');
   const [mensaje, setMensaje] = useState('');
   const [modoEdicion, setModoEdicion] = useState(false);
   const [id, setId] = useState<number | null>(null);
   const [form, setForm] = useState<PrestamoForm>(initialForm);
 
-  // Cálculo automático de cuota mensual
+  const cargarDatos = async () => {
+    try {
+      setCargando(true);
+      setError('');
+      const [prestamosData, empleadosData] = await Promise.all([
+        obtenerPrestamos(),
+        obtenerEmpleados()
+      ]);
+      setDatos(prestamosData);
+      setEmpleados(empleadosData);
+    } catch (err: unknown) {
+      setError(getApiErrorMessage(err, 'Error cargando prestamos'));
+    } finally {
+      setCargando(false);
+    }
+  };
+
+  useEffect(() => {
+    cargarDatos();
+  }, []);
+
+  const empleadosPorId = useMemo(
+    () => new Map(empleados.map((empleado) => [String(empleado.EMP_ID), empleado])),
+    [empleados]
+  );
+
   const cuotaMensualCalculada =
     form.pre_monto_total && form.pre_total_cuotas
-      ? (Number(form.pre_monto_total) / Number(form.pre_total_cuotas))
+      ? numero(form.pre_monto_total) / numero(form.pre_total_cuotas)
       : 0;
 
   const handleChange = (
@@ -107,100 +116,97 @@ function PrestamoCRUD() {
     if (
       !String(form.emp_id).trim() ||
       !form.pre_monto_total.trim() ||
-      !form.pre_total_cuotas.trim() ||
+      !String(form.pre_total_cuotas).trim() ||
       !form.pre_fecha_inicio.trim()
     ) {
       setError('Empleado, monto, cuotas y fecha son obligatorios');
       return false;
     }
-    if (Number(form.pre_total_cuotas) <= 0) {
-      setError('El número de cuotas debe ser mayor a 0');
+    if (numero(form.pre_total_cuotas) <= 0) {
+      setError('El numero de cuotas debe ser mayor a 0');
       return false;
     }
     return true;
   };
 
-  const guardar = () => {
-    setError('');
-    setMensaje('');
-    if (!validar()) return;
+  const obtenerPayload = (): PrestamoForm => {
+    const monto = numero(form.pre_monto_total);
+    const cuotas = numero(form.pre_total_cuotas);
+    const cuota = cuotas > 0 ? monto / cuotas : 0;
+    const cuotasPagadas = numero(form.pre_cuotas_pagadas);
 
-    const monto = Number(form.pre_monto_total);
-    const cuotas = Number(form.pre_total_cuotas);
-    const cuota = monto / cuotas;
-
-    if (modoEdicion && id !== null) {
-      setDatos((prev) => prev.map((p) =>
-        p.PRE_ID === id ? {
-          ...p,
-          EMP_ID: Number(form.emp_id),
-          PRE_MONTO_TOTAL: monto,
-          PRE_CUOTA_MENSUAL: cuota,
-          PRE_TOTAL_CUOTAS: cuotas,
-          PRE_SALDO_PENDIENTE: monto - (p.PRE_CUOTAS_PAGADAS * cuota),
-          PRE_FECHA_INICIO: form.pre_fecha_inicio,
-          PRE_ESTADO: form.pre_estado,
-          PRE_DESCRIPCION: form.pre_descripcion
-        } : p
-      ));
-      setMensaje('Préstamo actualizado correctamente');
-    } else {
-      const nuevo: Prestamo = {
-        PRE_ID: datos.length + 1,
-        EMP_ID: Number(form.emp_id),
-        PRE_MONTO_TOTAL: monto,
-        PRE_CUOTA_MENSUAL: cuota,
-        PRE_TOTAL_CUOTAS: cuotas,
-        PRE_CUOTAS_PAGADAS: 0,
-        PRE_SALDO_PENDIENTE: monto,
-        PRE_FECHA_INICIO: form.pre_fecha_inicio,
-        PRE_ESTADO: form.pre_estado,
-        PRE_DESCRIPCION: form.pre_descripcion
-      };
-      setDatos((prev) => [...prev, nuevo]);
-      setMensaje('Préstamo registrado correctamente');
-    }
-
-    limpiarFormulario();
+    return {
+      emp_id: String(form.emp_id),
+      pre_monto_total: monto.toFixed(2),
+      pre_interes: String(form.pre_interes ?? '0'),
+      pre_plazo: String(form.pre_total_cuotas || form.pre_plazo || ''),
+      pre_cuota_mensual: cuota.toFixed(2),
+      pre_total_cuotas: String(cuotas),
+      pre_cuotas_pagadas: String(cuotasPagadas),
+      pre_saldo_pendiente: Math.max(0, monto - cuotasPagadas * cuota).toFixed(2),
+      pre_fecha_inicio: form.pre_fecha_inicio,
+      pre_estado: form.pre_estado,
+      pre_descripcion: form.pre_descripcion ?? ''
+    };
   };
 
-  const handleEliminar = (idEliminar: number) => {
-    if (!window.confirm('¿Deseas eliminar este préstamo?')) return;
-    setDatos((prev) => prev.filter((p) => p.PRE_ID !== idEliminar));
-    setMensaje('Préstamo eliminado correctamente');
-    if (id === idEliminar) limpiarFormulario();
+  const guardar = async () => {
+    try {
+      setError('');
+      setMensaje('');
+      if (!validar()) return;
+
+      const payload = obtenerPayload();
+      if (modoEdicion && id !== null) {
+        await actualizarPrestamo(id, payload);
+        setMensaje('Prestamo actualizado correctamente');
+      } else {
+        await crearPrestamo(payload);
+        setMensaje('Prestamo registrado correctamente');
+      }
+
+      limpiarFormulario();
+      await cargarDatos();
+    } catch (err: unknown) {
+      setError(getApiErrorMessage(err, 'Error guardando prestamo'));
+    }
+  };
+
+  const handleEliminar = async (idEliminar: number) => {
+    if (!window.confirm('Deseas eliminar este prestamo?')) return;
+    try {
+      setError('');
+      setMensaje('');
+      await eliminarPrestamo(idEliminar);
+      setMensaje('Prestamo eliminado correctamente');
+      if (id === idEliminar) limpiarFormulario();
+      await cargarDatos();
+    } catch (err: unknown) {
+      setError(getApiErrorMessage(err, 'Error eliminando prestamo'));
+    }
   };
 
   const handleEditar = (p: Prestamo) => {
+    const totalCuotas = p.PRE_TOTAL_CUOTAS ?? p.PRE_PLAZO ?? '';
+    const cuotasPagadas = p.PRE_CUOTAS_PAGADAS ?? '0';
+
     setModoEdicion(true);
     setId(p.PRE_ID);
     setMensaje('');
     setError('');
     setForm({
-      emp_id: String(p.EMP_ID),
+      emp_id: p.EMP_ID ? String(p.EMP_ID) : '',
       pre_monto_total: String(p.PRE_MONTO_TOTAL),
-      pre_total_cuotas: String(p.PRE_TOTAL_CUOTAS),
-      pre_fecha_inicio: p.PRE_FECHA_INICIO
-        ? String(p.PRE_FECHA_INICIO).split('T')[0] : '',
+      pre_interes: String(p.PRE_INTERES ?? '0'),
+      pre_plazo: String(totalCuotas),
+      pre_cuota_mensual: String(p.PRE_CUOTA_MENSUAL),
+      pre_total_cuotas: String(totalCuotas),
+      pre_cuotas_pagadas: String(cuotasPagadas),
+      pre_saldo_pendiente: String(p.PRE_SALDO_PENDIENTE),
+      pre_fecha_inicio: formatearFecha(p.PRE_FECHA_INICIO),
       pre_estado: p.PRE_ESTADO,
-      pre_descripcion: p.PRE_DESCRIPCION
+      pre_descripcion: p.PRE_DESCRIPCION ?? ''
     });
-  };
-
-  const registrarPago = (idPrestamo: number) => {
-    setDatos((prev) => prev.map((p) => {
-      if (p.PRE_ID !== idPrestamo) return p;
-      if (p.PRE_CUOTAS_PAGADAS >= p.PRE_TOTAL_CUOTAS) return p;
-      const nuevasPagadas = p.PRE_CUOTAS_PAGADAS + 1;
-      const nuevoSaldo = p.PRE_MONTO_TOTAL - (nuevasPagadas * p.PRE_CUOTA_MENSUAL);
-      return {
-        ...p,
-        PRE_CUOTAS_PAGADAS: nuevasPagadas,
-        PRE_SALDO_PENDIENTE: Math.max(0, nuevoSaldo),
-        PRE_ESTADO: nuevasPagadas >= p.PRE_TOTAL_CUOTAS ? 'F' : 'A'
-      };
-    }));
-    setMensaje('Pago de cuota registrado');
   };
 
   const obtenerChipEstado = (estado: string) => {
@@ -210,28 +216,45 @@ function PrestamoCRUD() {
     return <Chip label={estado} size="small" />;
   };
 
-  const fmt = (valor: number) =>
-    `Q ${valor.toLocaleString('es-GT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  if (cargando) {
+    return (
+      <Box sx={{ p: 3 }}>
+        <Typography variant="h6">Cargando prestamos...</Typography>
+      </Box>
+    );
+  }
 
   return (
     <Box sx={{ py: 2 }}>
-      {/* Formulario */}
       <Paper elevation={3} sx={{ p: 3, mb: 3 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 3 }}>
           <AccountBalanceIcon color="primary" />
           <Typography variant="h4" sx={{ fontWeight: 'bold' }}>
-            Préstamos Banco Trabajadores
+            Prestamos de Empleados
           </Typography>
         </Box>
 
+        <Alert severity="info" sx={{ mb: 2 }}>
+          Esta vista registra el prestamo maestro. Las cuotas pagadas o pendientes se administran en Detalle Prestamo, y desde ahi se actualiza el saldo.
+        </Alert>
+
         <Typography variant="h6" sx={{ mb: 2 }}>
-          {modoEdicion ? 'Editar préstamo' : 'Nuevo préstamo'}
+          {modoEdicion ? 'Editar prestamo' : 'Nuevo prestamo'}
         </Typography>
 
         <Grid container spacing={2}>
           <Grid size={{ xs: 12, md: 6 }}>
-            <TextField fullWidth label="Empleado ID" name="emp_id"
-              type="number" value={form.emp_id} onChange={handleChange} />
+            <FormControl fullWidth>
+              <InputLabel>Empleado</InputLabel>
+              <Select name="emp_id" value={String(form.emp_id ?? '')} label="Empleado" onChange={handleChange}>
+                <MenuItem value="">Seleccione empleado</MenuItem>
+                {empleados.map((empleado) => (
+                  <MenuItem key={empleado.EMP_ID} value={String(empleado.EMP_ID)}>
+                    {obtenerNombreEmpleado(empleado)}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
           </Grid>
 
           <Grid size={{ xs: 12, md: 6 }}>
@@ -240,14 +263,13 @@ function PrestamoCRUD() {
           </Grid>
 
           <Grid size={{ xs: 12, md: 4 }}>
-            <TextField fullWidth label="Número de cuotas" name="pre_total_cuotas"
-              type="number" value={form.pre_total_cuotas} onChange={handleChange} />
+            <TextField fullWidth label="Numero de cuotas" name="pre_total_cuotas"
+              type="number" value={form.pre_total_cuotas ?? ''} onChange={handleChange} />
           </Grid>
 
-          {/* Cuota mensual calculada automáticamente */}
           <Grid size={{ xs: 12, md: 4 }}>
             <TextField fullWidth label="Cuota mensual (calculada)"
-              value={cuotaMensualCalculada > 0 ? fmt(cuotaMensualCalculada) : ''}
+              value={cuotaMensualCalculada > 0 ? formatearMoneda(cuotaMensualCalculada) : ''}
               slotProps={{ input: { readOnly: true } }}
               sx={{ backgroundColor: '#f5f5f5' }} />
           </Grid>
@@ -271,8 +293,8 @@ function PrestamoCRUD() {
           </Grid>
 
           <Grid size={{ xs: 12, md: 6 }}>
-            <TextField fullWidth label="Descripción" name="pre_descripcion"
-              value={form.pre_descripcion} onChange={handleChange} />
+            <TextField fullWidth label="Descripcion" name="pre_descripcion"
+              value={form.pre_descripcion ?? ''} onChange={handleChange} />
           </Grid>
 
           <Grid size={{ xs: 12 }}>
@@ -289,10 +311,9 @@ function PrestamoCRUD() {
         </Grid>
       </Paper>
 
-      {/* Tabla */}
       <Paper elevation={3} sx={{ p: 3 }}>
         <Typography variant="h6" sx={{ mb: 2 }}>
-          Listado de préstamos: {datos.length}
+          Listado de prestamos: {datos.length}
         </Typography>
 
         <TableContainer>
@@ -311,34 +332,35 @@ function PrestamoCRUD() {
             </TableHead>
             <TableBody>
               {datos.length > 0 ? datos.map((p) => {
-                const porcentaje = (p.PRE_CUOTAS_PAGADAS / p.PRE_TOTAL_CUOTAS) * 100;
+                const empleado = empleadosPorId.get(String(p.EMP_ID));
+                const totalCuotas = numero(p.PRE_TOTAL_CUOTAS ?? p.PRE_PLAZO);
+                const cuotasPagadas = numero(p.PRE_CUOTAS_PAGADAS);
+                const porcentaje = totalCuotas > 0 ? (cuotasPagadas / totalCuotas) * 100 : 0;
+
                 return (
                   <TableRow key={p.PRE_ID} hover>
                     <TableCell>{p.PRE_ID}</TableCell>
-                    <TableCell>Emp. {p.EMP_ID}</TableCell>
-                    <TableCell>{fmt(p.PRE_MONTO_TOTAL)}</TableCell>
-                    <TableCell>{fmt(p.PRE_CUOTA_MENSUAL)}</TableCell>
+                    <TableCell>
+                      <Typography variant="body2">{obtenerNombreEmpleado(empleado) || `Empleado #${p.EMP_ID ?? '-'}`}</Typography>
+                      <Typography variant="caption" color="text.secondary">ID: {p.EMP_ID ?? '-'}</Typography>
+                    </TableCell>
+                    <TableCell>{formatearMoneda(p.PRE_MONTO_TOTAL)}</TableCell>
+                    <TableCell>{formatearMoneda(p.PRE_CUOTA_MENSUAL)}</TableCell>
                     <TableCell sx={{ minWidth: 150 }}>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                         <LinearProgress variant="determinate" value={porcentaje}
                           sx={{ flexGrow: 1, height: 8, borderRadius: 4 }} />
                         <Typography variant="caption">
-                          {p.PRE_CUOTAS_PAGADAS}/{p.PRE_TOTAL_CUOTAS}
+                          {cuotasPagadas}/{totalCuotas || '-'}
                         </Typography>
                       </Box>
                     </TableCell>
-                    <TableCell sx={{ color: p.PRE_SALDO_PENDIENTE > 0 ? 'error.main' : 'success.main', fontWeight: 'bold' }}>
-                      {fmt(p.PRE_SALDO_PENDIENTE)}
+                    <TableCell sx={{ color: numero(p.PRE_SALDO_PENDIENTE) > 0 ? 'error.main' : 'success.main', fontWeight: 'bold' }}>
+                      {formatearMoneda(p.PRE_SALDO_PENDIENTE)}
                     </TableCell>
                     <TableCell>{obtenerChipEstado(p.PRE_ESTADO)}</TableCell>
                     <TableCell>
                       <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                        {p.PRE_ESTADO === 'A' && (
-                          <Button size="small" variant="contained" color="success"
-                            onClick={() => registrarPago(p.PRE_ID)}>
-                            + Cuota
-                          </Button>
-                        )}
                         <Button size="small" variant="outlined" startIcon={<EditIcon />}
                           onClick={() => handleEditar(p)}>Editar</Button>
                         <Button size="small" variant="contained" color="error"
@@ -350,7 +372,7 @@ function PrestamoCRUD() {
                 );
               }) : (
                 <TableRow>
-                  <TableCell colSpan={8} align="center">No hay préstamos registrados</TableCell>
+                  <TableCell colSpan={8} align="center">No hay prestamos registrados</TableCell>
                 </TableRow>
               )}
             </TableBody>

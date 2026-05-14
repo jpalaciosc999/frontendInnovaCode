@@ -1,14 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
-import type { Nomina, NominaForm } from '../interfaces/nomina';
-import type { KPIResultado } from '../interfaces/kpi-resultado';
-import {
-  obtenerNominas,
-  crearNomina,
-  actualizarNomina,
-  eliminarNomina
-} from '../services/nomina.service';
-import { obtenerResultados } from '../services/kpi-resultado.service';
-
+import { useEffect, useMemo, useState } from 'react';
+import type { SelectChangeEvent } from '@mui/material/Select';
 import {
   Alert,
   Box,
@@ -30,50 +21,101 @@ import {
   TextField,
   Typography
 } from '@mui/material';
-
-import type { SelectChangeEvent } from '@mui/material/Select';
-
 import SaveIcon from '@mui/icons-material/Save';
 import CleaningServicesIcon from '@mui/icons-material/CleaningServices';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import RequestQuoteIcon from '@mui/icons-material/RequestQuote';
+import SendIcon from '@mui/icons-material/Send';
+import CalculateIcon from '@mui/icons-material/Calculate';
+
+import type { Nomina, NominaForm } from '../interfaces/nomina';
+import type { NominaDetalle } from '../interfaces/nomina-detalle';
+import type { Empleado } from '../interfaces/empleados';
+import type { Periodo } from '../interfaces/periodo';
+import type { Liquidacion } from '../interfaces/liquidacion';
+import {
+  obtenerNominas,
+  crearNomina,
+  actualizarNomina,
+  eliminarNomina
+} from '../services/nomina.service';
+import { obtenerDetallesNomina } from '../services/nomina-detalle.service';
+import { obtenerEmpleados } from '../services/empleados.service';
+import { obtenerPeriodos } from '../services/periodo.service';
+import { obtenerLiquidaciones } from '../services/liquidacion.service';
+import { getApiErrorMessage } from '../api/errors';
+import { formatearFecha, formatearMoneda, obtenerNombreEmpleado } from '../utils/relations';
+
+type TotalesNomina = {
+  ingresos: number;
+  descuentos: number;
+  liquido: number;
+  cantidad: number;
+};
 
 const initialForm: NominaForm = {
-  nom_total_ingresos: '',
-  nom_total_descuento: '',
-  nom_salario_liquido: '',
+  nom_total_ingresos: 0,
+  nom_total_descuento: 0,
+  nom_salario_liquido: 0,
   nom_fecha_generacion: '',
   per_id: '',
   empleado_id: '',
-  liq_id: '',
-  nom_estado: ''
+  liq_id: null,
+  nom_estado: 'B'
+};
+
+const totalesVacios: TotalesNomina = {
+  ingresos: 0,
+  descuentos: 0,
+  liquido: 0,
+  cantidad: 0,
+};
+
+const toInputDate = (value: string | null | undefined) => {
+  if (!value) return '';
+
+  const raw = String(value);
+  const isoMatch = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (isoMatch) return `${isoMatch[1]}-${isoMatch[2]}-${isoMatch[3]}`;
+
+  const oracleMatch = raw.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
+  if (oracleMatch) return `${oracleMatch[3]}-${oracleMatch[2]}-${oracleMatch[1]}`;
+
+  return raw.slice(0, 10);
 };
 
 function NominaCRUD() {
   const [datos, setDatos] = useState<Nomina[]>([]);
+  const [detalles, setDetalles] = useState<NominaDetalle[]>([]);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState('');
   const [mensaje, setMensaje] = useState('');
   const [modoEdicion, setModoEdicion] = useState(false);
   const [id, setId] = useState<number | null>(null);
   const [form, setForm] = useState<NominaForm>(initialForm);
-  const [resultadosKpi, setResultadosKpi] = useState<KPIResultado[]>([]);
-  const [bonoKpiAplicado, setBonoKpiAplicado] = useState(0);
-  const ultimoBonoAplicado = useRef(0);
+  const [empleados, setEmpleados] = useState<Empleado[]>([]);
+  const [periodos, setPeriodos] = useState<Periodo[]>([]);
+  const [liquidaciones, setLiquidaciones] = useState<Liquidacion[]>([]);
 
   const cargarDatos = async () => {
     try {
       setCargando(true);
       setError('');
-      const [nominasData, resultadosData] = await Promise.all([
+      const [nominasData, detallesData, empleadosData, periodosData, liquidacionesData] = await Promise.all([
         obtenerNominas(),
-        obtenerResultados(),
+        obtenerDetallesNomina(),
+        obtenerEmpleados(),
+        obtenerPeriodos(),
+        obtenerLiquidaciones(),
       ]);
       setDatos(nominasData);
-      setResultadosKpi(resultadosData);
-    } catch (err: any) {
-      setError('Error cargando nóminas: ' + err.message);
+      setDetalles(detallesData);
+      setEmpleados(empleadosData);
+      setPeriodos(periodosData);
+      setLiquidaciones(liquidacionesData);
+    } catch (err: unknown) {
+      setError(getApiErrorMessage(err, 'Error cargando datos de nomina'));
     } finally {
       setCargando(false);
     }
@@ -83,22 +125,77 @@ function NominaCRUD() {
     cargarDatos();
   }, []);
 
-  // Cálculo automático del salario líquido
-  useEffect(() => {
-    const total =
-      Number(form.nom_total_ingresos || 0) -
-      Number(form.nom_total_descuento || 0);
+  const empleadosPorId = useMemo(
+    () => new Map(empleados.map((empleado) => [String(empleado.EMP_ID), empleado])),
+    [empleados]
+  );
 
-    setForm((prev) => ({
-      ...prev,
-      nom_salario_liquido: total.toString()
-    }));
-  }, [form.nom_total_ingresos, form.nom_total_descuento]);
+  const periodosPorId = useMemo(
+    () => new Map(periodos.map((periodo) => [String(periodo.PER_ID), periodo])),
+    [periodos]
+  );
 
-  const obtenerBonoProductividadEmpleado = (empId: string | number) =>
-    resultadosKpi
-      .filter((resultado) => String(resultado.EMP_ID ?? '') === String(empId))
-      .reduce((total, resultado) => total + Number(resultado.KRE_MONTO_TOTAL || 0), 0);
+  const liquidacionesPorId = useMemo(
+    () => new Map(liquidaciones.map((liquidacion) => [String(liquidacion.LIQ_ID), liquidacion])),
+    [liquidaciones]
+  );
+
+  const liquidacionesDisponibles = useMemo(() => {
+    if (!form.empleado_id) return liquidaciones;
+    return liquidaciones.filter((liquidacion) => String(liquidacion.EMP_ID) === String(form.empleado_id));
+  }, [form.empleado_id, liquidaciones]);
+
+  const totalesPorNomina = useMemo(() => {
+    const totales = new Map<string, TotalesNomina>();
+
+    detalles.forEach((detalle) => {
+      const key = String(detalle.NOM_ID);
+      const actual = totales.get(key) ?? { ...totalesVacios };
+      const monto = Number(detalle.DET_MONTO || 0);
+
+      if (detalle.TDS_ID) {
+        actual.descuentos += monto;
+      } else {
+        actual.ingresos += monto;
+      }
+
+      actual.liquido = actual.ingresos - actual.descuentos;
+      actual.cantidad += 1;
+      totales.set(key, actual);
+    });
+
+    return totales;
+  }, [detalles]);
+
+  const obtenerTotalesCalculados = (nominaId: number) =>
+    totalesPorNomina.get(String(nominaId)) ?? totalesVacios;
+
+  const obtenerEtiquetaPeriodo = (periodo?: Periodo) =>
+    periodo
+      ? `${formatearFecha(periodo.PER_FECHA_INICIO)} al ${formatearFecha(periodo.PER_FECHA_FIN)}`
+      : '';
+
+  const obtenerEtiquetaLiquidacion = (liquidacion?: Liquidacion) => {
+    if (!liquidacion) return '';
+    const empleado = empleadosPorId.get(String(liquidacion.EMP_ID));
+    const nombreEmpleado = obtenerNombreEmpleado(empleado) || `Empleado #${liquidacion.EMP_ID}`;
+    return `${nombreEmpleado} - ${formatearMoneda(liquidacion.LIQ_LIQUIDACION)}`;
+  };
+
+  const crearPayloadNomina = (
+    datosForm: NominaForm,
+    totales: TotalesNomina = totalesVacios,
+    estado = datosForm.nom_estado
+  ): NominaForm => ({
+    nom_total_ingresos: totales.ingresos.toFixed(2),
+    nom_total_descuento: totales.descuentos.toFixed(2),
+    nom_salario_liquido: totales.liquido.toFixed(2),
+    nom_fecha_generacion: datosForm.nom_fecha_generacion,
+    per_id: datosForm.per_id,
+    empleado_id: datosForm.empleado_id,
+    liq_id: datosForm.liq_id || null,
+    nom_estado: estado,
+  });
 
   const handleChange = (
     e:
@@ -106,27 +203,9 @@ function NominaCRUD() {
       | SelectChangeEvent
   ) => {
     const { name, value } = e.target;
-
     if (name === 'empleado_id') {
-      const bono = obtenerBonoProductividadEmpleado(value);
-      setBonoKpiAplicado(bono);
-
-      setForm((prev) => {
-        const ingresosActuales = Number(prev.nom_total_ingresos || 0);
-        const ingresosSinBonoAnterior = ingresosActuales - ultimoBonoAplicado.current;
-        ultimoBonoAplicado.current = bono;
-
-        return {
-          ...prev,
-          empleado_id: value,
-          nom_total_ingresos: (ingresosSinBonoAnterior + bono).toFixed(2),
-        };
-      });
+      setForm((prev) => ({ ...prev, empleado_id: value, liq_id: null }));
       return;
-    }
-
-    if (name === 'nom_total_ingresos') {
-      ultimoBonoAplicado.current = bonoKpiAplicado;
     }
 
     setForm((prev) => ({ ...prev, [name as string]: value }));
@@ -137,21 +216,16 @@ function NominaCRUD() {
     setModoEdicion(false);
     setId(null);
     setError('');
-    setBonoKpiAplicado(0);
-    ultimoBonoAplicado.current = 0;
   };
 
   const validar = () => {
     if (
-      !String(form.nom_total_ingresos).trim() ||
-      !String(form.nom_total_descuento).trim() ||
       !form.nom_fecha_generacion.trim() ||
       !String(form.per_id).trim() ||
       !String(form.empleado_id).trim() ||
-      !String(form.liq_id).trim() ||
       !form.nom_estado.trim()
     ) {
-      setError('Todos los campos son obligatorios');
+      setError('Fecha, periodo, empleado y estado son obligatorios');
       return false;
     }
     return true;
@@ -165,17 +239,18 @@ function NominaCRUD() {
       if (!validar()) return;
 
       if (modoEdicion && id !== null) {
-        await actualizarNomina(id, form);
-        setMensaje('Nómina actualizada correctamente');
+        const totales = obtenerTotalesCalculados(id);
+        await actualizarNomina(id, crearPayloadNomina(form, totales));
+        setMensaje('Cabecera de nomina actualizada correctamente');
       } else {
-        await crearNomina(form);
-        setMensaje('Nómina creada correctamente');
+        await crearNomina(crearPayloadNomina(form));
+        setMensaje('Cabecera creada. Ahora agrega ingresos y descuentos en Detalle de Nomina.');
       }
 
       limpiarFormulario();
       await cargarDatos();
-    } catch (err: any) {
-      setError('Error guardando nómina: ' + (err.response?.data?.error || err.message));
+    } catch (err: unknown) {
+      setError(getApiErrorMessage(err, 'Error guardando nomina'));
     }
   };
 
@@ -185,115 +260,125 @@ function NominaCRUD() {
     setMensaje('');
     setError('');
     setForm({
-      nom_total_ingresos: String(n.NOM_TOTAL_INGRESOS),
-      nom_total_descuento: String(n.NOM_TOTAL_DESCUENTO),
-      nom_salario_liquido: String(n.NOM_SALARIO_LIQUIDO),
-      nom_fecha_generacion: n.NOM_FECHA_GENERACION
-        ? String(n.NOM_FECHA_GENERACION).split('T')[0]
-        : '',
+      nom_total_ingresos: n.NOM_TOTAL_INGRESOS,
+      nom_total_descuento: n.NOM_TOTAL_DESCUENTO,
+      nom_salario_liquido: n.NOM_SALARIO_LIQUIDO,
+      nom_fecha_generacion: toInputDate(n.NOM_FECHA_GENERACION),
       per_id: String(n.PER_ID),
-      empleado_id: String(n.EMP_ID),
-      liq_id: String(n.LIQ_ID),
+      empleado_id: n.EMP_ID ? String(n.EMP_ID) : '',
+      liq_id: n.LIQ_ID ? String(n.LIQ_ID) : null,
       nom_estado: n.NOM_ESTADO
     });
-    const bono = obtenerBonoProductividadEmpleado(n.EMP_ID);
-    setBonoKpiAplicado(bono);
-    ultimoBonoAplicado.current = bono;
   };
 
   const handleEliminar = async (idEliminar: number) => {
-    if (!window.confirm('¿Deseas eliminar esta nómina?')) return;
+    if (!window.confirm('Deseas eliminar esta nomina?')) return;
 
     try {
       setError('');
       setMensaje('');
       await eliminarNomina(idEliminar);
-      setMensaje('Nómina eliminada correctamente');
+      setMensaje('Nomina eliminada correctamente');
 
       if (id === idEliminar) limpiarFormulario();
 
       await cargarDatos();
-    } catch (err: any) {
-      setError('Error eliminando nómina: ' + (err.response?.data?.error || err.message));
+    } catch (err: unknown) {
+      setError(getApiErrorMessage(err, 'Error eliminando nomina'));
+    }
+  };
+
+  const recalcularNomina = async (n: Nomina, estado = n.NOM_ESTADO) => {
+    const totales = obtenerTotalesCalculados(n.NOM_ID);
+
+    if (totales.cantidad === 0) {
+      setError('Esta nomina no tiene detalle. Primero agrega ingresos y descuentos en Detalle de Nomina.');
+      return false;
+    }
+
+    await actualizarNomina(n.NOM_ID, crearPayloadNomina({
+      nom_total_ingresos: n.NOM_TOTAL_INGRESOS,
+      nom_total_descuento: n.NOM_TOTAL_DESCUENTO,
+      nom_salario_liquido: n.NOM_SALARIO_LIQUIDO,
+      nom_fecha_generacion: toInputDate(n.NOM_FECHA_GENERACION),
+      per_id: n.PER_ID,
+      empleado_id: n.EMP_ID,
+      liq_id: n.LIQ_ID ?? null,
+      nom_estado: n.NOM_ESTADO,
+    }, totales, estado));
+
+    return true;
+  };
+
+  const handleRecalcular = async (n: Nomina) => {
+    try {
+      setError('');
+      setMensaje('');
+      const ok = await recalcularNomina(n);
+      if (!ok) return;
+      setMensaje('Totales recalculados desde el detalle de nomina');
+      await cargarDatos();
+    } catch (err: unknown) {
+      setError(getApiErrorMessage(err, 'Error recalculando totales de nomina'));
+    }
+  };
+
+  const enviarAGerente = async (n: Nomina) => {
+    try {
+      setError('');
+      setMensaje('');
+      const ok = await recalcularNomina(n, 'P');
+      if (!ok) return;
+      setMensaje('Nomina recalculada y enviada a aprobacion gerencial');
+      await cargarDatos();
+    } catch (err: unknown) {
+      setError(getApiErrorMessage(err, 'Error enviando nomina a gerente'));
     }
   };
 
   const obtenerChipEstado = (estado: string) => {
     if (estado === 'A' || estado === 'Activo')
-      return <Chip label="Activo" color="success" size="small" />;
+      return <Chip label="Aprobada" color="success" size="small" />;
     if (estado === 'I' || estado === 'Inactivo')
-      return <Chip label="Inactivo" color="default" size="small" />;
+      return <Chip label="Rechazada" color="error" size="small" />;
     if (estado === 'P' || estado === 'Pendiente')
       return <Chip label="Pendiente" color="warning" size="small" />;
+    if (estado === 'B' || estado === 'Borrador')
+      return <Chip label="Borrador" color="default" size="small" />;
     return <Chip label={estado || 'Sin estado'} size="small" />;
   };
 
   if (cargando) {
     return (
       <Box sx={{ p: 3 }}>
-        <Typography variant="h6">Cargando nóminas...</Typography>
+        <Typography variant="h6">Cargando nominas...</Typography>
       </Box>
     );
   }
 
   return (
     <Box sx={{ py: 2 }}>
-      {/* Formulario */}
       <Paper elevation={3} sx={{ p: 3, mb: 3 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 3 }}>
           <RequestQuoteIcon color="primary" />
           <Typography variant="h4" sx={{ fontWeight: 'bold' }}>
-            Gestión de Nómina
+            Gestion de Nomina
           </Typography>
         </Box>
 
         <Typography variant="h6" sx={{ mb: 2 }}>
-          {modoEdicion ? 'Editar nómina' : 'Nueva nómina'}
+          {modoEdicion ? 'Editar cabecera de nomina' : 'Nueva cabecera de nomina'}
         </Typography>
+
+        <Alert severity="info" sx={{ mb: 2 }}>
+          Esta vista solo registra la cabecera: empleado, periodo y estado. La liquidacion es opcional y solo se usa cuando corresponde a una salida laboral. Los ingresos, descuentos y KPI se agregan en Detalle de Nomina.
+        </Alert>
 
         <Grid container spacing={2}>
           <Grid size={{ xs: 12, md: 6 }}>
             <TextField
               fullWidth
-              label="Total Ingresos"
-              name="nom_total_ingresos"
-              type="number"
-              value={form.nom_total_ingresos}
-              onChange={handleChange}
-              helperText={
-                bonoKpiAplicado > 0
-                  ? `Incluye bono productividad KPI: Q${bonoKpiAplicado.toLocaleString('es-GT')}`
-                  : 'Selecciona empleado para sumar bonos KPI registrados'
-              }
-            />
-          </Grid>
-
-          <Grid size={{ xs: 12, md: 6 }}>
-            <TextField
-              fullWidth
-              label="Total Descuentos"
-              name="nom_total_descuento"
-              type="number"
-              value={form.nom_total_descuento}
-              onChange={handleChange}
-            />
-          </Grid>
-
-          {/* Salario líquido — solo lectura, calculado automáticamente */}
-          <Grid size={{ xs: 12, md: 6 }}>
-            <TextField
-              fullWidth
-              label="Salario Líquido (calculado)"
-              value={`Q ${Number(form.nom_salario_liquido).toLocaleString('es-GT')}`}
-              slotProps={{ input: { readOnly: true } }}
-              sx={{ backgroundColor: '#f5f5f5' }}
-            />
-          </Grid>
-
-          <Grid size={{ xs: 12, md: 6 }}>
-            <TextField
-              fullWidth
-              label="Fecha de generación"
+              label="Fecha de generacion"
               name="nom_fecha_generacion"
               type="date"
               value={form.nom_fecha_generacion}
@@ -303,36 +388,45 @@ function NominaCRUD() {
           </Grid>
 
           <Grid size={{ xs: 12, md: 6 }}>
-            <TextField
-              fullWidth
-              label="Periodo ID"
-              name="per_id"
-              type="number"
-              value={form.per_id}
-              onChange={handleChange}
-            />
+            <FormControl fullWidth>
+              <InputLabel>Periodo</InputLabel>
+              <Select name="per_id" value={String(form.per_id)} label="Periodo" onChange={handleChange}>
+                <MenuItem value="">Seleccione periodo</MenuItem>
+                {periodos.map((periodo) => (
+                  <MenuItem key={periodo.PER_ID} value={String(periodo.PER_ID)}>
+                    {obtenerEtiquetaPeriodo(periodo)} - Pago {formatearFecha(periodo.PER_FECHA_PAGO)}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
           </Grid>
 
           <Grid size={{ xs: 12, md: 6 }}>
-            <TextField
-              fullWidth
-              label="Empleado ID"
-              name="empleado_id"
-              type="number"
-              value={form.empleado_id}
-              onChange={handleChange}
-            />
+            <FormControl fullWidth>
+              <InputLabel>Empleado</InputLabel>
+              <Select name="empleado_id" value={String(form.empleado_id)} label="Empleado" onChange={handleChange}>
+                <MenuItem value="">Seleccione empleado</MenuItem>
+                {empleados.map((empleado) => (
+                  <MenuItem key={empleado.EMP_ID} value={String(empleado.EMP_ID)}>
+                    {obtenerNombreEmpleado(empleado)}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
           </Grid>
 
           <Grid size={{ xs: 12, md: 6 }}>
-            <TextField
-              fullWidth
-              label="Liquidación ID"
-              name="liq_id"
-              type="number"
-              value={form.liq_id}
-              onChange={handleChange}
-            />
+            <FormControl fullWidth>
+              <InputLabel>Liquidacion opcional</InputLabel>
+              <Select name="liq_id" value={String(form.liq_id ?? '')} label="Liquidacion opcional" onChange={handleChange}>
+                <MenuItem value="">No aplica</MenuItem>
+                {liquidacionesDisponibles.map((liquidacion) => (
+                  <MenuItem key={liquidacion.LIQ_ID} value={String(liquidacion.LIQ_ID)}>
+                    {obtenerEtiquetaLiquidacion(liquidacion)}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
           </Grid>
 
           <Grid size={{ xs: 12, md: 6 }}>
@@ -345,9 +439,10 @@ function NominaCRUD() {
                 onChange={handleChange}
               >
                 <MenuItem value="">Seleccione estado</MenuItem>
-                <MenuItem value="A">Activo</MenuItem>
-                <MenuItem value="I">Inactivo</MenuItem>
+                <MenuItem value="B">Borrador</MenuItem>
                 <MenuItem value="P">Pendiente</MenuItem>
+                <MenuItem value="A">Aprobada</MenuItem>
+                <MenuItem value="I">Rechazada</MenuItem>
               </Select>
             </FormControl>
           </Grid>
@@ -359,7 +454,7 @@ function NominaCRUD() {
                 startIcon={<SaveIcon />}
                 onClick={guardar}
               >
-                {modoEdicion ? 'Actualizar' : 'Guardar'}
+                {modoEdicion ? 'Actualizar cabecera' : 'Guardar cabecera'}
               </Button>
 
               <Button
@@ -375,10 +470,9 @@ function NominaCRUD() {
         </Grid>
       </Paper>
 
-      {/* Tabla */}
       <Paper elevation={3} sx={{ p: 3 }}>
         <Typography variant="h6" sx={{ mb: 2 }}>
-          Listado de nóminas: {datos.length}
+          Listado de nominas: {datos.length}
         </Typography>
 
         <TableContainer>
@@ -386,11 +480,14 @@ function NominaCRUD() {
             <TableHead>
               <TableRow>
                 <TableCell><strong>ID</strong></TableCell>
-                <TableCell><strong>Empleado ID</strong></TableCell>
-                <TableCell><strong>Total Ingresos</strong></TableCell>
-                <TableCell><strong>Total Descuentos</strong></TableCell>
-                <TableCell><strong>Salario Líquido</strong></TableCell>
-                <TableCell><strong>Fecha Generación</strong></TableCell>
+                <TableCell><strong>Empleado</strong></TableCell>
+                <TableCell><strong>Periodo</strong></TableCell>
+                <TableCell><strong>Liquidacion</strong></TableCell>
+                <TableCell align="right"><strong>Ingresos</strong></TableCell>
+                <TableCell align="right"><strong>Descuentos</strong></TableCell>
+                <TableCell align="right"><strong>Liquido</strong></TableCell>
+                <TableCell align="center"><strong>Detalle</strong></TableCell>
+                <TableCell><strong>Fecha</strong></TableCell>
                 <TableCell><strong>Estado</strong></TableCell>
                 <TableCell><strong>Acciones</strong></TableCell>
               </TableRow>
@@ -398,47 +495,91 @@ function NominaCRUD() {
 
             <TableBody>
               {datos.length > 0 ? (
-                datos.map((n) => (
-                  <TableRow key={n.NOM_ID} hover>
-                    <TableCell>{n.NOM_ID}</TableCell>
-                    <TableCell>{n.EMP_ID}</TableCell>
-                    <TableCell>Q{Number(n.NOM_TOTAL_INGRESOS).toLocaleString('es-GT')}</TableCell>
-                    <TableCell>Q{Number(n.NOM_TOTAL_DESCUENTO).toLocaleString('es-GT')}</TableCell>
-                    <TableCell>Q{Number(n.NOM_SALARIO_LIQUIDO).toLocaleString('es-GT')}</TableCell>
-                    <TableCell>
-                      {n.NOM_FECHA_GENERACION
-                        ? new Date(n.NOM_FECHA_GENERACION).toLocaleDateString('es-GT')
-                        : '—'}
-                    </TableCell>
-                    <TableCell>{obtenerChipEstado(n.NOM_ESTADO)}</TableCell>
-                    <TableCell>
-                      <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                        <Button
-                          size="small"
-                          variant="outlined"
-                          startIcon={<EditIcon />}
-                          onClick={() => handleEditar(n)}
-                        >
-                          Editar
-                        </Button>
+                datos.map((n) => {
+                  const empleado = empleadosPorId.get(String(n.EMP_ID));
+                  const periodo = periodosPorId.get(String(n.PER_ID));
+                  const liquidacion = liquidacionesPorId.get(String(n.LIQ_ID));
+                  const totales = obtenerTotalesCalculados(n.NOM_ID);
+                  const mostrarTotales = totales.cantidad > 0
+                    ? totales
+                    : {
+                      ingresos: Number(n.NOM_TOTAL_INGRESOS || 0),
+                      descuentos: Number(n.NOM_TOTAL_DESCUENTO || 0),
+                      liquido: Number(n.NOM_SALARIO_LIQUIDO || 0),
+                      cantidad: 0,
+                    };
 
-                        <Button
+                  return (
+                    <TableRow key={n.NOM_ID} hover>
+                      <TableCell>{n.NOM_ID}</TableCell>
+                      <TableCell>
+                        <Typography variant="body2">{obtenerNombreEmpleado(empleado) || 'Sin empleado'}</Typography>
+                        <Typography variant="caption" color="text.secondary">ID: {n.EMP_ID ?? '-'}</Typography>
+                      </TableCell>
+                      <TableCell>{obtenerEtiquetaPeriodo(periodo) || `Periodo #${n.PER_ID}`}</TableCell>
+                      <TableCell>{liquidacion ? formatearMoneda(liquidacion.LIQ_LIQUIDACION) : 'No aplica'}</TableCell>
+                      <TableCell align="right">{formatearMoneda(mostrarTotales.ingresos)}</TableCell>
+                      <TableCell align="right">{formatearMoneda(mostrarTotales.descuentos)}</TableCell>
+                      <TableCell align="right" sx={{ fontWeight: 'bold' }}>{formatearMoneda(mostrarTotales.liquido)}</TableCell>
+                      <TableCell align="center">
+                        <Chip
+                          label={`${totales.cantidad} conceptos`}
+                          color={totales.cantidad > 0 ? 'primary' : 'default'}
                           size="small"
-                          variant="contained"
-                          color="error"
-                          startIcon={<DeleteIcon />}
-                          onClick={() => handleEliminar(n.NOM_ID)}
-                        >
-                          Eliminar
-                        </Button>
-                      </Box>
-                    </TableCell>
-                  </TableRow>
-                ))
+                        />
+                      </TableCell>
+                      <TableCell>{formatearFecha(n.NOM_FECHA_GENERACION) || '-'}</TableCell>
+                      <TableCell>{obtenerChipEstado(n.NOM_ESTADO)}</TableCell>
+                      <TableCell>
+                        <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                          {n.NOM_ESTADO !== 'P' && n.NOM_ESTADO !== 'A' && (
+                            <>
+                              <Button
+                                size="small"
+                                variant="outlined"
+                                startIcon={<CalculateIcon />}
+                                onClick={() => handleRecalcular(n)}
+                              >
+                                Recalcular
+                              </Button>
+                              <Button
+                                size="small"
+                                variant="contained"
+                                color="warning"
+                                startIcon={<SendIcon />}
+                                onClick={() => enviarAGerente(n)}
+                              >
+                                Enviar
+                              </Button>
+                            </>
+                          )}
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            startIcon={<EditIcon />}
+                            onClick={() => handleEditar(n)}
+                          >
+                            Editar
+                          </Button>
+
+                          <Button
+                            size="small"
+                            variant="contained"
+                            color="error"
+                            startIcon={<DeleteIcon />}
+                            onClick={() => handleEliminar(n.NOM_ID)}
+                          >
+                            Eliminar
+                          </Button>
+                        </Box>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
               ) : (
                 <TableRow>
-                  <TableCell colSpan={8} align="center">
-                    No hay nóminas registradas
+                  <TableCell colSpan={11} align="center">
+                    No hay nominas registradas
                   </TableCell>
                 </TableRow>
               )}
@@ -447,7 +588,6 @@ function NominaCRUD() {
         </TableContainer>
       </Paper>
 
-      {/* Snackbars */}
       <Snackbar
         open={!!mensaje}
         autoHideDuration={3000}

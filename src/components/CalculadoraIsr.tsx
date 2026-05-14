@@ -18,8 +18,8 @@ import {
 import GavelIcon from '@mui/icons-material/Gavel';
 import { obtenerEmpleados } from '../services/empleados.service';
 import type { Empleado } from '../interfaces/empleados';
-
-const SALARIO_BASE_DEFAULT = 4000;
+import { getApiErrorMessage } from '../api/errors';
+import { obtenerSueldoMensual } from '../utils/payroll';
 
 const calcularISR = (salarioMensual: number) => {
   const anual = salarioMensual * 12;
@@ -60,7 +60,7 @@ function CalculadoraISR() {
         const filas = data
           .filter((e: Empleado) => e.EMP_ESTADO === 'A')
           .map((e: Empleado) => {
-            const salario = SALARIO_BASE_DEFAULT;
+            const salario = obtenerSueldoMensual(e);
             const { isr_anual, isr_mensual, imponible } = calcularISR(salario);
             return {
               emp_id: e.EMP_ID,
@@ -73,8 +73,8 @@ function CalculadoraISR() {
             };
           });
         setEmpleados(filas);
-      } catch (err: any) {
-        setError('Error cargando empleados: ' + err.message);
+      } catch (err: unknown) {
+        setError(getApiErrorMessage(err, 'Error cargando empleados'));
       } finally {
         setCargando(false);
       }

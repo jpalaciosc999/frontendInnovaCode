@@ -7,7 +7,6 @@ import ProtectedRoute from './components/ProtectedRoute';
 import LoginPage from './components/LoginPage';
 import Navbar from './components/Navbar';
 import AccessDenied from './components/common/AccessDenied';
-import PendingView from './components/common/PendingView';
 
 import Home from './pages/Home';
 import PruebaAxios from './components/PruebaAxios';
@@ -40,6 +39,7 @@ import CalculadoraIgss from './components/CalculadoraIgss';
 import CalculadoraISR from './components/CalculadoraIsr';
 import GenerarCSV from './components/Generarcsv';
 import SuspensionIgss from './components/SuspensionIgss';
+import AprobacionNomina from './components/AprobacionNomina';
 
 function GuardedRoute({
   path,
@@ -102,16 +102,16 @@ function Layout() {
           <Route path="/calculadora-igss" element={guarded('/calculadora-igss', <CalculadoraIgss />)} />
           <Route path="/calculadora-isr" element={guarded('/calculadora-isr', <CalculadoraISR />)} />
           <Route path="/suspensiones-igss" element={guarded('/suspensiones-igss', <SuspensionIgss />)} />
-          <Route path="/tipos-descuento" element={guarded('/tipos-descuento', <Descuentos />)} />
-          <Route path="/prestamos-banco" element={guarded('/prestamos-banco', <Prestamos />)} />
+          <Route path="/tipos-descuento" element={<Navigate to="/descuentos" replace />} />
+          <Route path="/prestamos-banco" element={<Navigate to="/prestamos" replace />} />
           <Route path="/generar-csv" element={guarded('/generar-csv', <GenerarCSV />)} />
 
           <Route path="/resumen-marcaje" element={guarded('/resumen-marcaje', <MarcajePage />)} />
           <Route path="/registro-vacaciones" element={<Navigate to="/control-laboral" replace />} />
-          <Route path="/isr" element={guarded('/isr', <PendingView title="ISR" roleName="Contabilidad" />)} />
-          <Route path="/irtra" element={guarded('/irtra', <PendingView title="IRTRA" roleName="Contabilidad" />)} />
-          <Route path="/intecap" element={guarded('/intecap', <PendingView title="INTECAP" roleName="Contabilidad" />)} />
-          <Route path="/aprobacion-nomina" element={guarded('/aprobacion-nomina', <PendingView title="Aprobación de Nómina" roleName="Gerente" />)} />
+          <Route path="/isr" element={<Navigate to="/descuentos" replace />} />
+          <Route path="/irtra" element={<Navigate to="/descuentos" replace />} />
+          <Route path="/intecap" element={<Navigate to="/descuentos" replace />} />
+          <Route path="/aprobacion-nomina" element={guarded('/aprobacion-nomina', <AprobacionNomina />)} />
 
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

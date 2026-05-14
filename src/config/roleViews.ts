@@ -57,19 +57,14 @@ export const appViews: AppView[] = [
   { key: 'periodos', text: 'Periodos', path: '/periodo', roles: ['CONTABILIDAD'] },
   { key: 'tipo-ingresos', text: 'Ingresos', path: '/tipo-ingresos', roles: ['CONTABILIDAD'] },
   { key: 'descuentos', text: 'Descuentos', path: '/descuentos', roles: ['CONTABILIDAD'] },
-  { key: 'isr', text: 'ISR', path: '/isr', roles: ['CONTABILIDAD'], pending: true },
-  { key: 'irtra', text: 'IRTRA', path: '/irtra', roles: ['CONTABILIDAD'], pending: true },
-  { key: 'intecap', text: 'INTECAP', path: '/intecap', roles: ['CONTABILIDAD'], pending: true },
   { key: 'prestamos', text: 'Prestamos', path: '/prestamos', roles: ['CONTABILIDAD'] },
   { key: 'prestamo-detalle', text: 'Detalle Prestamo', path: '/prestamo-detalle', roles: ['CONTABILIDAD'] },
   { key: 'liquidacion', text: 'Liquidacion', path: '/liquidacion', roles: ['CONTABILIDAD'] },
   { key: 'calculadora-igss', text: 'Calculadora IGSS', path: '/calculadora-igss', roles: ['CONTABILIDAD'] },
   { key: 'calculadora-isr', text: 'Calculadora ISR', path: '/calculadora-isr', roles: ['CONTABILIDAD'] },
-  { key: 'tipos-descuento', text: 'Tipos Descuento', path: '/tipos-descuento', roles: ['CONTABILIDAD'] },
-  { key: 'prestamos-banco', text: 'Prestamos Banco', path: '/prestamos-banco', roles: ['CONTABILIDAD'] },
   { key: 'generar-csv', text: 'Generar CSV Deposito', path: '/generar-csv', roles: ['CONTABILIDAD'] },
 
-  { key: 'aprobacion-nomina', text: 'Aprobacion de Nomina', path: '/aprobacion-nomina', roles: ['GERENTE'], pending: true },
+  { key: 'aprobacion-nomina', text: 'Aprobacion de Nomina', path: '/aprobacion-nomina', roles: ['GERENTE'] },
 ];
 
 export const legacyViews: AppView[] = [
