@@ -14,6 +14,7 @@ export interface Empleado {
   TIC_ID?: number;
   EMP_FECHA_INICIO_CONTRATO?: string;
   EMP_FECHA_FIN_CONTRATO?: string;
+  EMP_MOTIVO_CAMBIO_CONTRATO?: string;
   EMP_SUELDO?: number | string;
   EMP_FOTO?: string | { data?: number[] };
   emp_foto?: string | { data?: number[] };
@@ -32,8 +33,8 @@ export interface EmpleadoForm {
   sed_id: string;
   pue_id: string;
   tic_id: string;
-  emp_fecha_inicio_contrato: string;
-  emp_fecha_fin_contrato: string;
+  emp_fecha_inicio_contrato?: string;
+  emp_fecha_fin_contrato?: string;
   emp_motivo_cambio_contrato?: string;
   emp_sueldo: string;
   emp_foto: string;

@@ -1,11 +1,13 @@
+/* eslint-disable react-refresh/only-export-components */
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
 import { canAccessPath as userCanAccessPath, getTokenPermissionKeys } from '../auth/access';
 import { notifyAuthUserChanged } from '../config/roleViews';
+import { refrescarSesion } from '../services/authService';
 
 interface AuthUser {
   id: number;
-  email: string;
-  rol: string;
+  email?: string;
+  rol?: string;
   username?: string;
   nombre_completo?: string;
   correo?: string;
@@ -24,6 +26,7 @@ interface AuthContextType {
   loadingPermissions: boolean;
   login: (token: string, user: AuthUser) => void;
   logout: () => void;
+  refreshSession: () => Promise<void>;
   canAccessPath: (path: string) => boolean;
   isAuthenticated: boolean;
 }
@@ -38,6 +41,22 @@ const clearLegacyRoleState = () => {
   localStorage.removeItem('tipoUsuario');
   localStorage.removeItem('authUser');
   localStorage.removeItem('currentUser');
+};
+
+const normalizeAuthUser = (authUser: AuthUser): AuthUser => {
+  const rolNombre = authUser.rol_nombre ?? authUser.ROL_NOMBRE ?? authUser.rol;
+  const correo = authUser.correo ?? authUser.email;
+
+  return {
+    ...authUser,
+    id: Number(authUser.id),
+    email: String(correo ?? ''),
+    correo: String(correo ?? ''),
+    rol: String(rolNombre ?? authUser.rol_id ?? authUser.ROL_ID ?? ''),
+    rol_id: authUser.rol_id ?? authUser.ROL_ID,
+    rol_nombre: rolNombre,
+    permisos: Array.isArray(authUser.permisos) ? authUser.permisos : [],
+  };
 };
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
@@ -55,13 +74,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [permissions, setPermissions] = useState<string[]>(() => getTokenPermissionKeys(user));
   const loadingPermissions = false;
 
-  const login = (newToken: string, newUser: AuthUser) => {
+  const setSession = useCallback((newToken: string, newUser: AuthUser) => {
+    const normalizedUser = normalizeAuthUser(newUser);
     clearLegacyRoleState();
     localStorage.setItem('token', newToken);
-    localStorage.setItem('user', JSON.stringify(newUser));
+    localStorage.setItem('user', JSON.stringify(normalizedUser));
     setToken(newToken);
-    setUser(newUser);
+    setUser(normalizedUser);
     notifyAuthUserChanged();
+  }, []);
+
+  const login = (newToken: string, newUser: AuthUser) => {
+    setSession(newToken, newUser);
   };
 
   const logout = () => {
@@ -78,6 +102,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     (path: string) => userCanAccessPath(user, path),
     [user]
   );
+
+  const refreshSession = useCallback(async () => {
+    const currentToken = localStorage.getItem('token');
+    if (!currentToken) return;
+
+    const refreshed = await refrescarSesion(currentToken);
+    if (!refreshed.token || !refreshed.usuario) return;
+
+    setSession(refreshed.token, refreshed.usuario);
+  }, [setSession]);
 
   // Verificar expiración del token
   useEffect(() => {
@@ -109,6 +143,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         loadingPermissions,
         login,
         logout,
+        refreshSession,
         canAccessPath,
         isAuthenticated: !!token,
       }}

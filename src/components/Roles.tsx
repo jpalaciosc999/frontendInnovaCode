@@ -1,11 +1,12 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { Rol, RolForm } from '../interfaces/roles';
 import type { RolPermiso } from '../interfaces/rolPermisos';
 import type { Usuario } from '../interfaces/usuario';
 import {
   crearRol,
   actualizarRol,
-  eliminarRol
+  eliminarRol,
+  eliminarRolPermanente
 } from '../services/roles.service';
 import { obtenerAdminCatalogo } from '../services/admin.service';
 
@@ -41,16 +42,18 @@ import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
 import PeopleIcon from '@mui/icons-material/People';
 import ShieldIcon from '@mui/icons-material/Shield';
 import { useAuth } from '../context/AuthContext';
+import { getApiErrorMessage } from '../api/errors';
 
 const rolesBase = new Set([
   'ADMIN',
   'ADMINISTRADOR',
-  'CONTABILIDAD',
+  'ADMINNOMINA',
+  'ADMIN_NOMINA',
+  'ADMINISTRADORNOMINA',
+  'ADMINISTRADORDENOMINA',
+  'ADMINISTRADOR DE NOMINA',
   'EMPLEADO',
-  'GERENTE',
   'ROOT',
-  'RRHH',
-  'SUPREMO',
 ]);
 const fechaHoy = () => new Date().toISOString().slice(0, 10);
 const normalizar = (valor: unknown) =>
@@ -58,6 +61,14 @@ const normalizar = (valor: unknown) =>
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase();
+
+const normalizarClave = (valor: unknown) =>
+  String(valor ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toUpperCase()
+    .replace(/[\s-]+/g, '');
 
 const leerCampo = (item: unknown, keys: string[]) => {
   if (!item || typeof item !== 'object') return undefined;
@@ -91,7 +102,7 @@ const crearFormularioInicial = (): RolForm => ({
 });
 
 function Roles() {
-  const { user } = useAuth();
+  const { refreshSession, user } = useAuth();
   const [datos, setDatos] = useState<Rol[]>([]);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState('');
@@ -112,8 +123,8 @@ function Roles() {
       setDatos(catalogo.roles);
       setRolPermisos(catalogo.rolPermisos);
       setUsuarios(catalogo.usuarios);
-    } catch (err: any) {
-      setError('Error cargando roles: ' + (err.response?.data?.error || err.message));
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'Error cargando roles'));
     } finally {
       setCargando(false);
     }
@@ -143,7 +154,7 @@ function Roles() {
     const targetLevel = toFiniteNumber(rol.ROL_NIVEL_ACCESO);
     if (currentRoleLevel === undefined || targetLevel === undefined) return false;
 
-    return targetLevel < currentRoleLevel;
+    return targetLevel > currentRoleLevel;
   };
 
   const handleChange = (
@@ -187,7 +198,7 @@ function Roles() {
       !currentRoleIsSupremo &&
       currentRoleLevel !== undefined &&
       targetLevel !== undefined &&
-      targetLevel >= currentRoleLevel
+      targetLevel <= currentRoleLevel
     ) {
       setError('No puedes crear o modificar roles de nivel igual o superior al tuyo');
       return false;
@@ -205,7 +216,7 @@ function Roles() {
 
       const payload: RolForm = {
         ...form,
-        rol_nombre: form.rol_nombre.trim().toUpperCase(),
+        rol_nombre: form.rol_nombre.trim(),
         rol_descripcion: form.rol_descripcion.trim(),
         rol_nivel_acceso: Number(form.rol_nivel_acceso),
         rol_fecha_creacion: form.rol_fecha_creacion || fechaHoy(),
@@ -213,16 +224,34 @@ function Roles() {
 
       if (modoEdicion && rolId !== null) {
         await actualizarRol(rolId, payload);
-        setMensaje('Rol actualizado correctamente. Cierra sesión y vuelve a entrar para refrescar el menú.');
+        await refreshSession();
+        setDatos((prev) =>
+          prev.map((rol) =>
+            rol.ROL_ID === rolId
+              ? {
+                  ...rol,
+                  ROL_NOMBRE: String(payload.rol_nombre),
+                  ROL_DESCRIPCION: String(payload.rol_descripcion ?? ''),
+                  ROL_NIVEL_ACCESO: String(payload.rol_nivel_acceso),
+                  ROL_ESTADO: String(payload.rol_estado),
+                  ROL_FECHA_CREACION: String(payload.rol_fecha_creacion ?? rol.ROL_FECHA_CREACION),
+                }
+              : rol
+          )
+        );
+        setMensaje('Rol actualizado correctamente. Menú y permisos refrescados.');
       } else {
         await crearRol(payload);
-        setMensaje('Rol creado correctamente. Cierra sesión y vuelve a entrar para refrescar el menú.');
+        await refreshSession();
+        setMensaje('Rol creado correctamente. Menú y permisos refrescados.');
       }
 
       limpiarFormulario();
-      await cargarRoles();
-    } catch (err: any) {
-      setError('Error guardando rol: ' + (err.response?.data?.error || err.message));
+      if (!modoEdicion || rolId === null) {
+        await cargarRoles();
+      }
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'Error guardando rol'));
     }
   };
 
@@ -248,7 +277,7 @@ function Roles() {
       (usuario) => getUsuarioRolId(usuario) === id && getUsuarioEstado(usuario) === 'A'
     ).length;
 
-    if (rol && rolesBase.has(rol.ROL_NOMBRE.trim().toUpperCase())) {
+    if (rol && esRolBase(rol)) {
       setError('No se puede eliminar un rol base del sistema');
       return;
     }
@@ -269,10 +298,49 @@ function Roles() {
       setError('');
       setMensaje('');
       await eliminarRol(id);
-      setMensaje('Rol inactivado correctamente. Cierra sesión y vuelve a entrar para refrescar el menú.');
+      await refreshSession();
+      setMensaje('Rol inactivado correctamente. Menú y permisos refrescados.');
       await cargarRoles();
-    } catch (err: any) {
-      setError('Error eliminando rol: ' + (err.response?.data?.error || err.message));
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'Error eliminando rol'));
+    }
+  };
+
+  const handleEliminarPermanente = async (id: number) => {
+    const rol = datos.find((item) => item.ROL_ID === id);
+    const usuariosAsignados = obtenerUsuariosAsignados(id);
+    const permisosAsignados = obtenerPermisosAsignados(id);
+
+    if (rol && esRolBase(rol)) {
+      setError('No se puede eliminar definitivamente un rol base del sistema');
+      return;
+    }
+
+    if (rol && !puedeGestionarRol(rol)) {
+      setError('No puedes eliminar roles de nivel igual o superior al tuyo');
+      return;
+    }
+
+    if (usuariosAsignados > 0) {
+      setError('No se puede eliminar definitivamente un rol con usuarios asociados');
+      return;
+    }
+
+    const detallePermisos = permisosAsignados > 0
+      ? ` Tambien se quitaran ${permisosAsignados} permisos asignados a este rol.`
+      : '';
+
+    if (!window.confirm(`¿Deseas eliminar definitivamente este rol? Esta accion no se puede deshacer.${detallePermisos}`)) return;
+
+    try {
+      setError('');
+      setMensaje('');
+      await eliminarRolPermanente(id);
+      await refreshSession();
+      setMensaje('Rol eliminado definitivamente');
+      await cargarRoles();
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'Error eliminando definitivamente rol'));
     }
   };
 
@@ -282,12 +350,16 @@ function Roles() {
     return <Chip label={estado || 'N/A'} size="small" />;
   };
 
-  const esRolBase = (rol: Rol) => rolesBase.has(rol.ROL_NOMBRE.trim().toUpperCase());
-  const obtenerPermisosAsignados = (id: number) =>
-    rolPermisos.filter((item) => String(item.ROL_ID) === String(id)).length;
+  const esRolBase = (rol: Rol) => rolesBase.has(normalizarClave(rol.ROL_NOMBRE));
+  const obtenerPermisosAsignados = useCallback(
+    (id: number) => rolPermisos.filter((item) => String(item.ROL_ID) === String(id)).length,
+    [rolPermisos]
+  );
 
-  const obtenerUsuariosAsignados = (id: number) =>
-    usuarios.filter((usuario) => getUsuarioRolId(usuario) === id).length;
+  const obtenerUsuariosAsignados = useCallback(
+    (id: number) => usuarios.filter((usuario) => getUsuarioRolId(usuario) === id).length,
+    [usuarios]
+  );
 
   const rolesFiltrados = useMemo(() => {
     const texto = normalizar(busqueda);
@@ -305,7 +377,7 @@ function Roles() {
     inactivos: datos.filter((rol) => rol.ROL_ESTADO === 'I').length,
     base: datos.filter(esRolBase).length,
     sinPermisos: datos.filter((rol) => obtenerPermisosAsignados(rol.ROL_ID) === 0).length,
-  }), [datos, rolPermisos]);
+  }), [datos, obtenerPermisosAsignados]);
 
   if (cargando) {
     return (
@@ -466,6 +538,12 @@ function Roles() {
               {rolesFiltrados.length > 0 ? (
                 rolesFiltrados.map((rol) => {
                   const rolProtegido = !puedeGestionarRol(rol);
+                  const permisosAsignados = obtenerPermisosAsignados(rol.ROL_ID);
+                  const usuariosAsignados = obtenerUsuariosAsignados(rol.ROL_ID);
+                  const puedeEliminarDefinitivo =
+                    !esRolBase(rol) &&
+                    !rolProtegido &&
+                    usuariosAsignados === 0;
 
                   return (
                     <TableRow key={rol.ROL_ID} hover>
@@ -479,8 +557,8 @@ function Roles() {
                       <TableCell>
                         <Chip label={`Nivel ${rol.ROL_NIVEL_ACCESO}`} size="small" color="info" />
                       </TableCell>
-                      <TableCell>{obtenerPermisosAsignados(rol.ROL_ID)}</TableCell>
-                      <TableCell>{obtenerUsuariosAsignados(rol.ROL_ID)}</TableCell>
+                      <TableCell>{permisosAsignados}</TableCell>
+                      <TableCell>{usuariosAsignados}</TableCell>
                       <TableCell>{obtenerChipEstado(rol.ROL_ESTADO)}</TableCell>
                       <TableCell>
                         {rol.ROL_FECHA_CREACION ? String(rol.ROL_FECHA_CREACION).slice(0, 10) : ''}
@@ -505,6 +583,16 @@ function Roles() {
                             onClick={() => handleEliminar(rol.ROL_ID)}
                           >
                             Inactivar
+                          </Button>
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            color="error"
+                            startIcon={<DeleteIcon />}
+                            disabled={!puedeEliminarDefinitivo}
+                            onClick={() => handleEliminarPermanente(rol.ROL_ID)}
+                          >
+                            Eliminar
                           </Button>
                         </Box>
                       </TableCell>

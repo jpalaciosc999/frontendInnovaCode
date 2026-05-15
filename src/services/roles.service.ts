@@ -19,3 +19,7 @@ export const actualizarRol = async (id: number, data: RolForm): Promise<void> =>
 export const eliminarRol = async (id: number): Promise<void> => {
   await api.delete(`${ENDPOINT}/${id}`);
 };
+
+export const eliminarRolPermanente = async (id: number): Promise<void> => {
+  await api.delete(`${ENDPOINT}/${id}/permanente`);
+};

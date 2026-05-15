@@ -136,6 +136,7 @@ function Navbar() {
     EMPLEADO: true,
     RRHH: true,
     ADMIN: true,
+    ADMIN_NOMINA: true,
     CONTABILIDAD: true,
     GERENTE: true,
   });

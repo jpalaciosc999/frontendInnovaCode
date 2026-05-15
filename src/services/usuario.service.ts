@@ -31,6 +31,14 @@ const pickUsuarios = (data: unknown): Usuario[] => {
     return [];
 };
 
+export const eliminarUsuarioPermanente = async (id: number): Promise<void> => {
+    if (!Number.isFinite(id)) {
+        throw new Error('El id del usuario debe ser numérico');
+    }
+
+    await api.delete(`${ENDPOINT}/${id}/permanente`);
+};
+
 const read = (item: unknown, keys: string[]) => {
     if (!item || typeof item !== 'object') return undefined;
     const record = item as Record<string, unknown>;

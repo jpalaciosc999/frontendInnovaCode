@@ -39,6 +39,7 @@ import KeyIcon from '@mui/icons-material/Key';
 import AutoFixHighIcon from '@mui/icons-material/AutoFixHigh';
 import { suggestedPermissions } from '../config/permissionSuggestions';
 import { getApiErrorMessage } from '../api/errors';
+import { useAuth } from '../context/AuthContext';
 
 const initialForm: PermisoForm = {
   per_nombre_permiso: '',
@@ -78,6 +79,7 @@ const esErrorDuplicado = (err: unknown) => {
 };
 
 function Permisos() {
+  const { refreshSession } = useAuth();
   const [datos, setDatos] = useState<Permiso[]>([]);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState('');
@@ -96,8 +98,8 @@ function Permisos() {
       const catalogo = await obtenerAdminCatalogo();
       setDatos(catalogo.permisos);
       setRolPermisos(catalogo.rolPermisos);
-    } catch (err: any) {
-      setError('Error cargando permisos: ' + err.message);
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'Error cargando permisos'));
     } finally {
       setCargando(false);
     }
@@ -168,16 +170,18 @@ function Permisos() {
 
       if (modoEdicion && permisoId !== null) {
         await actualizarPermiso(permisoId, payload);
-        setMensaje('Permiso actualizado correctamente. Cierra sesión y vuelve a entrar para refrescar el menú.');
+        await refreshSession();
+        setMensaje('Permiso actualizado correctamente. Menú y permisos refrescados.');
       } else {
         await crearPermiso(payload);
-        setMensaje('Permiso creado correctamente. Cierra sesión y vuelve a entrar para refrescar el menú.');
+        await refreshSession();
+        setMensaje('Permiso creado correctamente. Menú y permisos refrescados.');
       }
 
       limpiarFormulario();
       await cargarPermisos();
-    } catch (err: any) {
-      setError('Error guardando permiso: ' + (err.response?.data?.error || err.message));
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'Error guardando permiso'));
     }
   };
 
@@ -217,10 +221,11 @@ function Permisos() {
       }
 
       const detalleOmitidos = omitidos ? ` Omitidos por existir: ${omitidos}.` : '';
-      setMensaje(`Permisos sugeridos creados: ${creados}.${detalleOmitidos} Cierra sesión y vuelve a entrar para refrescar el menú.`);
+      await refreshSession();
+      setMensaje(`Permisos sugeridos creados: ${creados}.${detalleOmitidos} Menú y permisos refrescados.`);
       await cargarPermisos();
-    } catch (err: any) {
-      setError('Error creando permisos sugeridos: ' + (err.response?.data?.error || err.message));
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'Error creando permisos sugeridos'));
     }
   };
 
@@ -243,10 +248,11 @@ function Permisos() {
       setError('');
       setMensaje('');
       await eliminarPermiso(id);
-      setMensaje('Permiso inactivado correctamente. Cierra sesión y vuelve a entrar para refrescar el menú.');
+      await refreshSession();
+      setMensaje('Permiso inactivado correctamente. Menú y permisos refrescados.');
       await cargarPermisos();
-    } catch (err: any) {
-      setError('Error eliminando permiso: ' + (err.response?.data?.error || err.message));
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'Error eliminando permiso'));
     }
   };
 

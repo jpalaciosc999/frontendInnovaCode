@@ -19,7 +19,8 @@ import {
   TextField,
 } from '@mui/material';
 
-import AddIcon from '@mui/icons-material/Add';
+import LoginIcon from '@mui/icons-material/Login';
+import LogoutIcon from '@mui/icons-material/Logout';
 import CheckIcon from '@mui/icons-material/Check';
 import CloseIcon from '@mui/icons-material/Close';
 import HistoryIcon from '@mui/icons-material/History';
@@ -32,6 +33,8 @@ import {
 
 import { obtenerEmpleados } from '../services/empleados.service';
 import { obtenerHorarios } from '../services/horario.service';
+import { useAuth } from '../context/AuthContext';
+import { normalizeRole } from '../config/roleViews';
 
 import type { Marcaje } from '../interfaces/marcaje';
 import type { Empleado } from '../interfaces/empleados';
@@ -40,6 +43,28 @@ import type { Horario } from '../interfaces/horario';
 type DiferenciaMarcaje = {
   texto: string;
   positiva: boolean;
+};
+
+type ApiError = {
+  response?: {
+    data?: {
+      message?: string;
+      error?: string;
+    };
+  };
+  message?: string;
+};
+
+const getErrorMessage = (err: unknown, fallback: string) => {
+  if (typeof err === 'object' && err !== null) {
+    const apiError = err as ApiError;
+    return apiError.response?.data?.message
+      || apiError.response?.data?.error
+      || apiError.message
+      || fallback;
+  }
+
+  return fallback;
 };
 
 const obtenerPartesHora = (hora: string | undefined, respaldo: string) => {
@@ -63,6 +88,18 @@ const formatearDiferencia = (diffMs: number): string => {
   const formato = `${hrs}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
 
   return esNegativo ? `-${formato}` : formato;
+};
+
+const getLocalDateKey = (value: Date | string | null | undefined) => {
+  if (!value) return '';
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+
+  return `${year}-${month}-${day}`;
 };
 
 const calcularDiferencia = (
@@ -108,6 +145,7 @@ const calcularDiferencia = (
 };
 
 function MarcajeCRUD() {
+  const { user } = useAuth();
   const [datos, setDatos] = useState<Marcaje[]>([]);
   const [empleados, setEmpleados] = useState<Empleado[]>([]);
   const [horarios, setHorarios] = useState<Horario[]>([]);
@@ -118,6 +156,11 @@ function MarcajeCRUD() {
   const [error, setError] = useState('');
   const [offset, setOffset] = useState(0);
   const [fechaHoy, setFechaHoy] = useState(new Date());
+
+  const esRolEmpleado = normalizeRole(
+    String(user?.rol_nombre ?? user?.ROL_NOMBRE ?? user?.rol ?? '')
+  ) === 'EMPLEADO';
+  const empIdSesion = Number(user?.emp_id ?? 0);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -140,10 +183,19 @@ function MarcajeCRUD() {
 
         setEmpleados(empleadosData);
         setHorarios(horariosData);
-      } catch (err: any) {
+
+        if (esRolEmpleado) {
+          const empleadoSesion = empleadosData.find((empleado) => empleado.EMP_ID === empIdSesion) ?? null;
+          setEmpleadoSeleccionado(empleadoSesion);
+
+          if (!empleadoSesion) {
+            setError('Tu usuario no tiene un empleado asociado. Pide a RRHH que vincule tu usuario con tu registro de empleado.');
+          }
+        }
+      } catch (err: unknown) {
         setError(
           'Error al obtener empleados u horarios del servidor: ' +
-            (err.response?.data?.message || err.message || '')
+            getErrorMessage(err, '')
         );
       } finally {
         setCargandoEmpleados(false);
@@ -151,11 +203,16 @@ function MarcajeCRUD() {
     };
 
     cargarCatalogos();
-  }, []);
+  }, [empIdSesion, esRolEmpleado]);
 
   const horarioSeleccionado = horarios.find(
     (horario) => horario.HOR_ID === empleadoSeleccionado?.HOR_ID
   );
+  const fechaHoyKey = getLocalDateKey(fechaHoy);
+  const marcajeHoy = datos.find((reg) => getLocalDateKey(reg.MAR_FECHA) === fechaHoyKey);
+  const puedeMarcarEntrada = Boolean(empleadoSeleccionado && !marcajeHoy);
+  const puedeMarcarSalida = Boolean(empleadoSeleccionado && marcajeHoy?.MAR_ENTRADA && !marcajeHoy.MAR_SALIDA);
+  const jornadaCompleta = Boolean(marcajeHoy?.MAR_ENTRADA && marcajeHoy.MAR_SALIDA);
 
   const cargarDatos = useCallback(
     async (nuevoOffset: number = 0) => {
@@ -181,9 +238,9 @@ function MarcajeCRUD() {
         } else {
           setDatos((prev) => [...prev, ...res]);
         }
-      } catch (err: any) {
+      } catch (err: unknown) {
         setError(
-          err.response?.data?.message || 'Error al obtener datos del servidor.'
+          getErrorMessage(err, 'Error al obtener datos del servidor.')
         );
       } finally {
         setCargandoMas(false);
@@ -200,13 +257,15 @@ function MarcajeCRUD() {
     _event: SyntheticEvent,
     empleado: Empleado | null
   ) => {
+    if (esRolEmpleado) return;
+
     setEmpleadoSeleccionado(empleado);
     setDatos([]);
     setOffset(0);
     setError('');
   };
 
-  const handleRegistrar = async () => {
+  const handleRegistrar = async (tipo: 'entrada' | 'salida') => {
     if (!empleadoSeleccionado) {
       setError('Selecciona un empleado antes de registrar el marcaje.');
       return;
@@ -216,14 +275,14 @@ function MarcajeCRUD() {
     setCargandoMas(true);
 
     try {
-      const res = await registrarMarcaje(empleadoSeleccionado.EMP_ID);
+      const res = await registrarMarcaje(empleadoSeleccionado.EMP_ID, tipo);
 
       alert(res.message);
 
       setOffset(0);
       await cargarDatos(0);
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Error en el servidor.');
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, 'Error en el servidor.'));
     } finally {
       setCargandoMas(false);
     }
@@ -237,9 +296,9 @@ function MarcajeCRUD() {
 
       setOffset(0);
       await cargarDatos(0);
-    } catch (err: any) {
+    } catch (err: unknown) {
       alert(
-        err.response?.data?.message || 'Error al actualizar la autorización.'
+        getErrorMessage(err, 'Error al actualizar la autorizacion.')
       );
     }
   };
@@ -293,6 +352,7 @@ function MarcajeCRUD() {
               options={empleados}
               value={empleadoSeleccionado}
               loading={cargandoEmpleados}
+              disabled={esRolEmpleado}
               onChange={handleSeleccionarEmpleado}
               getOptionLabel={(empleado) =>
                 `${empleado.EMP_ID} - ${empleado.EMP_NOMBRE} ${empleado.EMP_APELLIDO}`
@@ -328,19 +388,45 @@ function MarcajeCRUD() {
           <Button
             variant="contained"
             size="large"
+            color="success"
             startIcon={
               cargandoMas ? (
                 <CircularProgress size={20} color="inherit" />
               ) : (
-                <AddIcon />
+                <LoginIcon />
               )
             }
-            onClick={handleRegistrar}
-            disabled={cargandoMas || !empleadoSeleccionado}
+            onClick={() => handleRegistrar('entrada')}
+            disabled={cargandoMas || !puedeMarcarEntrada}
           >
-            Registrar Marcaje
+            Marcar entrada
+          </Button>
+
+          <Button
+            variant="contained"
+            size="large"
+            color="primary"
+            startIcon={
+              cargandoMas ? (
+                <CircularProgress size={20} color="inherit" />
+              ) : (
+                <LogoutIcon />
+              )
+            }
+            onClick={() => handleRegistrar('salida')}
+            disabled={cargandoMas || !puedeMarcarSalida}
+          >
+            Marcar salida
           </Button>
         </Box>
+
+        {marcajeHoy && (
+          <Alert severity={jornadaCompleta ? 'success' : 'info'} sx={{ mt: 2 }}>
+            {jornadaCompleta
+              ? 'Jornada de hoy completada. Podras marcar nuevamente manana.'
+              : 'Entrada registrada. Ahora puedes marcar tu salida.'}
+          </Alert>
+        )}
 
         {error && (
           <Alert severity="error" sx={{ mt: 2 }}>
@@ -408,6 +494,10 @@ function MarcajeCRUD() {
                       {!diferencia.positiva ? (
                         <Typography color="text.secondary">
                           No aplica
+                        </Typography>
+                      ) : esRolEmpleado ? (
+                        <Typography color="text.secondary">
+                          Pendiente RRHH
                         </Typography>
                       ) : reg.MAR_AUTORIZACION === 1 ? (
                         <Typography color="success.main">SÍ</Typography>

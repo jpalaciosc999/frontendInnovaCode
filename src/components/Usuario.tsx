@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { Usuario, UsuarioForm } from '../interfaces/usuario';
 import type { Rol } from '../interfaces/roles';
 import type { Empleado } from '../interfaces/empleados';
@@ -6,7 +6,8 @@ import {
   obtenerUsuarios,
   crearUsuario,
   actualizarUsuario,
-  eliminarUsuario
+  eliminarUsuario,
+  eliminarUsuarioPermanente
 } from '../services/usuario.service';
 import { obtenerEmpleados } from '../services/empleados.service';
 import { obtenerAdminCatalogo } from '../services/admin.service';
@@ -41,6 +42,7 @@ import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import ManageAccountsIcon from '@mui/icons-material/ManageAccounts';
 import { useAuth } from '../context/AuthContext';
+import { getApiErrorMessage } from '../api/errors';
 
 const initialForm: UsuarioForm = {
   username: '',
@@ -207,7 +209,7 @@ const generarCredenciales = (
 };
 
 function UsuarioCRUD() {
-  const { user } = useAuth();
+  const { refreshSession, user } = useAuth();
   const [datos, setDatos] = useState<Usuario[]>([]);
   const [roles, setRoles] = useState<Rol[]>([]);
   const [empleados, setEmpleados] = useState<Empleado[]>([]);
@@ -235,8 +237,8 @@ function UsuarioCRUD() {
       setDatos(usuariosFuente);
       setRoles(catalogo.roles);
       setEmpleados(empleadosData);
-    } catch (err: any) {
-      setError('Error cargando usuarios, roles o empleados: ' + err.message);
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'Error cargando usuarios, roles o empleados'));
     } finally {
       setCargando(false);
     }
@@ -281,7 +283,7 @@ function UsuarioCRUD() {
     const targetLevel = getRolNivel(rolId);
     if (currentRoleLevel === undefined || targetLevel === undefined) return false;
 
-    return targetLevel < currentRoleLevel;
+    return targetLevel > currentRoleLevel;
   };
 
   const esUsuarioSesion = (usuarioId?: number | null) =>
@@ -449,8 +451,8 @@ function UsuarioCRUD() {
 
       limpiarFormulario();
       await cargarDatos();
-    } catch (err: any) {
-      setError('Error guardando usuario: ' + (err.response?.data?.error || err.message));
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'Error guardando usuario'));
     }
   };
 
@@ -500,8 +502,8 @@ function UsuarioCRUD() {
       if (id === idEliminar) limpiarFormulario();
 
       await cargarDatos();
-    } catch (err: any) {
-      setError('Error eliminando usuario: ' + (err.response?.data?.error || err.message));
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'Error eliminando usuario'));
     }
   };
 
@@ -511,15 +513,50 @@ function UsuarioCRUD() {
     return <Chip label={estado || 'Sin estado'} size="small" />;
   };
 
-  const obtenerNombreRol = (rolId?: number) =>
-    roles.find((rol) => getRolId(rol) === rolId)
-      ? getRolNombre(roles.find((rol) => getRolId(rol) === rolId)!)
-      : 'Sin rol';
+  const handleEliminarPermanente = async (idEliminar: number) => {
+    if (esUsuarioSesion(idEliminar)) {
+      setError('No puedes eliminar el usuario con el que tienes la sesión abierta');
+      return;
+    }
 
-  const obtenerNombreEmpleadoPorId = (empId?: number) =>
-    empleados.find((empleado) => empleado.EMP_ID === empId)
-      ? obtenerNombreEmpleado(empleados.find((empleado) => empleado.EMP_ID === empId)!)
-      : 'Sin empleado';
+    const usuarioEliminar = datos.find((usuario) => getUsuarioId(usuario) === idEliminar);
+    if (usuarioEliminar && !puedeGestionarRolId(getUsuarioRolId(usuarioEliminar))) {
+      setError('No puedes eliminar usuarios con roles de nivel igual o superior al tuyo');
+      return;
+    }
+
+    if (!window.confirm('¿Deseas eliminar definitivamente este usuario? Esta acción no se puede deshacer.')) return;
+
+    try {
+      setError('');
+      setMensaje('');
+      await eliminarUsuarioPermanente(idEliminar);
+      await refreshSession();
+      setMensaje('Usuario eliminado definitivamente');
+
+      if (id === idEliminar) limpiarFormulario();
+
+      await cargarDatos();
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'Error eliminando definitivamente usuario'));
+    }
+  };
+
+  const obtenerNombreRol = useCallback(
+    (rolId?: number) => {
+      const rol = roles.find((item) => getRolId(item) === rolId);
+      return rol ? getRolNombre(rol) : 'Sin rol';
+    },
+    [roles]
+  );
+
+  const obtenerNombreEmpleadoPorId = useCallback(
+    (empId?: number) => {
+      const empleado = empleados.find((item) => item.EMP_ID === empId);
+      return empleado ? obtenerNombreEmpleado(empleado) : 'Sin empleado';
+    },
+    [empleados]
+  );
 
   const empleadoAsignadoAOtroUsuario = (empId: number) =>
     datos.some((usuario) => getUsuarioEmpId(usuario) === empId && getUsuarioId(usuario) !== id);
@@ -538,7 +575,7 @@ function UsuarioCRUD() {
       if (texto && !contenido.includes(texto)) return false;
       return true;
     });
-  }, [busqueda, datos, empleados, filtroEstado, filtroRol, roles]);
+  }, [busqueda, datos, filtroEstado, filtroRol, obtenerNombreEmpleadoPorId, obtenerNombreRol]);
 
   const resumenUsuarios = useMemo(() => ({
     activos: datos.filter((usuario) => getUsuarioEstado(usuario) === 'A').length,
@@ -838,6 +875,16 @@ function UsuarioCRUD() {
                           onClick={() => usuarioId !== undefined && handleEliminar(usuarioId)}
                         >
                           Inactivar
+                        </Button>
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          color="error"
+                          startIcon={<DeleteIcon />}
+                          disabled={usuarioId === undefined || esSesion || rolProtegido}
+                          onClick={() => usuarioId !== undefined && handleEliminarPermanente(usuarioId)}
+                        >
+                          Eliminar
                         </Button>
                       </Box>
                     </TableCell>

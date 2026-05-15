@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { SelectChangeEvent } from '@mui/material/Select';
 import type { RolPermiso, RolPermisoForm } from '../interfaces/rolPermisos';
 import type { Rol } from '../interfaces/roles';
@@ -41,6 +41,7 @@ import AutoFixHighIcon from '@mui/icons-material/AutoFixHigh';
 import { normalizeRole } from '../config/roleViews';
 import { suggestedPermissionNamesByRole } from '../config/permissionSuggestions';
 import { useAuth } from '../context/AuthContext';
+import { getApiErrorMessage } from '../api/errors';
 
 const initialForm: RolPermisoForm = {
   per_id: '',
@@ -70,7 +71,7 @@ const toFiniteNumber = (value: unknown) => {
 };
 
 function RolPermisosView() {
-  const { user } = useAuth();
+  const { refreshSession, user } = useAuth();
   const [datos, setDatos] = useState<RolPermiso[]>([]);
   const [roles, setRoles] = useState<Rol[]>([]);
   const [permisos, setPermisos] = useState<Permiso[]>([]);
@@ -92,8 +93,8 @@ function RolPermisosView() {
       setDatos(catalogo.rolPermisos);
       setRoles(catalogo.roles);
       setPermisos(catalogo.permisos);
-    } catch (err: any) {
-      setError('Error cargando roles, permisos o relaciones: ' + err.message);
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'Error cargando roles, permisos o relaciones'));
     } finally {
       setCargando(false);
     }
@@ -135,7 +136,7 @@ function RolPermisosView() {
     const targetLevel = toFiniteNumber(rol?.ROL_NIVEL_ACCESO);
     if (currentRoleLevel === undefined || targetLevel === undefined) return false;
 
-    return targetLevel < currentRoleLevel;
+    return targetLevel > currentRoleLevel;
   };
 
   const permisoYaAsignado = (rolId: string, permisoId: string) =>
@@ -186,16 +187,18 @@ function RolPermisosView() {
 
       if (modoEdicion && rpeId !== null) {
         await actualizarRolPermiso(rpeId, form);
-        setMensaje('Relación actualizada correctamente. Cierra sesión y vuelve a entrar para refrescar el menú.');
+        await refreshSession();
+        setMensaje('Relación actualizada correctamente. Menú y permisos refrescados.');
       } else {
         await crearRolPermiso(form);
-        setMensaje('Permiso asignado correctamente. Cierra sesión y vuelve a entrar para refrescar el menú.');
+        await refreshSession();
+        setMensaje('Permiso asignado correctamente. Menú y permisos refrescados.');
       }
 
       limpiarFormulario();
       await cargarDatos();
-    } catch (err: any) {
-      setError('Error guardando: ' + (err.response?.data?.error || err.message));
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'Error guardando'));
     }
   };
 
@@ -245,11 +248,12 @@ function RolPermisosView() {
         )
       );
 
-      setMensaje(`Permisos sugeridos asignados: ${faltantes.length}. Cierra sesión y vuelve a entrar para refrescar el menú.`);
+      await refreshSession();
+      setMensaje(`Permisos sugeridos asignados: ${faltantes.length}. Menú y permisos refrescados.`);
       limpiarFormulario();
       await cargarDatos();
-    } catch (err: any) {
-      setError('Error asignando permisos sugeridos: ' + (err.response?.data?.error || err.message));
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'Error asignando permisos sugeridos'));
     }
   };
 
@@ -282,18 +286,23 @@ function RolPermisosView() {
       setError('');
       setMensaje('');
       await eliminarRolPermiso(id);
-      setMensaje('Relación eliminada correctamente. Cierra sesión y vuelve a entrar para refrescar el menú.');
+      await refreshSession();
+      setMensaje('Relación eliminada correctamente. Menú y permisos refrescados.');
       await cargarDatos();
-    } catch (err: any) {
-      setError('Error eliminando: ' + (err.response?.data?.error || err.message));
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'Error eliminando'));
     }
   };
 
-  const obtenerNombreRol = (rolId: number | string) =>
-    rolesPorId.get(String(rolId))?.ROL_NOMBRE ?? `Rol #${rolId}`;
+  const obtenerNombreRol = useCallback(
+    (rolId: number | string) => rolesPorId.get(String(rolId))?.ROL_NOMBRE ?? `Rol #${rolId}`,
+    [rolesPorId]
+  );
 
-  const obtenerPermiso = (permisoId: number | string) =>
-    permisosPorId.get(String(permisoId));
+  const obtenerPermiso = useCallback(
+    (permisoId: number | string) => permisosPorId.get(String(permisoId)),
+    [permisosPorId]
+  );
 
   const relacionesFiltradas = useMemo(() => {
     const texto = normalizar(busqueda);
@@ -307,7 +316,7 @@ function RolPermisosView() {
       if (texto && !contenido.includes(texto)) return false;
       return true;
     });
-  }, [busqueda, datos, filtroModulo, filtroRol, permisosPorId, rolesPorId]);
+  }, [busqueda, datos, filtroModulo, filtroRol, obtenerNombreRol, obtenerPermiso]);
 
   const modulos = useMemo(
     () => Array.from(new Set(permisos.map((permiso) => permiso.PER_MODULO).filter(Boolean))).sort(),

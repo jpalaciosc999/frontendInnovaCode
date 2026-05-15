@@ -24,3 +24,7 @@ export const actualizarEmpleado = async (id: number, data: EmpleadoForm): Promis
 export const eliminarEmpleado = async (id: number): Promise<void> => {
   await api.delete(`${ENDPOINT}/${id}`);
 };
+
+export const eliminarEmpleadoPermanente = async (id: number): Promise<void> => {
+  await api.delete(`${ENDPOINT}/${id}/permanente`);
+};

@@ -17,8 +17,8 @@ export const obtenerHistorial = async (empId: number, offset: number = 0): Promi
 /**
  * Registro unificado: Entrada o Salida automática (Punto 3 del PDF)
  */
-export const registrarMarcaje = async (empId: number) => {
-  const response = await axios.post(`${API_URL}/registrar`, { emp_id: empId });
+export const registrarMarcaje = async (empId: number, tipo: 'entrada' | 'salida' = 'entrada') => {
+  const response = await axios.post(`${API_URL}/registrar`, { emp_id: empId, tipo });
   return response.data;
 };
 

@@ -43,6 +43,12 @@ export const suggestedPermissions: SuggestedPermission[] = [
   { nombre: 'VER_REPORTES_GERENCIALES', modulo: 'REPORTES', descripcion: 'Permite consultar reportes gerenciales.' },
 ];
 
+const auditPermissionNames = new Set(['VER_BITACORA', 'VER_USUARIO_BITACORA']);
+
+const nonAuditPermissionNames = suggestedPermissions
+  .map((permiso) => permiso.nombre)
+  .filter((nombre) => !auditPermissionNames.has(nombre));
+
 export const suggestedPermissionNamesByRole: Record<AppRole, string[]> = {
   EMPLEADO: ['VER_MARCAJE'],
   RRHH: [
@@ -68,6 +74,7 @@ export const suggestedPermissionNamesByRole: Record<AppRole, string[]> = {
     'VER_BITACORA',
     'VER_USUARIO_BITACORA',
   ],
+  ADMIN_NOMINA: nonAuditPermissionNames,
   CONTABILIDAD: [
     'GESTIONAR_NOMINA',
     'VER_NOMINA_DETALLE',

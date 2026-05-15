@@ -4,12 +4,14 @@ import type { Horario } from '../interfaces/horario';
 import type { Puesto } from '../interfaces/puestos';
 import type { Sede } from '../interfaces/sede';
 import type { TipoContrato } from '../interfaces/tipoContrato';
+import type { Departamento } from '../interfaces/departamentos';
 
 import {
   obtenerEmpleados,
   crearEmpleado,
   actualizarEmpleado,
-  eliminarEmpleado
+  eliminarEmpleado,
+  eliminarEmpleadoPermanente
 } from '../services/empleados.service';
 
 import { obtenerHorarios } from '../services/horario.service';
@@ -52,6 +54,7 @@ import SaveIcon from '@mui/icons-material/Save';
 import CleaningServicesIcon from '@mui/icons-material/CleaningServices';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
+import BlockIcon from '@mui/icons-material/Block';
 import PeopleIcon from '@mui/icons-material/People';
 import SearchIcon from '@mui/icons-material/Search';
 import CloseIcon from '@mui/icons-material/Close';
@@ -97,6 +100,28 @@ const initialFilters = {
   sedId: '',
   pueId: '',
   ticId: ''
+};
+
+type ApiError = {
+  response?: {
+    data?: {
+      error?: string;
+      message?: string;
+    };
+  };
+  message?: string;
+};
+
+const getErrorMessage = (err: unknown) => {
+  if (typeof err === 'object' && err !== null) {
+    const apiError = err as ApiError;
+    return apiError.response?.data?.error
+      || apiError.response?.data?.message
+      || apiError.message
+      || 'Error desconocido';
+  }
+
+  return String(err);
 };
 
 const EMPLOYEE_TABLE_LIMIT = 75;
@@ -179,12 +204,18 @@ function PruebaAxios() {
   const [filters, setFilters] = useState(initialFilters);
   const [perfilEmpleado, setPerfilEmpleado] = useState<Empleado | null>(null);
   const modalDepartamentos = false;
-  const setModalDepartamentos = (_open: boolean) => {};
+  const setModalDepartamentos = (open: boolean) => {
+    void open;
+  };
   const filtroDep = '';
-  const setFiltroDep = (_value: string) => {};
+  const setFiltroDep = (value: string) => {
+    void value;
+  };
   const cargandoDeps = false;
-  const departamentosFiltrados: any[] = [];
-  const seleccionarDepartamento = (_dep: any) => {};
+  const departamentosFiltrados: Departamento[] = [];
+  const seleccionarDepartamento = (dep: Departamento) => {
+    void dep;
+  };
 
   const cargarEmpleados = async () => {
     try {
@@ -192,8 +223,8 @@ function PruebaAxios() {
       setError('');
       const data = await obtenerEmpleados();
       setDatos(data);
-    } catch (err: any) {
-      setError('Error cargando empleados: ' + (err.response?.data?.error || err.message));
+    } catch (err: unknown) {
+      setError('Error cargando empleados: ' + getErrorMessage(err));
     } finally {
       setCargando(false);
     }
@@ -204,8 +235,8 @@ function PruebaAxios() {
       setCargandoHorarios(true);
       const data = await obtenerHorarios();
       setHorarios(data);
-    } catch (err: any) {
-      setError('Error cargando horarios: ' + (err.response?.data?.error || err.message));
+    } catch (err: unknown) {
+      setError('Error cargando horarios: ' + getErrorMessage(err));
     } finally {
       setCargandoHorarios(false);
     }
@@ -216,8 +247,8 @@ function PruebaAxios() {
       setCargandoPuestos(true);
       const data = await obtenerPuestos();
       setPuestos(data);
-    } catch (err: any) {
-      setError('Error cargando puestos: ' + (err.response?.data?.error || err.message));
+    } catch (err: unknown) {
+      setError('Error cargando puestos: ' + getErrorMessage(err));
     } finally {
       setCargandoPuestos(false);
     }
@@ -228,8 +259,8 @@ function PruebaAxios() {
       setCargandoSedes(true);
       const data = await obtenerSedes();
       setSedes(data);
-    } catch (err: any) {
-      setError('Error cargando sedes: ' + (err.response?.data?.error || err.message));
+    } catch (err: unknown) {
+      setError('Error cargando sedes: ' + getErrorMessage(err));
     } finally {
       setCargandoSedes(false);
     }
@@ -240,8 +271,8 @@ function PruebaAxios() {
       setCargandoTiposContrato(true);
       const data = await obtenerTiposContrato();
       setTiposContrato(data);
-    } catch (err: any) {
-      setError('Error cargando tipos de contrato: ' + (err.response?.data?.error || err.message));
+    } catch (err: unknown) {
+      setError('Error cargando tipos de contrato: ' + getErrorMessage(err));
     } finally {
       setCargandoTiposContrato(false);
     }
@@ -465,10 +496,16 @@ function PruebaAxios() {
 
       if (!validarFormulario()) return;
 
-      const payload: EmpleadoForm = {
-        ...form,
-        emp_fecha_inicio_contrato: form.emp_fecha_inicio_contrato || form.emp_fecha_contratacion
-      };
+      const payload: EmpleadoForm = { ...form };
+
+      if (modoEdicion && !contratoCambioPendiente) {
+        delete payload.emp_fecha_inicio_contrato;
+        delete payload.emp_fecha_fin_contrato;
+        delete payload.emp_motivo_cambio_contrato;
+      } else {
+        payload.emp_fecha_inicio_contrato = form.emp_fecha_inicio_contrato || form.emp_fecha_contratacion;
+        payload.emp_fecha_fin_contrato = esContratoIndefinido(form.tic_id) ? '' : form.emp_fecha_fin_contrato;
+      }
 
       if (modoEdicion && empleadoId !== null) {
         await actualizarEmpleado(empleadoId, payload);
@@ -480,25 +517,42 @@ function PruebaAxios() {
 
       limpiarFormulario();
       await cargarEmpleados();
-    } catch (err: any) {
-      setError('Error guardando empleado: ' + (err.response?.data?.error || err.message));
+    } catch (err: unknown) {
+      setError('Error guardando empleado: ' + getErrorMessage(err));
     }
   };
 
-  const handleEliminar = async (id: number) => {
-    if (!window.confirm('¿Deseas eliminar este empleado?')) return;
+  const handleInactivar = async (id: number) => {
+    if (!window.confirm('Deseas inactivar este empleado? Se conservara su historial.')) return;
 
     try {
       setError('');
       setMensaje('');
       await eliminarEmpleado(id);
-      setMensaje('Empleado eliminado correctamente');
+      setMensaje('Empleado inactivado correctamente');
 
       if (empleadoId === id) limpiarFormulario();
 
       await cargarEmpleados();
-    } catch (err: any) {
-      setError('Error eliminando empleado: ' + (err.response?.data?.error || err.message));
+    } catch (err: unknown) {
+      setError('Error inactivando empleado: ' + getErrorMessage(err));
+    }
+  };
+
+  const handleEliminarPermanente = async (id: number) => {
+    if (!window.confirm('Deseas eliminar definitivamente este empleado? Solo se podra borrar si no tiene registros relacionados.')) return;
+
+    try {
+      setError('');
+      setMensaje('');
+      await eliminarEmpleadoPermanente(id);
+      setMensaje('Empleado eliminado definitivamente');
+
+      if (empleadoId === id) limpiarFormulario();
+
+      await cargarEmpleados();
+    } catch (err: unknown) {
+      setError('Error eliminando empleado: ' + getErrorMessage(err));
     }
   };
 
@@ -968,14 +1022,15 @@ function PruebaAxios() {
           <Grid size={{ xs: 12, md: 6 }}>
             <TextField
               fullWidth
-              label="Sueldo"
+              label="Sueldo base del puesto"
               name="emp_sueldo"
               type="number"
               value={form.emp_sueldo}
               onChange={handleChange}
-              helperText="Se llena con el sueldo base del puesto, pero puedes modificarlo para este empleado"
+              helperText="Se toma de Puestos. Para cambiarlo, edita el salario base del puesto o asigna otro puesto."
               slotProps={{
                 input: {
+                  readOnly: true,
                   startAdornment: <InputAdornment position="start">Q</InputAdornment>,
                   inputProps: { min: 0, step: '0.01' }
                 }
@@ -1196,9 +1251,20 @@ function PruebaAxios() {
                         <Button
                           size="small"
                           variant="contained"
+                          color="warning"
+                          startIcon={<BlockIcon />}
+                          onClick={() => handleInactivar(empleado.EMP_ID)}
+                          disabled={empleado.EMP_ESTADO === 'I'}
+                        >
+                          Inactivar
+                        </Button>
+
+                        <Button
+                          size="small"
+                          variant="outlined"
                           color="error"
                           startIcon={<DeleteIcon />}
-                          onClick={() => handleEliminar(empleado.EMP_ID)}
+                          onClick={() => handleEliminarPermanente(empleado.EMP_ID)}
                         >
                           Eliminar
                         </Button>
@@ -1492,6 +1558,12 @@ function PruebaAxios() {
                   {perfilEmpleado.TIC_ID && esContratoIndefinido(perfilEmpleado.TIC_ID)
                     ? 'Indefinido'
                     : formatearFechaSimple(perfilEmpleado.EMP_FECHA_FIN_CONTRATO)}
+                </Typography>
+              </Grid>
+              <Grid size={{ xs: 12 }}>
+                <Typography variant="caption" color="text.secondary">Motivo del ultimo cambio de contrato</Typography>
+                <Typography>
+                  {perfilEmpleado.EMP_MOTIVO_CAMBIO_CONTRATO || 'Sin cambios registrados'}
                 </Typography>
               </Grid>
             </Grid>

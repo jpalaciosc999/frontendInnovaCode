@@ -13,6 +13,8 @@ export type AuthUserWithPermissions = {
   permisos?: unknown[];
 };
 
+const AUDIT_PATHS = new Set(['/bitacora', '/usuario-bitacora']);
+
 export function normalizePermiso(value = '') {
   return String(value)
     .trim()
@@ -27,6 +29,27 @@ const normalizeCompact = (value: unknown) =>
   normalizePermiso(String(value ?? '')).replace(/[^a-z0-9]+/g, '');
 
 export const toAccessKey = normalizeCompact;
+
+export function isNominaAdminUser(usuario: AuthUserWithPermissions | null | undefined) {
+  const role = normalizeCompact(
+    usuario?.rol_nombre ?? usuario?.ROL_NOMBRE ?? usuario?.rol ?? usuario?.role ?? ''
+  );
+
+  return [
+    'adminnomina',
+    'nominaadmin',
+    'administradornomina',
+    'administradordenomina',
+  ].includes(role);
+}
+
+export function isEmpleadoUser(usuario: AuthUserWithPermissions | null | undefined) {
+  const role = normalizeCompact(
+    usuario?.rol_nombre ?? usuario?.ROL_NOMBRE ?? usuario?.rol ?? usuario?.role ?? ''
+  );
+
+  return role === 'empleado';
+}
 
 export const permisosVista = {
   admin: [
@@ -49,7 +72,10 @@ export const permisosVista = {
   ],
   contratos: [{ modulo: 'CONTRATOS', permiso: 'Gestionar contratos' }],
   horarios: [{ modulo: 'ASISTENCIA', permiso: 'Gestionar horarios' }],
-  marcajes: [{ modulo: 'ASISTENCIA', permiso: 'Validar marcajes' }],
+  marcajes: [
+    { modulo: 'ASISTENCIA', permiso: 'Validar marcajes' },
+    { modulo: 'MARCAJE', permiso: 'Ver marcaje' },
+  ],
   suspensionesIgss: [{ modulo: 'ASISTENCIA', permiso: 'Gestionar suspensiones IGSS' }],
   nominas: [
     { modulo: 'NOMINA', permiso: 'Generar nomina' },
@@ -171,6 +197,7 @@ export function puedeVerVista(
   vista: keyof typeof permisosVista
 ) {
   if (isFullAccessUser(usuario)) return true;
+  if (isNominaAdminUser(usuario)) return vista !== 'bitacora' && vista !== 'usuarioBitacora';
   return permisosVista[vista].some(({ modulo, permiso }) => tienePermiso(usuario, modulo, permiso));
 }
 
@@ -180,6 +207,10 @@ export function getVistaForPath(path: string) {
 
 export function canAccessPath(usuario: AuthUserWithPermissions | null | undefined, path: string) {
   if (path === '/') return true;
+  if (path === '/marcajes' && isEmpleadoUser(usuario)) return true;
+  if (isNominaAdminUser(usuario)) {
+    return !AUDIT_PATHS.has(path) && Boolean(getVistaForPath(path));
+  }
   const vista = getVistaForPath(path);
   if (!vista) return false;
   return puedeVerVista(usuario, vista);
@@ -187,6 +218,7 @@ export function canAccessPath(usuario: AuthUserWithPermissions | null | undefine
 
 export function getTokenPermissionKeys(authUser: AuthUserWithPermissions | null | undefined) {
   if (isFullAccessUser(authUser)) return [ALL_PERMISSIONS];
+  if (isNominaAdminUser(authUser)) return ['adminnomina'];
 
   return (authUser?.permisos ?? [])
     .flatMap((permission) => {

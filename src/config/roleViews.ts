@@ -1,4 +1,4 @@
-export type AppRole = 'EMPLEADO' | 'RRHH' | 'ADMIN' | 'CONTABILIDAD' | 'GERENTE' | 'SUPREMO';
+export type AppRole = 'EMPLEADO' | 'RRHH' | 'ADMIN' | 'ADMIN_NOMINA' | 'CONTABILIDAD' | 'GERENTE' | 'SUPREMO';
 
 export type AppView = {
   key: string;
@@ -12,6 +12,7 @@ export const roleLabels: Record<AppRole, string> = {
   EMPLEADO: 'Empleado',
   RRHH: 'RRHH',
   ADMIN: 'Admin',
+  ADMIN_NOMINA: 'Admin Nomina',
   CONTABILIDAD: 'Contabilidad',
   GERENTE: 'Gerente',
   SUPREMO: 'Supremo',
@@ -21,6 +22,7 @@ export const roleOrder: AppRole[] = [
   'EMPLEADO',
   'RRHH',
   'ADMIN',
+  'ADMIN_NOMINA',
   'CONTABILIDAD',
   'GERENTE',
   'SUPREMO',
@@ -86,6 +88,12 @@ export function normalizeRole(value: unknown): AppRole | null {
   if (normalized === 'EMPLEADO') return 'EMPLEADO';
   if (normalized === 'RRHH' || normalized === 'RH' || normalized === 'RECURSOSHUMANOS') return 'RRHH';
   if (normalized === 'ADMIN' || normalized === 'ADMINISTRADOR') return 'ADMIN';
+  if (
+    normalized === 'ADMINNOMINA' ||
+    normalized === 'NOMINAADMIN' ||
+    normalized === 'ADMINISTRADORNOMINA' ||
+    normalized === 'ADMINISTRADORDENOMINA'
+  ) return 'ADMIN_NOMINA';
   if (normalized === 'CONTABILIDAD' || normalized === 'CONTADOR') return 'CONTABILIDAD';
   if (normalized === 'GERENTE' || normalized === 'MANAGER') return 'GERENTE';
   if (normalized === 'SUPREMO' || normalized === 'SUPERADMIN' || normalized === 'ROOT') return 'SUPREMO';
@@ -176,6 +184,7 @@ export function canAccessPath(path: string, role: AppRole | null): boolean {
   if (path === '/') return true;
   if (!role) return true;
   if (role === 'SUPREMO') return true;
+  if (role === 'ADMIN_NOMINA') return !['/bitacora', '/usuario-bitacora'].includes(path);
 
   const view = allViews.find((item) => item.path === path);
   return Boolean(view?.roles.includes(role));
