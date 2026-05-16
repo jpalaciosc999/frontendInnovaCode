@@ -48,17 +48,16 @@ import ExpandLess from '@mui/icons-material/ExpandLess';
 import ExpandMore from '@mui/icons-material/ExpandMore';
 import SummarizeIcon from '@mui/icons-material/Summarize';
 import ApprovalIcon from '@mui/icons-material/Approval';
-import HealthAndSafetyIcon from '@mui/icons-material/HealthAndSafety';
-import GavelIcon from '@mui/icons-material/Gavel';
 import {
   AUTH_USER_CHANGED_EVENT,
   appViews,
   getCurrentUserRole,
+  navSectionLabels,
+  reportViews,
   roleLabels,
   roleOrder,
 } from '../config/roleViews';
 import { useAuth } from '../context/AuthContext';
-  import { reportesPorRol } from '../config/roleViews';
 
 type MenuItemType = {
   text: string;
@@ -106,8 +105,6 @@ const viewIcons: Record<string, ReactNode> = {
   intecap: <PercentIcon />,
   prestamos: <PaymentsIcon />,
   liquidacion: <DescriptionIcon />,
-  'calculadora-igss': <HealthAndSafetyIcon />,
-  'calculadora-isr': <GavelIcon />,
   'reporte-igss': <SummarizeIcon />,
   'reporte-isr': <SummarizeIcon />,
   'reporte-aguinaldo': <SummarizeIcon />,
@@ -126,7 +123,7 @@ const buildMenuSections = (): MenuSectionType[] =>
   roleOrder
     .map((role) => ({
       key: role,
-      text: `Rol ${roleLabels[role]}`,
+      text: navSectionLabels[role],
       icon: <FolderIcon />,
       items: appViews
         .filter((view) => view.roles.includes(role))
@@ -147,7 +144,8 @@ function Navbar() {
     ADMIN: true,
     CONTABILIDAD: true,
     GERENTE: true,
-      REPORTES: true,
+    SUPREMO: true,
+    REPORTES: true,
   });
 
   const location = useLocation();
@@ -171,6 +169,9 @@ function Navbar() {
       items: section.items.filter((item) => canAccessPath(item.path)),
     }))
     .filter((section) => section.items.length > 0);
+  const visibleReportes = reportViews
+    .filter((reporte) => canAccessPath(reporte.path))
+    .map(({ text, path, key }) => ({ text, path, key }));
 
   const toggleDrawer = (state: boolean) => () => {
     setOpen(state);
@@ -294,7 +295,7 @@ function Navbar() {
 
             <Divider sx={{ my: 0.5 }} />
 
-            {currentRole && reportesPorRol[currentRole]?.length > 0 && (
+            {visibleReportes.length > 0 && (
               <Box>
                 <ListItemButton
                   onClick={() => toggleSection('REPORTES')}
@@ -304,12 +305,12 @@ function Navbar() {
                   <ListItemIcon sx={{ color: 'inherit', minWidth: 40 }}>
                     <SummarizeIcon />
                   </ListItemIcon>
-                  <ListItemText primary="REPORTES" />
+                  <ListItemText primary="Reportes" />
                   {openSections['REPORTES'] ? <ExpandLess /> : <ExpandMore />}
                 </ListItemButton>
                 <Collapse in={openSections['REPORTES']} timeout="auto" unmountOnExit>
                   <List component="div" disablePadding>
-                    {reportesPorRol[currentRole]?.map((reporte) => {
+                    {visibleReportes.map((reporte) => {
                       const isActive = location.pathname === reporte.path;
                       return (
                         <ListItemButton

@@ -103,9 +103,6 @@ const pathToVista: Record<string, keyof typeof permisosVista> = {
   '/nomina-asignaciones': 'nominas',
   '/nomina': 'nominas',
   '/nomina-detalle': 'nominas',
-  '/calculadora-igss': 'nominas',
-  '/calculadora-isr': 'nominas',
-  '/generar-csv': 'nominas',
   '/reporte-igss': 'nominas',
   '/reporte-isr': 'nominas',
   '/reporte-aguinaldo': 'nominas',
@@ -123,6 +120,19 @@ const pathToVista: Record<string, keyof typeof permisosVista> = {
   '/aprobacion-nomina': 'nominas',
 };
 
+const reportPaths = new Set([
+  '/reporte-marcajes',
+  '/reporte-igss',
+  '/reporte-isr',
+  '/reporte-aguinaldo',
+  '/reporte-vacaciones',
+  '/reporte-descuentos',
+  '/reporte-liquidacion',
+  '/reporte-kpi',
+  '/reporte-horas-extra',
+  '/dashboard-ejecutivo',
+]);
+
 const getValue = (record: Record<string, unknown>, keys: string[]) => {
   for (const key of keys) {
     const value = record[key];
@@ -136,6 +146,13 @@ export function isFullAccessUser(usuario: AuthUserWithPermissions | null | undef
     String(usuario?.rol_nombre ?? usuario?.ROL_NOMBRE ?? usuario?.rol ?? usuario?.role ?? '')
   );
   return ['supremo', 'superadmin', 'root'].includes(role);
+}
+
+function isAdminUser(usuario: AuthUserWithPermissions | null | undefined) {
+  const role = normalizePermiso(
+    String(usuario?.rol_nombre ?? usuario?.ROL_NOMBRE ?? usuario?.rol ?? usuario?.role ?? '')
+  );
+  return ['admin', 'administrador'].includes(role);
 }
 
 export function tienePermiso(
@@ -190,6 +207,7 @@ export function getVistaForPath(path: string) {
 
 export function canAccessPath(usuario: AuthUserWithPermissions | null | undefined, path: string) {
   if (path === '/') return true;
+  if (isAdminUser(usuario) && reportPaths.has(path)) return true;
   const vista = getVistaForPath(path);
   if (!vista) return false;
   return puedeVerVista(usuario, vista);

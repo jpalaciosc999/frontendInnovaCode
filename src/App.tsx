@@ -107,13 +107,9 @@ function Layout() {
           <Route path="/usuario-bitacora" element={guarded('/usuario-bitacora', <UsuarioBitacora />)} />
           <Route path="/horarios" element={guarded('/horarios', <HorarioCRUD />)} />
           <Route path="/suspensiones-igss" element={guarded('/suspensiones-igss', <SuspensionIgss />)} />
-          <Route path="/calculadora-igss" element={<Navigate to="/nomina" replace />} />
-          <Route path="/calculadora-isr" element={<Navigate to="/nomina" replace />} />
           <Route path="/tipos-descuento" element={<Navigate to="/descuentos" replace />} />
           <Route path="/prestamos-banco" element={<Navigate to="/prestamos" replace />} />
           <Route path="/prestamo-detalle" element={<Navigate to="/prestamos" replace />} />
-          <Route path="/generar-csv" element={<Navigate to="/nomina" replace />} />
-
           <Route path="/resumen-marcaje" element={guarded('/resumen-marcaje', <MarcajePage />)} />
           <Route path="/registro-vacaciones" element={<Navigate to="/control-laboral" replace />} />
           <Route path="/isr" element={<Navigate to="/descuentos" replace />} />
