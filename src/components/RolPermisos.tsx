@@ -122,21 +122,23 @@ function RolPermisosView() {
     [currentUserRolId, roles]
   );
   const currentRoleLevel = toFiniteNumber(currentRole?.ROL_NIVEL_ACCESO);
-  const currentRoleName = normalizar(
-    leerCampo(user, ['rol_nombre', 'ROL_NOMBRE', 'rol', 'role']) ?? currentRole?.ROL_NOMBRE
-  );
-  const currentRoleIsSupremo = ['supremo', 'root', 'superadmin'].includes(currentRoleName);
+const currentRoleApp = normalizeRole(
+  leerCampo(user, ['rol_nombre', 'ROL_NOMBRE', 'rol', 'role']) ?? currentRole?.ROL_NOMBRE
+);
 
-  const puedeGestionarRolId = (rolId: string | number | undefined) => {
-    if (currentRoleIsSupremo) return true;
-    if (rolId === undefined || rolId === '') return false;
+const currentRoleIsAdministradorNomina = currentRoleApp === 'ADMINISTRADOR_NOMINA';
 
-    const rol = rolesPorId.get(String(rolId));
-    const targetLevel = toFiniteNumber(rol?.ROL_NIVEL_ACCESO);
-    if (currentRoleLevel === undefined || targetLevel === undefined) return false;
+const puedeGestionarRolId = (rolId: string | number | undefined) => {
+  if (currentRoleIsAdministradorNomina) return true;
+  if (rolId === undefined || rolId === '') return false;
 
-    return targetLevel < currentRoleLevel;
-  };
+  const rol = rolesPorId.get(String(rolId));
+  const targetLevel = toFiniteNumber(rol?.ROL_NIVEL_ACCESO);
+
+  if (currentRoleLevel === undefined || targetLevel === undefined) return false;
+
+  return targetLevel < currentRoleLevel;
+};
 
   const permisoYaAsignado = (rolId: string, permisoId: string) =>
     datos.some(

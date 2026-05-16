@@ -40,6 +40,7 @@ import CalculadoraISR from './components/CalculadoraIsr';
 import GenerarCSV from './components/Generarcsv';
 import SuspensionIgss from './components/SuspensionIgss';
 import AprobacionNomina from './components/AprobacionNomina';
+import MiTiendita from './components/MiTiendita';
 
 function GuardedRoute({
   path,
@@ -105,6 +106,7 @@ function Layout() {
           <Route path="/tipos-descuento" element={<Navigate to="/descuentos" replace />} />
           <Route path="/prestamos-banco" element={<Navigate to="/prestamos" replace />} />
           <Route path="/generar-csv" element={guarded('/generar-csv', <GenerarCSV />)} />
+          <Route path="/mi-tiendita" element={guarded('/mi-tiendita', <MiTiendita />)} />
 
           <Route path="/resumen-marcaje" element={guarded('/resumen-marcaje', <MarcajePage />)} />
           <Route path="/registro-vacaciones" element={<Navigate to="/control-laboral" replace />} />

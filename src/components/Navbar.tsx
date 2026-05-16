@@ -51,6 +51,7 @@ import ExpandLess from '@mui/icons-material/ExpandLess';
 import ExpandMore from '@mui/icons-material/ExpandMore';
 import SummarizeIcon from '@mui/icons-material/Summarize';
 import ApprovalIcon from '@mui/icons-material/Approval';
+import StorefrontIcon from '@mui/icons-material/Storefront';
 import {
   AUTH_USER_CHANGED_EVENT,
   appViews,
@@ -111,6 +112,7 @@ const viewIcons: Record<string, ReactNode> = {
   'prestamos-banco': <AccountBalanceIcon />,
   'generar-csv': <DescriptionIcon />,
   'aprobacion-nomina': <ApprovalIcon />,
+  'mi-tiendita': <StorefrontIcon />,
 };
 
 const buildMenuSections = (): MenuSectionType[] =>
@@ -134,10 +136,12 @@ function Navbar() {
   const [currentRole, setCurrentRole] = useState(getCurrentUserRole());
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
     EMPLEADO: true,
-    RRHH: true,
-    ADMIN: true,
+    ANALISTA_NOMINA: true,
+    CONSULTA_AUDITORIA: true,
+    GERENTE_RRHH: true,
+    SUPERVISOR_ASISTENCIA: true,
+    ADMINISTRADOR_NOMINA: true,
     CONTABILIDAD: true,
-    GERENTE: true,
   });
 
   const location = useLocation();

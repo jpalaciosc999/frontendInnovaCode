@@ -60,12 +60,20 @@ const MetricCard = ({ title, value, helper, icon, color, to }: MetricCardProps) 
       >
         {icon}
       </Box>
+
       <Box sx={{ minWidth: 0 }}>
-        <Typography variant="body2" color="text.secondary">{title}</Typography>
-        <Typography variant="h4" sx={{ fontWeight: 800, lineHeight: 1.1 }}>{value}</Typography>
-        <Typography variant="caption" color="text.secondary">{helper}</Typography>
+        <Typography variant="body2" color="text.secondary">
+          {title}
+        </Typography>
+        <Typography variant="h4" sx={{ fontWeight: 800, lineHeight: 1.1 }}>
+          {value}
+        </Typography>
+        <Typography variant="caption" color="text.secondary">
+          {helper}
+        </Typography>
       </Box>
     </Stack>
+
     <Button component={RouterLink} to={to} size="small" sx={{ mt: 1.5 }}>
       Revisar
     </Button>
@@ -79,22 +87,28 @@ function Home() {
   const [contratos, setContratos] = useState<EmpleadoContrato[]>([]);
   const [adminResumen, setAdminResumen] = useState<AdminResumen | null>(null);
   const [error, setError] = useState('');
+
   const currentRole = getCurrentUserRole();
+
+  const esAdministradorNomina = currentRole === 'ADMINISTRADOR_NOMINA';
+  const esGerenteRRHH = currentRole === 'GERENTE_RRHH';
+  const esSupervisorAsistencia = currentRole === 'SUPERVISOR_ASISTENCIA';
 
   useEffect(() => {
     const cargarDashboard = async () => {
       setError('');
 
-      if (currentRole === 'ADMIN' || currentRole === 'SUPREMO') {
+      if (esAdministradorNomina) {
         try {
           setAdminResumen(await obtenerAdminResumen());
         } catch {
           setError('No se pudo cargar el resumen administrativo.');
         }
+
         return;
       }
 
-      if (currentRole !== 'RRHH') return;
+      if (!esGerenteRRHH && !esSupervisorAsistencia) return;
 
       const [empleadosRes, controlesRes, cuentasRes, contratosRes] = await Promise.allSettled([
         obtenerEmpleados(),
@@ -114,17 +128,21 @@ function Home() {
     };
 
     cargarDashboard();
-  }, [currentRole]);
+  }, [esAdministradorNomina, esGerenteRRHH, esSupervisorAsistencia]);
 
   const metrics = useMemo(() => {
     const empleadosActivos = empleados.filter((emp) => emp.EMP_ESTADO === 'A').length;
+
     const empleadosSinCuenta = empleados.filter(
       (emp) => !cuentas.some((cuenta) => cuenta.EMP_ID === emp.EMP_ID)
     ).length;
+
     const empleadosSinContrato = empleados.filter(
       (emp) => !contratos.some((contrato) => Number(contrato.TIC_ID) === emp.EMP_ID)
     ).length;
+
     const controlesPendientes = controles.filter((control) => control.CTL_ESTADO === 'P').length;
+
     const vacacionesPendientes = controles.filter(
       (control) => control.CTL_MOTIVO === 'VAC' && control.CTL_ESTADO === 'P'
     ).length;
@@ -141,13 +159,17 @@ function Home() {
   const adminMetrics = useMemo(() => {
     const value = (keys: string[]) => {
       const record = adminResumen ?? {};
+
       for (const key of keys) {
         const found = record[key];
+
         if (typeof found === 'number') return found;
+
         if (typeof found === 'string' && found.trim() !== '' && !Number.isNaN(Number(found))) {
           return Number(found);
         }
       }
+
       return 0;
     };
 
@@ -159,7 +181,7 @@ function Home() {
     };
   }, [adminResumen]);
 
-  if (currentRole === 'ADMIN' || currentRole === 'SUPREMO') {
+  if (esAdministradorNomina) {
     return (
       <Box sx={{ py: 1 }}>
         <Stack
@@ -168,9 +190,14 @@ function Home() {
           sx={{ mb: 3, justifyContent: 'space-between' }}
         >
           <Box>
-            <Typography variant="h4" sx={{ fontWeight: 800 }}>Dashboard Admin</Typography>
-            <Typography color="text.secondary">Resumen de seguridad, catálogo y auditoría del sistema.</Typography>
+            <Typography variant="h4" sx={{ fontWeight: 800 }}>
+              Dashboard Administrador Nómina
+            </Typography>
+            <Typography color="text.secondary">
+              Resumen de seguridad, catálogo, auditoría y administración general del sistema.
+            </Typography>
           </Box>
+
           <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap' }}>
             <Chip color="primary" label={`${adminMetrics.usuarios} usuarios`} />
             <Chip color="info" label={`${adminMetrics.actividad} eventos auditados`} />
@@ -181,27 +208,62 @@ function Home() {
 
         <Grid container spacing={2}>
           <Grid size={{ xs: 12, md: 3 }}>
-            <MetricCard title="Usuarios" value={adminMetrics.usuarios} helper="Cuentas del sistema" icon={<ManageAccountsIcon />} color="#1976d2" to="/usuarios" />
+            <MetricCard
+              title="Usuarios"
+              value={adminMetrics.usuarios}
+              helper="Cuentas del sistema"
+              icon={<ManageAccountsIcon />}
+              color="#1976d2"
+              to="/usuarios"
+            />
           </Grid>
+
           <Grid size={{ xs: 12, md: 3 }}>
-            <MetricCard title="Roles" value={adminMetrics.roles} helper="Perfiles de acceso" icon={<SecurityIcon />} color="#2e7d32" to="/roles" />
+            <MetricCard
+              title="Roles"
+              value={adminMetrics.roles}
+              helper="Perfiles de acceso"
+              icon={<SecurityIcon />}
+              color="#2e7d32"
+              to="/roles"
+            />
           </Grid>
+
           <Grid size={{ xs: 12, md: 3 }}>
-            <MetricCard title="Permisos" value={adminMetrics.permisos} helper="Capacidades configuradas" icon={<BadgeIcon />} color="#ed6c02" to="/permisos" />
+            <MetricCard
+              title="Permisos"
+              value={adminMetrics.permisos}
+              helper="Capacidades configuradas"
+              icon={<BadgeIcon />}
+              color="#ed6c02"
+              to="/permisos"
+            />
           </Grid>
+
           <Grid size={{ xs: 12, md: 3 }}>
-            <MetricCard title="Actividad" value={adminMetrics.actividad} helper="Eventos recientes" icon={<HistoryIcon />} color="#7b1fa2" to="/bitacora" />
+            <MetricCard
+              title="Actividad"
+              value={adminMetrics.actividad}
+              helper="Eventos recientes"
+              icon={<HistoryIcon />}
+              color="#7b1fa2"
+              to="/bitacora"
+            />
           </Grid>
         </Grid>
       </Box>
     );
   }
 
-  if (currentRole !== 'RRHH') {
+  if (!esGerenteRRHH && !esSupervisorAsistencia) {
     return (
       <Paper sx={{ p: 3 }}>
-        <Typography variant="h4" sx={{ fontWeight: 800, mb: 1 }}>Inicio</Typography>
-        <Typography color="text.secondary">Selecciona una opcion del menu para comenzar.</Typography>
+        <Typography variant="h4" sx={{ fontWeight: 800, mb: 1 }}>
+          Inicio
+        </Typography>
+        <Typography color="text.secondary">
+          Selecciona una opcion del menu para comenzar.
+        </Typography>
       </Paper>
     );
   }
@@ -214,9 +276,14 @@ function Home() {
         sx={{ mb: 3, justifyContent: 'space-between' }}
       >
         <Box>
-          <Typography variant="h4" sx={{ fontWeight: 800 }}>Dashboard RRHH</Typography>
-          <Typography color="text.secondary">Resumen operativo para revisar pendientes importantes.</Typography>
+          <Typography variant="h4" sx={{ fontWeight: 800 }}>
+            {esGerenteRRHH ? 'Dashboard Gerente RRHH' : 'Dashboard Supervisor Asistencia'}
+          </Typography>
+          <Typography color="text.secondary">
+            Resumen operativo para revisar pendientes importantes.
+          </Typography>
         </Box>
+
         <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap' }}>
           <Chip label={`${empleados.length} empleados registrados`} />
           <Chip color="warning" label={`${metrics.controlesPendientes} controles pendientes`} />
@@ -236,6 +303,7 @@ function Home() {
             to="/empleados"
           />
         </Grid>
+
         <Grid size={{ xs: 12, md: 4 }}>
           <MetricCard
             title="Controles pendientes"
@@ -246,6 +314,7 @@ function Home() {
             to="/control-laboral"
           />
         </Grid>
+
         <Grid size={{ xs: 12, md: 4 }}>
           <MetricCard
             title="Vacaciones pendientes"
@@ -256,6 +325,7 @@ function Home() {
             to="/control-laboral"
           />
         </Grid>
+
         <Grid size={{ xs: 12, md: 4 }}>
           <MetricCard
             title="Sin cuenta bancaria"
@@ -266,6 +336,7 @@ function Home() {
             to="/cuenta-bancaria"
           />
         </Grid>
+
         <Grid size={{ xs: 12, md: 4 }}>
           <MetricCard
             title="Sin contrato"
@@ -276,6 +347,7 @@ function Home() {
             to="/empleado-contrato"
           />
         </Grid>
+
         <Grid size={{ xs: 12, md: 4 }}>
           <MetricCard
             title="Horarios"

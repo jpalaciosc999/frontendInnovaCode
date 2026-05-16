@@ -10,13 +10,17 @@ import {
   Typography,
 } from '@mui/material';
 import type { SelectChangeEvent } from '@mui/material/Select';
+
 import type { Usuario } from '../interfaces/usuario';
 import type { Rol } from '../interfaces/roles';
+
 import { obtenerUsuarios } from '../services/usuario.service';
 import { obtenerRoles } from '../services/roles.service';
+
 import {
   clearSelectedUserFromLocalStorage,
   getCurrentStoredUserId,
+  normalizeRole,
   saveSelectedUserToLocalStorage,
 } from '../config/roleViews';
 
@@ -34,6 +38,7 @@ function UserRoleSelector({ onUserChanged }: UserRoleSelectorProps) {
     const cargarDatos = async () => {
       try {
         setError('');
+
         const [usuariosData, rolesData] = await Promise.all([
           obtenerUsuarios(),
           obtenerRoles(),
@@ -42,7 +47,10 @@ function UserRoleSelector({ onUserChanged }: UserRoleSelectorProps) {
         setUsuarios(usuariosData);
         setRoles(rolesData);
       } catch (err: any) {
-        setError('No se pudieron cargar usuarios y roles: ' + (err.response?.data?.error || err.message));
+        setError(
+          'No se pudieron cargar usuarios y roles: ' +
+          (err.response?.data?.error || err.message)
+        );
       }
     };
 
@@ -62,13 +70,21 @@ function UserRoleSelector({ onUserChanged }: UserRoleSelectorProps) {
     if (!user) return;
 
     const role = rolesPorId.get(String(user.rol_id));
+    const rolNombre = role?.ROL_NOMBRE ?? '';
+    const rolNormalizado = normalizeRole(rolNombre);
+
     saveSelectedUserToLocalStorage(
       {
         ...user,
-        rol_nombre: role?.ROL_NOMBRE ?? '',
+        rol_id: role?.ROL_ID ?? user.rol_id,
+        ROL_ID: role?.ROL_ID ?? user.rol_id,
+        rol_nombre: rolNombre,
+        ROL_NOMBRE: rolNombre,
+        rol: rolNormalizado ?? rolNombre,
       },
-      role?.ROL_NOMBRE ?? ''
+      rolNombre
     );
+
     onUserChanged?.();
   };
 
@@ -88,6 +104,7 @@ function UserRoleSelector({ onUserChanged }: UserRoleSelectorProps) {
 
       <FormControl fullWidth size="small">
         <InputLabel id="active-user-label">Usuario</InputLabel>
+
         <Select
           labelId="active-user-label"
           label="Usuario"
