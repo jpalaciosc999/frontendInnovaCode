@@ -47,15 +47,17 @@ const initialForm: PrestamoForm = {
   pre_interes: '0',
   pre_plazo: '',
   pre_cuota_mensual: '',
-  pre_total_cuotas: '',
-  pre_cuotas_pagadas: '0',
   pre_saldo_pendiente: '',
   pre_fecha_inicio: '',
   pre_estado: 'A',
-  pre_descripcion: ''
 };
 
 const numero = (valor: number | string | undefined) => Number(valor || 0);
+const normalizarLista = <T,>(value: unknown): T[] => {
+  if (Array.isArray(value)) return value as T[];
+  const record = value as { value?: unknown };
+  return Array.isArray(record?.value) ? record.value as T[] : [];
+};
 
 function PrestamoCRUD() {
   const [datos, setDatos] = useState<Prestamo[]>([]);
@@ -71,12 +73,24 @@ function PrestamoCRUD() {
     try {
       setCargando(true);
       setError('');
-      const [prestamosData, empleadosData] = await Promise.all([
+      const [prestamosResult, empleadosResult] = await Promise.allSettled([
         obtenerPrestamos(),
         obtenerEmpleados()
       ]);
-      setDatos(prestamosData);
-      setEmpleados(empleadosData);
+
+      if (prestamosResult.status === 'fulfilled') {
+        setDatos(normalizarLista<Prestamo>(prestamosResult.value));
+      } else {
+        setDatos([]);
+        setError(getApiErrorMessage(prestamosResult.reason, 'Error cargando prestamos'));
+      }
+
+      if (empleadosResult.status === 'fulfilled') {
+        setEmpleados(normalizarLista<Empleado>(empleadosResult.value));
+      } else {
+        setEmpleados([]);
+        setError(getApiErrorMessage(empleadosResult.reason, 'Error cargando empleados'));
+      }
     } catch (err: unknown) {
       setError(getApiErrorMessage(err, 'Error cargando prestamos'));
     } finally {
@@ -94,8 +108,8 @@ function PrestamoCRUD() {
   );
 
   const cuotaMensualCalculada =
-    form.pre_monto_total && form.pre_total_cuotas
-      ? numero(form.pre_monto_total) / numero(form.pre_total_cuotas)
+    form.pre_monto_total && form.pre_plazo
+      ? numero(form.pre_monto_total) / numero(form.pre_plazo)
       : 0;
 
   const handleChange = (
@@ -116,13 +130,13 @@ function PrestamoCRUD() {
     if (
       !String(form.emp_id).trim() ||
       !form.pre_monto_total.trim() ||
-      !String(form.pre_total_cuotas).trim() ||
+      !String(form.pre_plazo).trim() ||
       !form.pre_fecha_inicio.trim()
     ) {
       setError('Empleado, monto, cuotas y fecha son obligatorios');
       return false;
     }
-    if (numero(form.pre_total_cuotas) <= 0) {
+    if (numero(form.pre_plazo) <= 0) {
       setError('El numero de cuotas debe ser mayor a 0');
       return false;
     }
@@ -131,22 +145,18 @@ function PrestamoCRUD() {
 
   const obtenerPayload = (): PrestamoForm => {
     const monto = numero(form.pre_monto_total);
-    const cuotas = numero(form.pre_total_cuotas);
+    const cuotas = numero(form.pre_plazo);
     const cuota = cuotas > 0 ? monto / cuotas : 0;
-    const cuotasPagadas = numero(form.pre_cuotas_pagadas);
 
     return {
       emp_id: String(form.emp_id),
       pre_monto_total: monto.toFixed(2),
       pre_interes: String(form.pre_interes ?? '0'),
-      pre_plazo: String(form.pre_total_cuotas || form.pre_plazo || ''),
+      pre_plazo: String(form.pre_plazo || ''),
       pre_cuota_mensual: cuota.toFixed(2),
-      pre_total_cuotas: String(cuotas),
-      pre_cuotas_pagadas: String(cuotasPagadas),
-      pre_saldo_pendiente: Math.max(0, monto - cuotasPagadas * cuota).toFixed(2),
+      pre_saldo_pendiente: String(form.pre_saldo_pendiente || monto.toFixed(2)),
       pre_fecha_inicio: form.pre_fecha_inicio,
       pre_estado: form.pre_estado,
-      pre_descripcion: form.pre_descripcion ?? ''
     };
   };
 
@@ -187,8 +197,7 @@ function PrestamoCRUD() {
   };
 
   const handleEditar = (p: Prestamo) => {
-    const totalCuotas = p.PRE_TOTAL_CUOTAS ?? p.PRE_PLAZO ?? '';
-    const cuotasPagadas = p.PRE_CUOTAS_PAGADAS ?? '0';
+    const totalCuotas = p.PRE_PLAZO ?? '';
 
     setModoEdicion(true);
     setId(p.PRE_ID);
@@ -200,12 +209,9 @@ function PrestamoCRUD() {
       pre_interes: String(p.PRE_INTERES ?? '0'),
       pre_plazo: String(totalCuotas),
       pre_cuota_mensual: String(p.PRE_CUOTA_MENSUAL),
-      pre_total_cuotas: String(totalCuotas),
-      pre_cuotas_pagadas: String(cuotasPagadas),
       pre_saldo_pendiente: String(p.PRE_SALDO_PENDIENTE),
       pre_fecha_inicio: formatearFecha(p.PRE_FECHA_INICIO),
       pre_estado: p.PRE_ESTADO,
-      pre_descripcion: p.PRE_DESCRIPCION ?? ''
     });
   };
 
@@ -235,7 +241,7 @@ function PrestamoCRUD() {
         </Box>
 
         <Alert severity="info" sx={{ mb: 2 }}>
-          Esta vista registra el prestamo maestro. Las cuotas pagadas o pendientes se administran en Detalle Prestamo, y desde ahi se actualiza el saldo.
+          Registra el prestamo maestro del empleado. Nomina descuenta la cuota del periodo automaticamente cuando el prestamo esta activo y tiene saldo pendiente.
         </Alert>
 
         <Typography variant="h6" sx={{ mb: 2 }}>
@@ -250,11 +256,16 @@ function PrestamoCRUD() {
                 <MenuItem value="">Seleccione empleado</MenuItem>
                 {empleados.map((empleado) => (
                   <MenuItem key={empleado.EMP_ID} value={String(empleado.EMP_ID)}>
-                    {obtenerNombreEmpleado(empleado)}
+                    {obtenerNombreEmpleado(empleado) || `Empleado #${empleado.EMP_ID}`}
                   </MenuItem>
                 ))}
               </Select>
             </FormControl>
+            {empleados.length === 0 && (
+              <Typography variant="caption" color="error">
+                No se pudieron cargar empleados. Revisa el endpoint /empleados.
+              </Typography>
+            )}
           </Grid>
 
           <Grid size={{ xs: 12, md: 6 }}>
@@ -263,8 +274,8 @@ function PrestamoCRUD() {
           </Grid>
 
           <Grid size={{ xs: 12, md: 4 }}>
-            <TextField fullWidth label="Numero de cuotas" name="pre_total_cuotas"
-              type="number" value={form.pre_total_cuotas ?? ''} onChange={handleChange} />
+            <TextField fullWidth label="Numero de cuotas" name="pre_plazo"
+              type="number" value={form.pre_plazo ?? ''} onChange={handleChange} />
           </Grid>
 
           <Grid size={{ xs: 12, md: 4 }}>
@@ -290,11 +301,6 @@ function PrestamoCRUD() {
                 <MenuItem value="F">Finalizado</MenuItem>
               </Select>
             </FormControl>
-          </Grid>
-
-          <Grid size={{ xs: 12, md: 6 }}>
-            <TextField fullWidth label="Descripcion" name="pre_descripcion"
-              value={form.pre_descripcion ?? ''} onChange={handleChange} />
           </Grid>
 
           <Grid size={{ xs: 12 }}>
@@ -324,7 +330,7 @@ function PrestamoCRUD() {
                 <TableCell><strong>Empleado</strong></TableCell>
                 <TableCell><strong>Monto Total</strong></TableCell>
                 <TableCell><strong>Cuota Mensual</strong></TableCell>
-                <TableCell><strong>Avance</strong></TableCell>
+                <TableCell><strong>Cuotas</strong></TableCell>
                 <TableCell><strong>Saldo Pendiente</strong></TableCell>
                 <TableCell><strong>Estado</strong></TableCell>
                 <TableCell><strong>Acciones</strong></TableCell>
@@ -333,9 +339,10 @@ function PrestamoCRUD() {
             <TableBody>
               {datos.length > 0 ? datos.map((p) => {
                 const empleado = empleadosPorId.get(String(p.EMP_ID));
-                const totalCuotas = numero(p.PRE_TOTAL_CUOTAS ?? p.PRE_PLAZO);
-                const cuotasPagadas = numero(p.PRE_CUOTAS_PAGADAS);
-                const porcentaje = totalCuotas > 0 ? (cuotasPagadas / totalCuotas) * 100 : 0;
+                const totalCuotas = numero(p.PRE_PLAZO);
+                const montoTotal = numero(p.PRE_MONTO_TOTAL);
+                const saldoPendiente = numero(p.PRE_SALDO_PENDIENTE);
+                const porcentaje = montoTotal > 0 ? ((montoTotal - saldoPendiente) / montoTotal) * 100 : 0;
 
                 return (
                   <TableRow key={p.PRE_ID} hover>
@@ -351,11 +358,11 @@ function PrestamoCRUD() {
                         <LinearProgress variant="determinate" value={porcentaje}
                           sx={{ flexGrow: 1, height: 8, borderRadius: 4 }} />
                         <Typography variant="caption">
-                          {cuotasPagadas}/{totalCuotas || '-'}
+                          {totalCuotas || '-'}
                         </Typography>
                       </Box>
                     </TableCell>
-                    <TableCell sx={{ color: numero(p.PRE_SALDO_PENDIENTE) > 0 ? 'error.main' : 'success.main', fontWeight: 'bold' }}>
+                    <TableCell sx={{ color: saldoPendiente > 0 ? 'error.main' : 'success.main', fontWeight: 'bold' }}>
                       {formatearMoneda(p.PRE_SALDO_PENDIENTE)}
                     </TableCell>
                     <TableCell>{obtenerChipEstado(p.PRE_ESTADO)}</TableCell>

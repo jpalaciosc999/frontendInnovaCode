@@ -100,6 +100,7 @@ const pathToVista: Record<string, keyof typeof permisosVista> = {
   '/reporte-marcajes': 'marcajes',
   '/control-laboral': 'marcajes',
   '/suspensiones-igss': 'suspensionesIgss',
+  '/nomina-asignaciones': 'nominas',
   '/nomina': 'nominas',
   '/nomina-detalle': 'nominas',
   '/calculadora-igss': 'nominas',
@@ -118,7 +119,6 @@ const pathToVista: Record<string, keyof typeof permisosVista> = {
   '/tipo-ingresos': 'ingresos',
   '/descuentos': 'descuentos',
   '/prestamos': 'prestamos',
-  '/prestamo-detalle': 'prestamos',
   '/liquidacion': 'liquidaciones',
   '/aprobacion-nomina': 'nominas',
 };

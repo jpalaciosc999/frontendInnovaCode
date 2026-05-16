@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import type { NominaDetalle, NominaDetalleForm } from '../interfaces/nomina-detalle';
 import type { Nomina } from '../interfaces/nomina';
 import type { Ingreso } from '../interfaces/tipoIngresos';
@@ -26,6 +27,8 @@ import {
     Alert,
     Box,
     Button,
+    Chip,
+    Collapse,
     FormControl,
     Grid,
     InputLabel,
@@ -40,6 +43,7 @@ import {
     TableHead,
     TableRow,
     TextField,
+    Tooltip,
     Typography
 } from '@mui/material';
 import type { SelectChangeEvent } from '@mui/material/Select';
@@ -49,6 +53,7 @@ import CleaningServicesIcon from '@mui/icons-material/CleaningServices';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
+import AddIcon from '@mui/icons-material/Add';
 
 const initialForm: NominaDetalleForm = {
     det_referencia: null,
@@ -61,7 +66,11 @@ const initialForm: NominaDetalleForm = {
 
 type TipoConceptoNomina = '' | 'INGRESO' | 'DESCUENTO' | 'KPI';
 
+const redondearMoneda = (value: number) => Math.round(value * 100) / 100;
+const esNominaBloqueada = (estado?: string) => estado === 'P' || estado === 'A';
+
 function NominaDetalleCRUD() {
+    const [searchParams, setSearchParams] = useSearchParams();
     const [datos, setDatos] = useState<NominaDetalle[]>([]);
     const [cargando, setCargando] = useState(true);
     const [error, setError] = useState('');
@@ -76,6 +85,8 @@ function NominaDetalleCRUD() {
     const [empleados, setEmpleados] = useState<Empleado[]>([]);
     const [puestos, setPuestos] = useState<Puesto[]>([]);
     const [tipoConcepto, setTipoConcepto] = useState<TipoConceptoNomina>('');
+    const [filtroNominaId, setFiltroNominaId] = useState(searchParams.get('nom_id') ?? '');
+    const [mostrarFormulario, setMostrarFormulario] = useState(false);
 
     const cargarDatos = async () => {
         try {
@@ -107,6 +118,14 @@ function NominaDetalleCRUD() {
     useEffect(() => {
         cargarDatos();
     }, []);
+
+    useEffect(() => {
+        const nomId = searchParams.get('nom_id') ?? '';
+        setFiltroNominaId(nomId);
+        if (nomId) {
+            setForm((prev) => ({ ...prev, nom_id: nomId }));
+        }
+    }, [searchParams]);
 
     const empleadosPorId = useMemo(
         () => new Map(empleados.map((empleado) => [String(empleado.EMP_ID), empleado])),
@@ -173,9 +192,9 @@ function NominaDetalleCRUD() {
 
         const totales = calcularTotalesNomina(nomId, listaDetalles);
         await actualizarNomina(nomina.NOM_ID, {
-            nom_total_ingresos: totales.ingresos.toFixed(2),
-            nom_total_descuento: totales.descuentos.toFixed(2),
-            nom_salario_liquido: totales.liquido.toFixed(2),
+            nom_total_ingresos: redondearMoneda(totales.ingresos),
+            nom_total_descuento: redondearMoneda(totales.descuentos),
+            nom_salario_liquido: redondearMoneda(totales.liquido),
             nom_fecha_generacion: toInputDate(nomina.NOM_FECHA_GENERACION),
             per_id: nomina.PER_ID,
             empleado_id: nomina.EMP_ID,
@@ -198,6 +217,10 @@ function NominaDetalleCRUD() {
     };
 
     const obtenerNominaSeleccionada = () => nominasPorId.get(String(form.nom_id ?? ''));
+    const obtenerNominaDetalle = (nomId: string | number | null | undefined) =>
+        nominasPorId.get(String(nomId ?? ''));
+    const nominaSeleccionada = obtenerNominaSeleccionada();
+    const formularioBloqueado = esNominaBloqueada(nominaSeleccionada?.NOM_ESTADO);
 
     const resultadosKpiDisponibles = useMemo(() => {
         const nomina = nominasPorId.get(String(form.nom_id ?? ''));
@@ -302,9 +325,14 @@ function NominaDetalleCRUD() {
         setDetalleId(null);
         setError('');
         setTipoConcepto('');
+        setMostrarFormulario(false);
     };
 
     const validarFormulario = () => {
+        if (formularioBloqueado) {
+            setError('Esta nomina esta pendiente o aprobada. No se puede modificar su detalle.');
+            return false;
+        }
         if (!form.det_referencia || form.det_monto === null || form.det_monto === '' || !form.nom_id) {
             setError('Referencia, monto y nomina son obligatorios');
             return false;
@@ -338,6 +366,16 @@ function NominaDetalleCRUD() {
         kre_id: f.kre_id ? Number(f.kre_id) : null
     });
 
+    const obtenerConceptoDuplicado = (data: ReturnType<typeof limpiarDatos>) =>
+        datos.find((detalle) => {
+            if (modoEdicion && detalle.DET_ID === detalleId) return false;
+            if (String(detalle.NOM_ID) !== String(data.nom_id)) return false;
+            if (data.tis_id && String(detalle.TIS_ID ?? '') === String(data.tis_id)) return true;
+            if (data.tds_id && String(detalle.TDS_ID ?? '') === String(data.tds_id)) return true;
+            if (data.kre_id && String(detalle.KRE_ID ?? '') === String(data.kre_id)) return true;
+            return false;
+        });
+
     const guardarDetalle = async () => {
         try {
             setError('');
@@ -345,6 +383,11 @@ function NominaDetalleCRUD() {
             if (!validarFormulario()) return;
 
             const dataLimpia = limpiarDatos(form);
+            const duplicado = obtenerConceptoDuplicado(dataLimpia);
+            if (duplicado) {
+                setError('Esta nomina ya tiene ese concepto en el detalle. Edita el registro existente o elimina el duplicado antes de guardar otro.');
+                return;
+            }
             const detalleAnterior = detalleId !== null
                 ? datos.find((detalle) => detalle.DET_ID === detalleId)
                 : undefined;
@@ -367,11 +410,17 @@ function NominaDetalleCRUD() {
     };
 
     const handleEliminar = async (id: number) => {
+        const detalleAnterior = datos.find((detalle) => detalle.DET_ID === id);
+        const nomina = obtenerNominaDetalle(detalleAnterior?.NOM_ID);
+        if (esNominaBloqueada(nomina?.NOM_ESTADO)) {
+            setError('No se puede eliminar detalle de una nomina pendiente o aprobada.');
+            return;
+        }
+
         if (!window.confirm('¿Deseas eliminar este registro de nómina?')) return;
         try {
             setError('');
             setMensaje('');
-            const detalleAnterior = datos.find((detalle) => detalle.DET_ID === id);
             await eliminarDetalleNomina(id);
             await sincronizarCabeceras([detalleAnterior?.NOM_ID]);
             setMensaje('Registro eliminado correctamente');
@@ -383,7 +432,14 @@ function NominaDetalleCRUD() {
     };
 
     const handleEditar = (d: NominaDetalle) => {
+        const nomina = obtenerNominaDetalle(d.NOM_ID);
+        if (esNominaBloqueada(nomina?.NOM_ESTADO)) {
+            setError('No se puede editar detalle de una nomina pendiente o aprobada.');
+            return;
+        }
+
         setModoEdicion(true);
+        setMostrarFormulario(true);
         setDetalleId(d.DET_ID);
         setMensaje('');
         setError('');
@@ -401,6 +457,20 @@ function NominaDetalleCRUD() {
         else setTipoConcepto('');
     };
 
+    const handleFiltroNomina = (e: SelectChangeEvent) => {
+        const value = e.target.value;
+        setFiltroNominaId(value);
+        if (value) setSearchParams({ nom_id: value });
+        else setSearchParams({});
+    };
+
+    const datosVisibles = useMemo(
+        () => filtroNominaId
+            ? datos.filter((detalle) => String(detalle.NOM_ID) === String(filtroNominaId))
+            : datos,
+        [datos, filtroNominaId]
+    );
+
     if (cargando) {
         return (
             <Box sx={{ p: 3 }}>
@@ -416,18 +486,41 @@ function NominaDetalleCRUD() {
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 3 }}>
                     <ReceiptLongIcon color="primary" />
                     <Typography variant="h4" sx={{ fontWeight: 'bold' }}>
-                        Detalle de Nómina
+                        Revision de Detalle de Nomina
                     </Typography>
                 </Box>
 
-                <Typography variant="h6" sx={{ mb: 2 }}>
-                    {modoEdicion ? 'Editar detalle' : 'Nuevo detalle'}
-                </Typography>
-
                 <Alert severity="info" sx={{ mb: 2 }}>
-                    Primero selecciona la nomina. Luego elige si el movimiento es ingreso, descuento o KPI. Los KPI se muestran solo si pertenecen al empleado de la nomina seleccionada.
+                    Este apartado es para revisar o corregir el detalle que ya genero la nomina. La captura previa de ingresos y egresos debe hacerse por empleado y periodo antes de generar.
                 </Alert>
 
+                <Alert severity="warning" sx={{ mb: 2 }}>
+                    No uses esta pantalla para preparar una nomina nueva: si la nomina aun no existe, aqui no deberia capturarse. Para eso hace falta el modulo de Asignaciones por Periodo.
+                </Alert>
+
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 2, mb: 2, flexWrap: 'wrap' }}>
+                    <Typography variant="h6">
+                        {modoEdicion ? 'Editar concepto generado' : 'Correccion manual'}
+                    </Typography>
+                    <Button
+                        variant={mostrarFormulario ? 'outlined' : 'contained'}
+                        startIcon={mostrarFormulario ? <CleaningServicesIcon /> : <AddIcon />}
+                        onClick={() => {
+                            if (mostrarFormulario) limpiarFormulario();
+                            setMostrarFormulario((prev) => !prev);
+                        }}
+                    >
+                        {mostrarFormulario ? 'Ocultar correccion' : 'Agregar correccion manual'}
+                    </Button>
+                </Box>
+
+                {formularioBloqueado && (
+                    <Alert severity="warning" sx={{ mb: 2 }}>
+                        Esta nomina esta {nominaSeleccionada?.NOM_ESTADO === 'A' ? 'aprobada' : 'pendiente de aprobacion'}; su detalle queda bloqueado.
+                    </Alert>
+                )}
+
+                <Collapse in={mostrarFormulario}>
                 <Grid container spacing={2}>
                     <Grid size={{ xs: 12, md: 6 }}>
                         <TextField
@@ -542,6 +635,7 @@ function NominaDetalleCRUD() {
                                 variant="contained"
                                 startIcon={<SaveIcon />}
                                 onClick={guardarDetalle}
+                                disabled={formularioBloqueado}
                             >
                                 {modoEdicion ? 'Actualizar' : 'Guardar'}
                             </Button>
@@ -557,13 +651,27 @@ function NominaDetalleCRUD() {
                         </Box>
                     </Grid>
                 </Grid>
+                </Collapse>
             </Paper>
 
             {/* Tabla */}
             <Paper elevation={3} sx={{ p: 3 }}>
-                <Typography variant="h6" sx={{ mb: 2 }}>
-                    Listado de detalles: {datos.length}
-                </Typography>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 2, mb: 2, flexWrap: 'wrap' }}>
+                    <Typography variant="h6">
+                        Listado de detalles: {datosVisibles.length}
+                    </Typography>
+                    <FormControl sx={{ minWidth: 320 }}>
+                        <InputLabel>Filtrar por nomina</InputLabel>
+                        <Select value={filtroNominaId} label="Filtrar por nomina" onChange={handleFiltroNomina}>
+                            <MenuItem value="">Todas</MenuItem>
+                            {nominas.map((nomina) => (
+                                <MenuItem key={nomina.NOM_ID} value={String(nomina.NOM_ID)}>
+                                    {obtenerEtiquetaNomina(nomina)} {esNominaBloqueada(nomina.NOM_ESTADO) ? '- Bloqueada' : ''}
+                                </MenuItem>
+                            ))}
+                        </Select>
+                    </FormControl>
+                </Box>
 
                 <TableContainer>
                     <Table>
@@ -581,41 +689,57 @@ function NominaDetalleCRUD() {
                         </TableHead>
 
                         <TableBody>
-                            {datos.length > 0 ? (
-                                datos.map((d) => {
+                            {datosVisibles.length > 0 ? (
+                                datosVisibles.map((d) => {
                                     const nomina = nominasPorId.get(String(d.NOM_ID));
                                     const ingreso = ingresosPorId.get(String(d.TIS_ID));
                                     const descuento = descuentosPorId.get(String(d.TDS_ID));
                                     const resultado = resultadosPorId.get(String(d.KRE_ID));
+                                    const bloqueada = esNominaBloqueada(nomina?.NOM_ESTADO);
 
                                     return (
                                     <TableRow key={d.DET_ID} hover>
                                         <TableCell>{d.DET_ID}</TableCell>
                                         <TableCell>{d.DET_REFERENCIA}</TableCell>
                                         <TableCell>{formatearMoneda(d.DET_MONTO)}</TableCell>
-                                        <TableCell>{obtenerEtiquetaNomina(nomina) || `Nomina #${d.NOM_ID}`}</TableCell>
+                                        <TableCell>
+                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+                                                {obtenerEtiquetaNomina(nomina) || `Nomina #${d.NOM_ID}`}
+                                                {bloqueada && <Chip label="Bloqueada" size="small" color="warning" />}
+                                            </Box>
+                                        </TableCell>
                                         <TableCell>{ingreso ? `${ingreso.TIS_CODIGO} - ${ingreso.TIS_NOMBRE}` : '—'}</TableCell>
                                         <TableCell>{descuento ? `${descuento.TDS_CODIGO} - ${descuento.TDS_NOMBRE}` : '—'}</TableCell>
                                         <TableCell>{resultado ? formatearMoneda(resultado.KRE_MONTO_TOTAL) : '—'}</TableCell>
                                         <TableCell>
                                             <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                                                <Button
-                                                    size="small"
-                                                    variant="outlined"
-                                                    startIcon={<EditIcon />}
-                                                    onClick={() => handleEditar(d)}
-                                                >
-                                                    Editar
-                                                </Button>
-                                                <Button
-                                                    size="small"
-                                                    variant="contained"
-                                                    color="error"
-                                                    startIcon={<DeleteIcon />}
-                                                    onClick={() => handleEliminar(d.DET_ID)}
-                                                >
-                                                    Eliminar
-                                                </Button>
+                                                <Tooltip title={bloqueada ? 'No se modifica detalle de una nomina pendiente o aprobada' : ''}>
+                                                    <span>
+                                                        <Button
+                                                            size="small"
+                                                            variant="outlined"
+                                                            startIcon={<EditIcon />}
+                                                            disabled={bloqueada}
+                                                            onClick={() => handleEditar(d)}
+                                                        >
+                                                            Editar
+                                                        </Button>
+                                                    </span>
+                                                </Tooltip>
+                                                <Tooltip title={bloqueada ? 'No se elimina detalle de una nomina pendiente o aprobada' : ''}>
+                                                    <span>
+                                                        <Button
+                                                            size="small"
+                                                            variant="contained"
+                                                            color="error"
+                                                            startIcon={<DeleteIcon />}
+                                                            disabled={bloqueada}
+                                                            onClick={() => handleEliminar(d.DET_ID)}
+                                                        >
+                                                            Eliminar
+                                                        </Button>
+                                                    </span>
+                                                </Tooltip>
                                             </Box>
                                         </TableCell>
                                     </TableRow>

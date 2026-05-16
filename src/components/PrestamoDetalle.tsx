@@ -108,7 +108,7 @@ function PrestamoDetalleView() {
     Math.max(0, numero(prestamo.PRE_SALDO_PENDIENTE) - monto);
 
   const crearPayloadPrestamo = (prestamo: Prestamo, cuotasPagadas: number, saldoPendiente: number) => {
-    const totalCuotas = numero(prestamo.PRE_TOTAL_CUOTAS ?? prestamo.PRE_PLAZO);
+    const totalCuotas = numero(prestamo.PRE_PLAZO);
 
     return {
       emp_id: prestamo.EMP_ID ? String(prestamo.EMP_ID) : '',
@@ -116,12 +116,9 @@ function PrestamoDetalleView() {
       pre_interes: String(prestamo.PRE_INTERES ?? '0'),
       pre_plazo: String(prestamo.PRE_PLAZO ?? totalCuotas),
       pre_cuota_mensual: String(prestamo.PRE_CUOTA_MENSUAL),
-      pre_total_cuotas: String(totalCuotas),
-      pre_cuotas_pagadas: String(cuotasPagadas),
       pre_saldo_pendiente: saldoPendiente.toFixed(2),
       pre_fecha_inicio: formatearFecha(prestamo.PRE_FECHA_INICIO),
       pre_estado: saldoPendiente <= 0 || cuotasPagadas >= totalCuotas ? 'F' : 'A',
-      pre_descripcion: prestamo.PRE_DESCRIPCION ?? ''
     };
   };
 

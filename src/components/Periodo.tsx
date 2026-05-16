@@ -58,6 +58,22 @@ const toInputDate = (value?: string) => {
   return String(value).slice(0, 10);
 };
 
+const diffDaysInclusive = (fechaInicio: string, fechaFin: string) => {
+  if (!fechaInicio || !fechaFin) return 0;
+
+  const inicio = new Date(`${fechaInicio}T00:00:00Z`);
+  const fin = new Date(`${fechaFin}T00:00:00Z`);
+  if (Number.isNaN(inicio.getTime()) || Number.isNaN(fin.getTime())) return 0;
+
+  return Math.floor((fin.getTime() - inicio.getTime()) / 86400000) + 1;
+};
+
+const tipoPeriodoPorDias = (dias: number) => {
+  if (dias >= 14 && dias <= 16) return 'Quincenal';
+  if (dias >= 28 && dias <= 31) return 'Mensual';
+  return '';
+};
+
 function Periodos() {
   const [datos, setDatos] = useState<Periodo[]>([]);
   const [cargando, setCargando] = useState(true);
@@ -105,6 +121,13 @@ function Periodos() {
       setError('La fecha fin no puede ser anterior a la fecha inicio');
       return false;
     }
+
+    const diasPeriodo = diffDaysInclusive(form.fecha_inicio, form.fecha_fin);
+    if (!tipoPeriodoPorDias(diasPeriodo)) {
+      setError('Solo puedes crear periodos quincenales de 14 a 16 dias o mensuales de 28 a 31 dias');
+      return false;
+    }
+
     return true;
   };
 
@@ -183,6 +206,10 @@ function Periodos() {
           {modoEdicion ? 'Editar Periodo' : 'Nuevo Periodo'}
         </Typography>
 
+        <Alert severity="info" sx={{ mb: 2 }}>
+          La nomina calcula salario, bonificaciones, prestamos, IGSS, ISR y liquido segun el rango: quincenal o mensual.
+        </Alert>
+
         <Grid container spacing={3}>
           <Grid size={{ xs: 12, md: 3 }}>
             <TextField
@@ -233,6 +260,19 @@ function Periodos() {
             </FormControl>
           </Grid>
 
+          {form.fecha_inicio && form.fecha_fin && (
+            <Grid size={{ xs: 12 }}>
+              <Chip
+                color={tipoPeriodoPorDias(diffDaysInclusive(form.fecha_inicio, form.fecha_fin)) ? 'primary' : 'error'}
+                label={
+                  tipoPeriodoPorDias(diffDaysInclusive(form.fecha_inicio, form.fecha_fin))
+                    ? `${tipoPeriodoPorDias(diffDaysInclusive(form.fecha_inicio, form.fecha_fin))} - ${diffDaysInclusive(form.fecha_inicio, form.fecha_fin)} dias`
+                    : `${diffDaysInclusive(form.fecha_inicio, form.fecha_fin)} dias - rango no permitido`
+                }
+              />
+            </Grid>
+          )}
+
           <Grid size={{ xs: 12 }}>
             <Box sx={{ display: 'flex', gap: 2, mt: 1 }}>
               <Button
@@ -266,6 +306,8 @@ function Periodos() {
               <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
                 <TableCell><strong>ID</strong></TableCell>
                 <TableCell><strong>Rango de Fechas</strong></TableCell>
+                <TableCell><strong>Tipo</strong></TableCell>
+                <TableCell><strong>Dias</strong></TableCell>
                 <TableCell><strong>Fecha Pago</strong></TableCell>
                 <TableCell><strong>Estado</strong></TableCell>
                 <TableCell align="center"><strong>Acciones</strong></TableCell>
@@ -281,6 +323,14 @@ function Periodos() {
                         {per.PER_FECHA_INICIO?.slice(0, 10)} ⮕ {per.PER_FECHA_FIN?.slice(0, 10)}
                       </Typography>
                     </TableCell>
+                    <TableCell>
+                      <Chip
+                        size="small"
+                        color={per.TIPO_PERIODO === 'M' ? 'primary' : per.TIPO_PERIODO === 'Q' ? 'info' : 'warning'}
+                        label={per.TIPO_PERIODO === 'M' ? 'Mensual' : per.TIPO_PERIODO === 'Q' ? 'Quincenal' : 'Revisar'}
+                      />
+                    </TableCell>
+                    <TableCell>{per.DIAS_PERIODO || '-'}</TableCell>
                     <TableCell>{per.PER_FECHA_PAGO?.slice(0, 10)}</TableCell>
                     <TableCell>{obtenerChipEstado(per.PER_ESTADO)}</TableCell>
                     <TableCell align="center">
@@ -308,7 +358,7 @@ function Periodos() {
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={5} align="center">No hay periodos registrados</TableCell>
+                  <TableCell colSpan={7} align="center">No hay periodos registrados</TableCell>
                 </TableRow>
               )}
             </TableBody>

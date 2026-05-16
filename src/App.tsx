@@ -14,7 +14,6 @@ import Departamentos from './components/Departamentos';
 import Puestos from './components/Puestos';
 import Roles from './components/Roles';
 import Prestamos from './components/Prestamos';
-import PrestamoDetalleView from './components/PrestamoDetalle';
 import Permisos from './components/permisos';
 import RolPermisosView from './components/RolPermisos';
 import Periodo from './components/Periodo';
@@ -31,13 +30,11 @@ import Sede from './components/Sede';
 import Bitacora from './components/Bitacora';
 import Liquidacion from './components/Liquidacion';
 import Nomina from './components/Nomina';
+import NominaAsignaciones from './components/NominaAsignaciones';
 import Usuario from './components/Usuario';
 import TipoContrato from './components/TipoContrato';
 import UsuarioBitacora from './components/UsuarioBitacora';
 import HorarioCRUD from './components/HorarioCRUD';
-import CalculadoraIgss from './components/CalculadoraIgss';
-import CalculadoraISR from './components/CalculadoraIsr';
-import GenerarCSV from './components/Generarcsv';
 import SuspensionIgss from './components/SuspensionIgss';
 import AprobacionNomina from './components/AprobacionNomina';
 import ReporteMarcajes from './components/ReporteMarcajes';
@@ -86,7 +83,6 @@ function Layout() {
           <Route path="/departamentos" element={guarded('/departamentos', <Departamentos />)} />
           <Route path="/puestos" element={guarded('/puestos', <Puestos />)} />
           <Route path="/prestamos" element={guarded('/prestamos', <Prestamos />)} />
-          <Route path="/prestamo-detalle" element={guarded('/prestamo-detalle', <PrestamoDetalleView />)} />
           <Route path="/permisos" element={guarded('/permisos', <Permisos />)} />
           <Route path="/rol-permisos" element={guarded('/rol-permisos', <RolPermisosView />)} />
           <Route path="/roles" element={guarded('/roles', <Roles />)} />
@@ -104,17 +100,19 @@ function Layout() {
           <Route path="/sucursales" element={guarded('/sucursales', <Sede />)} />
           <Route path="/bitacora" element={guarded('/bitacora', <Bitacora />)} />
           <Route path="/liquidacion" element={guarded('/liquidacion', <Liquidacion />)} />
+          <Route path="/nomina-asignaciones" element={guarded('/nomina-asignaciones', <NominaAsignaciones />)} />
           <Route path="/nomina" element={guarded('/nomina', <Nomina />)} />
           <Route path="/usuarios" element={guarded('/usuarios', <Usuario />)} />
           <Route path="/tipo-contrato" element={guarded('/tipo-contrato', <TipoContrato />)} />
           <Route path="/usuario-bitacora" element={guarded('/usuario-bitacora', <UsuarioBitacora />)} />
           <Route path="/horarios" element={guarded('/horarios', <HorarioCRUD />)} />
-          <Route path="/calculadora-igss" element={guarded('/calculadora-igss', <CalculadoraIgss />)} />
-          <Route path="/calculadora-isr" element={guarded('/calculadora-isr', <CalculadoraISR />)} />
           <Route path="/suspensiones-igss" element={guarded('/suspensiones-igss', <SuspensionIgss />)} />
+          <Route path="/calculadora-igss" element={<Navigate to="/nomina" replace />} />
+          <Route path="/calculadora-isr" element={<Navigate to="/nomina" replace />} />
           <Route path="/tipos-descuento" element={<Navigate to="/descuentos" replace />} />
           <Route path="/prestamos-banco" element={<Navigate to="/prestamos" replace />} />
-          <Route path="/generar-csv" element={guarded('/generar-csv', <GenerarCSV />)} />
+          <Route path="/prestamo-detalle" element={<Navigate to="/prestamos" replace />} />
+          <Route path="/generar-csv" element={<Navigate to="/nomina" replace />} />
 
           <Route path="/resumen-marcaje" element={guarded('/resumen-marcaje', <MarcajePage />)} />
           <Route path="/registro-vacaciones" element={<Navigate to="/control-laboral" replace />} />
