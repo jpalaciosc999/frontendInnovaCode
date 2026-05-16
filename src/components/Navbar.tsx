@@ -56,6 +56,7 @@ import {
   roleOrder,
 } from '../config/roleViews';
 import { useAuth } from '../context/AuthContext';
+  import { reportesPorRol } from '../config/roleViews';
 
 type MenuItemType = {
   text: string;
@@ -73,6 +74,7 @@ type MenuSectionType = {
 const viewIcons: Record<string, ReactNode> = {
   marcaje: <FactCheckIcon />,
   'resumen-marcaje': <SummarizeIcon />,
+  'reporte-marcajes': <SummarizeIcon />,
   'registro-empleados': <PeopleIcon />,
   departamentos: <BusinessIcon />,
   puestos: <WorkIcon />,
@@ -102,6 +104,17 @@ const viewIcons: Record<string, ReactNode> = {
   intecap: <PercentIcon />,
   prestamos: <PaymentsIcon />,
   liquidacion: <DescriptionIcon />,
+  'calculadora-igss': <HealthAndSafetyIcon />,
+  'calculadora-isr': <GavelIcon />,
+  'reporte-igss': <SummarizeIcon />,
+  'reporte-isr': <SummarizeIcon />,
+  'reporte-aguinaldo': <SummarizeIcon />,
+  'reporte-vacaciones': <SummarizeIcon />,
+  'reporte-descuentos': <SummarizeIcon />,
+  'reporte-kpi':          <SummarizeIcon />,
+  'reporte-horas-extra':  <SummarizeIcon />,
+  'reporte-liquidacion':  <SummarizeIcon />,
+  'dashboard-ejecutivo': <SummarizeIcon />,
   'tipos-descuento': <PercentIcon />,
   'prestamos-banco': <AccountBalanceIcon />,
   'aprobacion-nomina': <ApprovalIcon />,
@@ -132,6 +145,7 @@ function Navbar() {
     ADMIN: true,
     CONTABILIDAD: true,
     GERENTE: true,
+      REPORTES: true,
   });
 
   const location = useLocation();
@@ -277,6 +291,50 @@ function Navbar() {
             </ListItemButton>
 
             <Divider sx={{ my: 0.5 }} />
+
+            {currentRole && reportesPorRol[currentRole]?.length > 0 && (
+              <Box>
+                <ListItemButton
+                  onClick={() => toggleSection('REPORTES')}
+                  selected={false}
+                  sx={getMenuItemSx(false)}
+                >
+                  <ListItemIcon sx={{ color: 'inherit', minWidth: 40 }}>
+                    <SummarizeIcon />
+                  </ListItemIcon>
+                  <ListItemText primary="REPORTES" />
+                  {openSections['REPORTES'] ? <ExpandLess /> : <ExpandMore />}
+                </ListItemButton>
+                <Collapse in={openSections['REPORTES']} timeout="auto" unmountOnExit>
+                  <List component="div" disablePadding>
+                    {reportesPorRol[currentRole]?.map((reporte) => {
+                      const isActive = location.pathname === reporte.path;
+                      return (
+                        <ListItemButton
+                          key={reporte.key}
+                          component={NavLink}
+                          to={reporte.path}
+                          selected={isActive}
+                          onClick={toggleDrawer(false)}
+                          sx={getMenuItemSx(isActive, { pl: 4 })}
+                        >
+                          <ListItemIcon
+                            sx={{
+                              color: isActive ? 'white' : 'inherit',
+                              minWidth: 40,
+                            }}
+                          >
+                            <SummarizeIcon />
+                          </ListItemIcon>
+                          <ListItemText primary={reporte.text} />
+                        </ListItemButton>
+                      );
+                    })}
+                  </List>
+                </Collapse>
+                <Divider sx={{ my: 0.5 }} />
+              </Box>
+            )}
 
             {visibleSections.map((section) => {
               const isSectionActive = section.items.some(

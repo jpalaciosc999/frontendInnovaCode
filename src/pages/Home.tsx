@@ -18,9 +18,6 @@ import EventAvailableIcon from '@mui/icons-material/EventAvailable';
 import AccountBalanceIcon from '@mui/icons-material/AccountBalance';
 import BadgeIcon from '@mui/icons-material/Badge';
 import ScheduleIcon from '@mui/icons-material/Schedule';
-import ManageAccountsIcon from '@mui/icons-material/ManageAccounts';
-import SecurityIcon from '@mui/icons-material/Security';
-import HistoryIcon from '@mui/icons-material/History';
 
 import type { Empleado } from '../interfaces/empleados';
 import type { ControlLaboral } from '../interfaces/controlLaboral';
@@ -31,7 +28,7 @@ import { obtenerEmpleados } from '../services/empleados.service';
 import { obtenerControles } from '../services/controlLaboral.service';
 import { obtenerCuentas } from '../services/cuentaBancaria.service';
 import { obtenerContratos } from '../services/empleado_contrato.service';
-import { obtenerAdminResumen, type AdminResumen } from '../services/admin.service';
+import DashboardEjecutivo from '../components/DashboardEjecutivo';
 import { getCurrentUserRole } from '../config/roleViews';
 
 type MetricCardProps = {
@@ -77,22 +74,12 @@ function Home() {
   const [controles, setControles] = useState<ControlLaboral[]>([]);
   const [cuentas, setCuentas] = useState<CuentaBancaria[]>([]);
   const [contratos, setContratos] = useState<EmpleadoContrato[]>([]);
-  const [adminResumen, setAdminResumen] = useState<AdminResumen | null>(null);
   const [error, setError] = useState('');
   const currentRole = getCurrentUserRole();
 
   useEffect(() => {
     const cargarDashboard = async () => {
       setError('');
-
-      if (currentRole === 'ADMIN' || currentRole === 'SUPREMO') {
-        try {
-          setAdminResumen(await obtenerAdminResumen());
-        } catch {
-          setError('No se pudo cargar el resumen administrativo.');
-        }
-        return;
-      }
 
       if (currentRole !== 'RRHH') return;
 
@@ -138,63 +125,8 @@ function Home() {
     };
   }, [contratos, controles, cuentas, empleados]);
 
-  const adminMetrics = useMemo(() => {
-    const value = (keys: string[]) => {
-      const record = adminResumen ?? {};
-      for (const key of keys) {
-        const found = record[key];
-        if (typeof found === 'number') return found;
-        if (typeof found === 'string' && found.trim() !== '' && !Number.isNaN(Number(found))) {
-          return Number(found);
-        }
-      }
-      return 0;
-    };
-
-    return {
-      usuarios: value(['usuarios', 'totalUsuarios', 'usuariosTotal']),
-      roles: value(['roles', 'totalRoles', 'rolesTotal']),
-      permisos: value(['permisos', 'totalPermisos', 'permisosTotal']),
-      actividad: value(['actividad', 'eventos', 'bitacora', 'totalActividad']),
-    };
-  }, [adminResumen]);
-
-  if (currentRole === 'ADMIN' || currentRole === 'SUPREMO') {
-    return (
-      <Box sx={{ py: 1 }}>
-        <Stack
-          direction={{ xs: 'column', md: 'row' }}
-          spacing={2}
-          sx={{ mb: 3, justifyContent: 'space-between' }}
-        >
-          <Box>
-            <Typography variant="h4" sx={{ fontWeight: 800 }}>Dashboard Admin</Typography>
-            <Typography color="text.secondary">Resumen de seguridad, catálogo y auditoría del sistema.</Typography>
-          </Box>
-          <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap' }}>
-            <Chip color="primary" label={`${adminMetrics.usuarios} usuarios`} />
-            <Chip color="info" label={`${adminMetrics.actividad} eventos auditados`} />
-          </Stack>
-        </Stack>
-
-        {error ? <Alert severity="warning" sx={{ mb: 2 }}>{error}</Alert> : null}
-
-        <Grid container spacing={2}>
-          <Grid size={{ xs: 12, md: 3 }}>
-            <MetricCard title="Usuarios" value={adminMetrics.usuarios} helper="Cuentas del sistema" icon={<ManageAccountsIcon />} color="#1976d2" to="/usuarios" />
-          </Grid>
-          <Grid size={{ xs: 12, md: 3 }}>
-            <MetricCard title="Roles" value={adminMetrics.roles} helper="Perfiles de acceso" icon={<SecurityIcon />} color="#2e7d32" to="/roles" />
-          </Grid>
-          <Grid size={{ xs: 12, md: 3 }}>
-            <MetricCard title="Permisos" value={adminMetrics.permisos} helper="Capacidades configuradas" icon={<BadgeIcon />} color="#ed6c02" to="/permisos" />
-          </Grid>
-          <Grid size={{ xs: 12, md: 3 }}>
-            <MetricCard title="Actividad" value={adminMetrics.actividad} helper="Eventos recientes" icon={<HistoryIcon />} color="#7b1fa2" to="/bitacora" />
-          </Grid>
-        </Grid>
-      </Box>
-    );
+  if (currentRole === 'ADMIN' || currentRole === 'GERENTE' || currentRole === 'SUPREMO') {
+    return <DashboardEjecutivo />;
   }
 
   if (currentRole !== 'RRHH') {
