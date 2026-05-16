@@ -32,6 +32,8 @@ export const appViews: AppView[] = [
   { key: 'marcaje', text: 'Marcaje', path: '/marcajes', roles: ['EMPLEADO'] },
 
   { key: 'resumen-marcaje', text: 'Resumen de Marcaje', path: '/resumen-marcaje', roles: ['RRHH'] },
+  { key: 'reporte-marcajes', text: 'Reporte de Marcajes', path: '/reporte-marcajes', roles: ['RRHH', 'ADMIN'] },
+  { key: 'reporte-vacaciones', text: 'Reporte de Vacaciones', path: '/reporte-vacaciones', roles: ['RRHH', 'ADMIN'] },
   { key: 'registro-empleados', text: 'Registro de Empleados', path: '/empleados', roles: ['RRHH'] },
   { key: 'departamentos', text: 'Departamentos', path: '/departamentos', roles: ['RRHH'] },
   { key: 'puestos', text: 'Puestos', path: '/puestos', roles: ['RRHH'] },
@@ -63,7 +65,14 @@ export const appViews: AppView[] = [
   { key: 'calculadora-igss', text: 'Calculadora IGSS', path: '/calculadora-igss', roles: ['CONTABILIDAD'] },
   { key: 'calculadora-isr', text: 'Calculadora ISR', path: '/calculadora-isr', roles: ['CONTABILIDAD'] },
   { key: 'generar-csv', text: 'Generar CSV Deposito', path: '/generar-csv', roles: ['CONTABILIDAD'] },
-
+  { key: 'reporte-igss', text: 'Reporte IGSS', path: '/reporte-igss', roles: ['ADMIN', 'CONTABILIDAD'] },
+  { key: 'reporte-isr', text: 'Reporte ISR Anual', path: '/reporte-isr', roles: ['ADMIN', 'CONTABILIDAD'] },
+  { key: 'reporte-aguinaldo', text: 'Reporte Aguinaldo/Bono 14', path: '/reporte-aguinaldo', roles: ['ADMIN', 'CONTABILIDAD', 'RRHH'] },
+  { key: 'reporte-descuentos', text: 'Reporte de Descuentos', path: '/reporte-descuentos', roles: ['ADMIN', 'CONTABILIDAD'] },
+  { key: 'reporte-liquidacion', text: 'Reporte de Liquidaciones', path: '/reporte-liquidacion', roles: ['ADMIN', 'CONTABILIDAD'] },
+  { key: 'reporte-kpi', text: 'Reporte KPIs', path: '/reporte-kpi', roles: ['ADMIN', 'RRHH', 'GERENTE'] },
+  { key: 'reporte-horas-extra', text: 'Reporte Horas Extra', path: '/reporte-horas-extra', roles: ['ADMIN', 'GERENTE', 'CONTABILIDAD'] },
+  { key: 'dashboard-ejecutivo', text: 'Dashboard Ejecutivo', path: '/dashboard-ejecutivo', roles: ['ADMIN','GERENTE'] },
   { key: 'aprobacion-nomina', text: 'Aprobacion de Nomina', path: '/aprobacion-nomina', roles: ['GERENTE'] },
 ];
 
@@ -72,6 +81,58 @@ export const legacyViews: AppView[] = [
 ];
 
 export const allViews = [...appViews, ...legacyViews];
+
+  export type ReportItem = {
+    text: string;
+    path: string;
+    key: string;
+  };
+
+  export const reportesPorRol: Record<AppRole, ReportItem[]> = {
+    EMPLEADO: [],
+    RRHH: [
+      { text: 'Reporte de Marcajes', path: '/reporte-marcajes', key: 'reporte-marcajes' },
+      { text: 'Reporte de Vacaciones', path: '/reporte-vacaciones', key: 'reporte-vacaciones' },
+      { text: 'Reporte KPIs', path: '/reporte-kpi', key: 'reporte-kpi' },
+      { text: 'Reporte Aguinaldo/Bono 14', path: '/reporte-aguinaldo', key: 'reporte-aguinaldo' },
+    ],
+    ADMIN: [
+      { text: 'Reporte de Marcajes', path: '/reporte-marcajes', key: 'reporte-marcajes' },
+      { text: 'Reporte IGSS', path: '/reporte-igss', key: 'reporte-igss' },
+      { text: 'Reporte ISR Anual', path: '/reporte-isr', key: 'reporte-isr' },
+      { text: 'Reporte Aguinaldo/Bono 14', path: '/reporte-aguinaldo', key: 'reporte-aguinaldo' },
+      { text: 'Reporte de Descuentos', path: '/reporte-descuentos', key: 'reporte-descuentos' },
+      { text: 'Reporte de Liquidaciones', path: '/reporte-liquidacion', key: 'reporte-liquidacion' },
+      { text: 'Reporte KPIs', path: '/reporte-kpi', key: 'reporte-kpi' },
+      { text: 'Reporte Horas Extra', path: '/reporte-horas-extra', key: 'reporte-horas-extra' },
+      { text: 'Dashboard Ejecutivo', path: '/dashboard-ejecutivo', key: 'dashboard-ejecutivo' },
+    ],
+    CONTABILIDAD: [
+      { text: 'Reporte IGSS', path: '/reporte-igss', key: 'reporte-igss' },
+      { text: 'Reporte ISR Anual', path: '/reporte-isr', key: 'reporte-isr' },
+      { text: 'Reporte Aguinaldo/Bono 14', path: '/reporte-aguinaldo', key: 'reporte-aguinaldo' },
+      { text: 'Reporte de Descuentos', path: '/reporte-descuentos', key: 'reporte-descuentos' },
+      { text: 'Reporte de Liquidaciones', path: '/reporte-liquidacion', key: 'reporte-liquidacion' },
+      { text: 'Reporte Horas Extra', path: '/reporte-horas-extra', key: 'reporte-horas-extra' },
+    ],
+    GERENTE: [
+      { text: 'Dashboard Ejecutivo', path: '/dashboard-ejecutivo', key: 'dashboard-ejecutivo' },
+      { text: 'Reporte KPIs', path: '/reporte-kpi', key: 'reporte-kpi' },
+      { text: 'Reporte Horas Extra', path: '/reporte-horas-extra', key: 'reporte-horas-extra' },
+      { text: 'Aprobacion de Nomina', path: '/aprobacion-nomina', key: 'aprobacion-nomina' },
+    ],
+    SUPREMO: [
+      { text: 'Reporte de Marcajes', path: '/reporte-marcajes', key: 'reporte-marcajes' },
+      { text: 'Reporte IGSS', path: '/reporte-igss', key: 'reporte-igss' },
+      { text: 'Reporte ISR Anual', path: '/reporte-isr', key: 'reporte-isr' },
+      { text: 'Reporte Aguinaldo/Bono 14', path: '/reporte-aguinaldo', key: 'reporte-aguinaldo' },
+      { text: 'Reporte de Descuentos', path: '/reporte-descuentos', key: 'reporte-descuentos' },
+      { text: 'Reporte de Liquidaciones', path: '/reporte-liquidacion', key: 'reporte-liquidacion' },
+      { text: 'Reporte KPIs', path: '/reporte-kpi', key: 'reporte-kpi' },
+      { text: 'Reporte Horas Extra', path: '/reporte-horas-extra', key: 'reporte-horas-extra' },
+      { text: 'Dashboard Ejecutivo', path: '/dashboard-ejecutivo', key: 'dashboard-ejecutivo' },
+    ],
+  };
 
 export function normalizeRole(value: unknown): AppRole | null {
   if (typeof value !== 'string') return null;

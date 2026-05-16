@@ -40,6 +40,16 @@ import CalculadoraISR from './components/CalculadoraIsr';
 import GenerarCSV from './components/Generarcsv';
 import SuspensionIgss from './components/SuspensionIgss';
 import AprobacionNomina from './components/AprobacionNomina';
+import ReporteMarcajes from './components/ReporteMarcajes';
+import ReporteIgss from './components/ReporteIgss';
+import ReporteIsr from './components/ReporteIsr';
+import ReporteAguinaldo from './components/ReporteAguinaldo';
+import ReporteVacaciones from './components/ReporteVacaciones';
+import ReporteDescuentos from './components/ReporteDescuentos';
+import ReporteKpi        from './components/ReporteKpi';
+import ReporteHorasExtra from './components/ReporteHorasExtra';
+import DashboardEjecutivo from './components/DashboardEjecutivo';
+import ReporteLiquidacion from './components/ReporteLiquidacion';
 
 function GuardedRoute({
   path,
@@ -112,6 +122,16 @@ function Layout() {
           <Route path="/irtra" element={<Navigate to="/descuentos" replace />} />
           <Route path="/intecap" element={<Navigate to="/descuentos" replace />} />
           <Route path="/aprobacion-nomina" element={guarded('/aprobacion-nomina', <AprobacionNomina />)} />
+          <Route path="/reporte-marcajes" element={guarded('/reporte-marcajes', <ReporteMarcajes />)} />
+          <Route path="/reporte-igss" element={guarded('/reporte-igss', <ReporteIgss />)} />
+          <Route path="/reporte-isr" element={guarded('/reporte-isr', <ReporteIsr />)} />
+          <Route path="/reporte-aguinaldo" element={guarded('/reporte-aguinaldo', <ReporteAguinaldo />)} />
+          <Route path="/reporte-vacaciones" element={guarded('/reporte-vacaciones', <ReporteVacaciones />)} />
+          <Route path="/reporte-descuentos" element={guarded('/reporte-descuentos', <ReporteDescuentos />)} />
+          <Route path="/reporte-kpi" element={guarded('/reporte-kpi', <ReporteKpi />)} />
+          <Route path="/reporte-horas-extra" element={guarded('/reporte-horas-extra', <ReporteHorasExtra />)} />
+          <Route path="/reporte-liquidacion" element={guarded('/reporte-liquidacion', <ReporteLiquidacion />)} />
+          <Route path="/dashboard-ejecutivo" element={guarded('/dashboard-ejecutivo', <DashboardEjecutivo />)} />
 
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
