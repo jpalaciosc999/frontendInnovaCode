@@ -48,6 +48,8 @@ import ExpandLess from '@mui/icons-material/ExpandLess';
 import ExpandMore from '@mui/icons-material/ExpandMore';
 import SummarizeIcon from '@mui/icons-material/Summarize';
 import ApprovalIcon from '@mui/icons-material/Approval';
+import HealthAndSafetyIcon from '@mui/icons-material/HealthAndSafety';
+import GavelIcon from '@mui/icons-material/Gavel';
 import {
   AUTH_USER_CHANGED_EVENT,
   appViews,
