@@ -52,17 +52,14 @@ export const appViews: AppView[] = [
   { key: 'bitacora', text: 'Bitácora', path: '/bitacora', roles: ['ADMIN'] },
   { key: 'usuario-bitacora', text: 'Trazabilidad Usuario-Bitácora', path: '/usuario-bitacora', roles: ['ADMIN'] },
 
+  { key: 'nomina-asignaciones', text: 'Asignaciones Nomina', path: '/nomina-asignaciones', roles: ['CONTABILIDAD'] },
   { key: 'nomina', text: 'Nomina', path: '/nomina', roles: ['CONTABILIDAD'] },
   { key: 'nomina-detalle', text: 'Nomina Detalle', path: '/nomina-detalle', roles: ['CONTABILIDAD'] },
   { key: 'periodos', text: 'Periodos', path: '/periodo', roles: ['CONTABILIDAD'] },
   { key: 'tipo-ingresos', text: 'Ingresos', path: '/tipo-ingresos', roles: ['CONTABILIDAD'] },
   { key: 'descuentos', text: 'Descuentos', path: '/descuentos', roles: ['CONTABILIDAD'] },
   { key: 'prestamos', text: 'Prestamos', path: '/prestamos', roles: ['CONTABILIDAD'] },
-  { key: 'prestamo-detalle', text: 'Detalle Prestamo', path: '/prestamo-detalle', roles: ['CONTABILIDAD'] },
   { key: 'liquidacion', text: 'Liquidacion', path: '/liquidacion', roles: ['CONTABILIDAD'] },
-  { key: 'calculadora-igss', text: 'Calculadora IGSS', path: '/calculadora-igss', roles: ['CONTABILIDAD'] },
-  { key: 'calculadora-isr', text: 'Calculadora ISR', path: '/calculadora-isr', roles: ['CONTABILIDAD'] },
-  { key: 'generar-csv', text: 'Generar CSV Deposito', path: '/generar-csv', roles: ['CONTABILIDAD'] },
 
   { key: 'aprobacion-nomina', text: 'Aprobacion de Nomina', path: '/aprobacion-nomina', roles: ['GERENTE'] },
 ];

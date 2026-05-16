@@ -30,7 +30,6 @@ import PaymentsIcon from '@mui/icons-material/Payments';
 import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
 import AccountBalanceIcon from '@mui/icons-material/AccountBalance';
 import AssignmentIcon from '@mui/icons-material/Assignment';
-import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
 import FactCheckIcon from '@mui/icons-material/FactCheck';
 import ApartmentIcon from '@mui/icons-material/Apartment';
 import BadgeIcon from '@mui/icons-material/Badge';
@@ -42,8 +41,6 @@ import GroupIcon from '@mui/icons-material/Group';
 import InsightsIcon from '@mui/icons-material/Insights';
 import QueryStatsIcon from '@mui/icons-material/QueryStats';
 import ScheduleIcon from '@mui/icons-material/Schedule';
-import HealthAndSafetyIcon from '@mui/icons-material/HealthAndSafety';
-import GavelIcon from '@mui/icons-material/Gavel';
 import MedicalServicesIcon from '@mui/icons-material/MedicalServices';
 import PercentIcon from '@mui/icons-material/Percent';
 import FolderIcon from '@mui/icons-material/Folder';
@@ -95,6 +92,7 @@ const viewIcons: Record<string, ReactNode> = {
   bitacora: <HistoryIcon />,
   'usuario-bitacora': <EditNoteIcon />,
   nomina: <DescriptionIcon />,
+  'nomina-asignaciones': <AssignmentIcon />,
   'nomina-detalle': <AssignmentIcon />,
   periodos: <CalendarMonthIcon />,
   'tipo-ingresos': <PaymentsIcon />,
@@ -103,13 +101,9 @@ const viewIcons: Record<string, ReactNode> = {
   irtra: <PercentIcon />,
   intecap: <PercentIcon />,
   prestamos: <PaymentsIcon />,
-  'prestamo-detalle': <ReceiptLongIcon />,
   liquidacion: <DescriptionIcon />,
-  'calculadora-igss': <HealthAndSafetyIcon />,
-  'calculadora-isr': <GavelIcon />,
   'tipos-descuento': <PercentIcon />,
   'prestamos-banco': <AccountBalanceIcon />,
-  'generar-csv': <DescriptionIcon />,
   'aprobacion-nomina': <ApprovalIcon />,
 };
 

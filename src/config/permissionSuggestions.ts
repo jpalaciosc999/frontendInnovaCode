@@ -28,6 +28,7 @@ export const suggestedPermissions: SuggestedPermission[] = [
   { nombre: 'VER_BITACORA', modulo: 'ADMIN', descripcion: 'Permite consultar bitácoras del sistema.' },
   { nombre: 'VER_USUARIO_BITACORA', modulo: 'AUDITORIA', descripcion: 'Permite consultar la relación entre usuarios y bitácoras.' },
   { nombre: 'GESTIONAR_NOMINA', modulo: 'NOMINA', descripcion: 'Permite administrar nomina.' },
+  { nombre: 'GESTIONAR_NOMINA_ASIGNACIONES', modulo: 'NOMINA', descripcion: 'Permite asignar ingresos y egresos por empleado y periodo antes de generar nomina.' },
   { nombre: 'VER_NOMINA_DETALLE', modulo: 'NOMINA', descripcion: 'Permite consultar detalle de nomina.' },
   { nombre: 'GESTIONAR_PERIODOS', modulo: 'NOMINA', descripcion: 'Permite administrar periodos.' },
   { nombre: 'GESTIONAR_INGRESOS', modulo: 'NOMINA', descripcion: 'Permite administrar tipos de ingresos.' },
@@ -37,8 +38,6 @@ export const suggestedPermissions: SuggestedPermission[] = [
   { nombre: 'GESTIONAR_IRTRA', modulo: 'NOMINA', descripcion: 'Permite administrar IRTRA.' },
   { nombre: 'GESTIONAR_INTECAP', modulo: 'NOMINA', descripcion: 'Permite administrar INTECAP.' },
   { nombre: 'GESTIONAR_PRESTAMOS', modulo: 'NOMINA', descripcion: 'Permite administrar prestamos.' },
-  { nombre: 'USAR_CALCULADORA_IGSS', modulo: 'NOMINA', descripcion: 'Permite usar calculadora IGSS.' },
-  { nombre: 'USAR_CALCULADORA_ISR', modulo: 'NOMINA', descripcion: 'Permite usar calculadora ISR.' },
   { nombre: 'APROBAR_NOMINA', modulo: 'REPORTES', descripcion: 'Permite aprobar nomina.' },
   { nombre: 'VER_REPORTES_GERENCIALES', modulo: 'REPORTES', descripcion: 'Permite consultar reportes gerenciales.' },
 ];
@@ -70,6 +69,7 @@ export const suggestedPermissionNamesByRole: Record<AppRole, string[]> = {
   ],
   CONTABILIDAD: [
     'GESTIONAR_NOMINA',
+    'GESTIONAR_NOMINA_ASIGNACIONES',
     'VER_NOMINA_DETALLE',
     'GESTIONAR_PERIODOS',
     'GESTIONAR_INGRESOS',
@@ -79,8 +79,6 @@ export const suggestedPermissionNamesByRole: Record<AppRole, string[]> = {
     'GESTIONAR_IRTRA',
     'GESTIONAR_INTECAP',
     'GESTIONAR_PRESTAMOS',
-    'USAR_CALCULADORA_IGSS',
-    'USAR_CALCULADORA_ISR',
   ],
   GERENTE: ['APROBAR_NOMINA', 'VER_REPORTES_GERENCIALES'],
   SUPREMO: suggestedPermissions.map((permiso) => permiso.nombre),
