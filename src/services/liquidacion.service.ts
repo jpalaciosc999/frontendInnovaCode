@@ -1,5 +1,5 @@
 import api from '../api/axios';
-import type { Liquidacion, LiquidacionForm } from '../interfaces/liquidacion';
+import type { Liquidacion, LiquidacionCalculo, LiquidacionForm } from '../interfaces/liquidacion';
 
 const ENDPOINT = 'liquidaciones';
 
@@ -31,6 +31,11 @@ const formatLiquidacionPayload = (data: LiquidacionForm): LiquidacionPayload => 
 
 export const obtenerLiquidaciones = async (): Promise<Liquidacion[]> => {
     const response = await api.get<Liquidacion[]>(`${ENDPOINT}/`);
+    return response.data;
+};
+
+export const calcularLiquidacion = async (data: LiquidacionForm): Promise<LiquidacionCalculo> => {
+    const response = await api.post<LiquidacionCalculo>(`${ENDPOINT}/calcular`, formatLiquidacionPayload(data));
     return response.data;
 };
 

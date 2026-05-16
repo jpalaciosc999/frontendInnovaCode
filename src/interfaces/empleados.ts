@@ -14,6 +14,7 @@ export interface Empleado {
   TIC_ID?: number;
   EMP_FECHA_INICIO_CONTRATO?: string;
   EMP_FECHA_FIN_CONTRATO?: string;
+  EMP_FECHA_LIQUIDACION?: string;
   EMP_SUELDO?: number | string;
   EMP_FOTO?: string | { data?: number[] };
   emp_foto?: string | { data?: number[] };

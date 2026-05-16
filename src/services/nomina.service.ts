@@ -14,6 +14,28 @@ type NominaPayload = {
     estado: string;
 };
 
+export type GenerarNominaPayload = {
+    per_id: string | number;
+    fecha_generacion?: string;
+    estado?: string;
+    emp_ids?: number[];
+    recalcular?: boolean;
+};
+
+export type GenerarNominaResponse = {
+    mensaje?: string;
+    message?: string;
+    generadas?: unknown[];
+    omitidas?: unknown[];
+    errores?: unknown[];
+    resumen?: {
+        generadas?: number;
+        omitidas?: number;
+        errores?: number;
+    };
+    [key: string]: unknown;
+};
+
 const toOracleDateLiteral = (value: string) => {
     if (!value) return value;
 
@@ -50,4 +72,9 @@ export const actualizarNomina = async (id: number, data: NominaForm): Promise<vo
 
 export const eliminarNomina = async (id: number): Promise<void> => {
     await api.delete(`${ENDPOINT}/${id}`);
+};
+
+export const generarNominas = async (data: GenerarNominaPayload): Promise<GenerarNominaResponse> => {
+    const response = await api.post<GenerarNominaResponse>(`${ENDPOINT}/generar`, data);
+    return response.data;
 };

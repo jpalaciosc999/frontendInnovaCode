@@ -23,15 +23,16 @@ import {
 import type { SelectChangeEvent } from '@mui/material/Select';
 import DownloadIcon from '@mui/icons-material/Download';
 import SummarizeIcon from '@mui/icons-material/Summarize';
-import SendIcon from '@mui/icons-material/Send';
 
 import api from '../api/axios';
 import { getApiErrorMessage } from '../api/errors';
 import type { Empleado } from '../interfaces/empleados';
 import type { Nomina } from '../interfaces/nomina';
+import type { NominaDetalle } from '../interfaces/nomina-detalle';
 import type { Periodo } from '../interfaces/periodo';
 import { obtenerEmpleados } from '../services/empleados.service';
-import { actualizarNomina, obtenerNominas } from '../services/nomina.service';
+import { obtenerNominas } from '../services/nomina.service';
+import { obtenerDetallesNomina } from '../services/nomina-detalle.service';
 import { obtenerPeriodos } from '../services/periodo.service';
 import { formatearFecha, formatearMoneda, obtenerNombreEmpleado } from '../utils/relations';
 
@@ -54,6 +55,9 @@ interface FilaNomina {
   descuentos: number;
   liquido_depositar: number;
   estado: string;
+  conceptos: number;
+  duplicados: number;
+  totales_cuadran: boolean;
 }
 
 const obtenerCuentas = async (): Promise<CuentaBancaria[]> => {
@@ -69,22 +73,48 @@ const obtenerEtiquetaEstado = (estado: string) => {
   return <Chip label={estado || 'Sin estado'} size="small" />;
 };
 
-const crearPayloadNomina = (nomina: Nomina, estado: string) => ({
-  nom_total_ingresos: nomina.NOM_TOTAL_INGRESOS,
-  nom_total_descuento: nomina.NOM_TOTAL_DESCUENTO,
-  nom_salario_liquido: nomina.NOM_SALARIO_LIQUIDO,
-  nom_fecha_generacion: formatearFecha(nomina.NOM_FECHA_GENERACION),
-  per_id: nomina.PER_ID,
-  empleado_id: nomina.EMP_ID,
-  liq_id: nomina.LIQ_ID ?? null,
-  nom_estado: estado,
-});
+const obtenerClaveConcepto = (detalle: NominaDetalle) => {
+  if (detalle.TIS_ID) return `I-${detalle.TIS_ID}`;
+  if (detalle.TDS_ID) return `D-${detalle.TDS_ID}`;
+  if (detalle.KRE_ID) return `K-${detalle.KRE_ID}`;
+  return '';
+};
+
+const calcularResumenDetalles = (nominaId: number, detalles: NominaDetalle[]) => {
+  const conceptos = new Set<string>();
+  return detalles
+    .filter((detalle) => String(detalle.NOM_ID) === String(nominaId))
+    .reduce(
+      (resumen, detalle) => {
+        const monto = Number(detalle.DET_MONTO || 0);
+        if (detalle.TDS_ID) resumen.descuentos += monto;
+        else resumen.ingresos += monto;
+
+        const concepto = obtenerClaveConcepto(detalle);
+        if (concepto) {
+          if (conceptos.has(concepto)) resumen.duplicados += 1;
+          conceptos.add(concepto);
+        }
+
+        resumen.liquido = resumen.ingresos - resumen.descuentos;
+        resumen.conceptos += 1;
+        return resumen;
+      },
+      { ingresos: 0, descuentos: 0, liquido: 0, conceptos: 0, duplicados: 0 }
+    );
+};
+
+const totalesCuadran = (nomina: Nomina, resumen: ReturnType<typeof calcularResumenDetalles>) => {
+  if (resumen.conceptos === 0) return false;
+  return Math.abs(Number(nomina.NOM_TOTAL_INGRESOS || 0) - resumen.ingresos) < 0.01
+    && Math.abs(Number(nomina.NOM_TOTAL_DESCUENTO || 0) - resumen.descuentos) < 0.01
+    && Math.abs(Number(nomina.NOM_SALARIO_LIQUIDO || 0) - resumen.liquido) < 0.01;
+};
 
 function GenerarCSV() {
   const [periodos, setPeriodos] = useState<Periodo[]>([]);
   const [periodoId, setPeriodoId] = useState('');
   const [datos, setDatos] = useState<FilaNomina[]>([]);
-  const [nominasPeriodo, setNominasPeriodo] = useState<Nomina[]>([]);
   const [cargando, setCargando] = useState(false);
   const [generado, setGenerado] = useState(false);
   const [error, setError] = useState('');
@@ -111,7 +141,6 @@ function GenerarCSV() {
     setPeriodoId(e.target.value);
     setGenerado(false);
     setDatos([]);
-    setNominasPeriodo([]);
     setError('');
     setMensaje('');
   };
@@ -119,7 +148,8 @@ function GenerarCSV() {
   const construirFilas = (
     nominas: Nomina[],
     empleados: Empleado[],
-    cuentas: CuentaBancaria[]
+    cuentas: CuentaBancaria[],
+    detalles: NominaDetalle[]
   ): FilaNomina[] => {
     const empleadosPorId = new Map(empleados.map((empleado) => [String(empleado.EMP_ID), empleado]));
     const cuentasPorEmp = new Map<number, CuentaBancaria>();
@@ -131,6 +161,7 @@ function GenerarCSV() {
     return nominas.map((nomina) => {
       const empleado = empleadosPorId.get(String(nomina.EMP_ID));
       const cuenta = cuentasPorEmp.get(nomina.EMP_ID);
+      const resumen = calcularResumenDetalles(nomina.NOM_ID, detalles);
 
       return {
         nom_id: nomina.NOM_ID,
@@ -139,10 +170,13 @@ function GenerarCSV() {
         banco: cuenta?.CUE_NOMBRE ?? 'Sin banco',
         cuenta_numero: cuenta?.CUE_NUMERO ?? 'Sin cuenta',
         cuenta_tipo: cuenta?.CUE_TIPO ?? '-',
-        ingresos: Number(nomina.NOM_TOTAL_INGRESOS || 0),
-        descuentos: Number(nomina.NOM_TOTAL_DESCUENTO || 0),
-        liquido_depositar: Number(nomina.NOM_SALARIO_LIQUIDO || 0),
+        ingresos: resumen.conceptos > 0 ? resumen.ingresos : Number(nomina.NOM_TOTAL_INGRESOS || 0),
+        descuentos: resumen.conceptos > 0 ? resumen.descuentos : Number(nomina.NOM_TOTAL_DESCUENTO || 0),
+        liquido_depositar: resumen.conceptos > 0 ? resumen.liquido : Number(nomina.NOM_SALARIO_LIQUIDO || 0),
         estado: nomina.NOM_ESTADO,
+        conceptos: resumen.conceptos,
+        duplicados: resumen.duplicados,
+        totales_cuadran: totalesCuadran(nomina, resumen),
       };
     });
   };
@@ -154,8 +188,9 @@ function GenerarCSV() {
       setError('');
       setMensaje('');
 
-      const [nominas, empleados, cuentas] = await Promise.all([
+      const [nominas, detalles, empleados, cuentas] = await Promise.all([
         obtenerNominas(),
+        obtenerDetallesNomina(),
         obtenerEmpleados(),
         obtenerCuentas()
       ]);
@@ -164,14 +199,12 @@ function GenerarCSV() {
 
       if (nominasFiltradas.length === 0) {
         setDatos([]);
-        setNominasPeriodo([]);
         setGenerado(true);
         setError('No hay nominas registradas para este periodo. Primero crea la cabecera y su detalle.');
         return;
       }
 
-      setNominasPeriodo(nominasFiltradas);
-      setDatos(construirFilas(nominasFiltradas, empleados, cuentas));
+      setDatos(construirFilas(nominasFiltradas, empleados, cuentas, detalles));
       setGenerado(true);
     } catch (err: unknown) {
       setError(getApiErrorMessage(err, 'Error generando planilla'));
@@ -180,36 +213,11 @@ function GenerarCSV() {
     }
   };
 
-  const enviarPeriodoAGerente = async () => {
-    if (!periodoId) return;
-    try {
-      setCargando(true);
-      setError('');
-      setMensaje('');
-
-      const nominas = nominasPeriodo.length > 0
-        ? nominasPeriodo
-        : (await obtenerNominas()).filter((nomina) => String(nomina.PER_ID) === String(periodoId));
-      const enviables = nominas.filter((nomina) => ['B', 'I'].includes(nomina.NOM_ESTADO));
-
-      if (enviables.length === 0) {
-        setMensaje('No hay nominas en borrador o rechazadas para enviar.');
-        return;
-      }
-
-      await Promise.all(enviables.map((nomina) => actualizarNomina(nomina.NOM_ID, crearPayloadNomina(nomina, 'P'))));
-      setMensaje('Planilla enviada al gerente. Queda pendiente de aprobacion.');
-      await cargarPlanilla();
-    } catch (err: unknown) {
-      setError(getApiErrorMessage(err, 'Error enviando planilla a gerente'));
-    } finally {
-      setCargando(false);
-    }
-  };
-
-  const puedeExportar = generado && datos.length > 0 && datos.every((fila) => fila.estado === 'A');
+  const puedeExportar = generado && datos.length > 0
+    && datos.every((fila) => fila.estado === 'A' && fila.conceptos > 0 && fila.duplicados === 0 && fila.totales_cuadran);
   const hayPendientes = generado && datos.some((fila) => fila.estado === 'P' || fila.estado === 'B');
   const hayRechazadas = generado && datos.some((fila) => fila.estado === 'I');
+  const hayInconsistencias = generado && datos.some((fila) => fila.conceptos === 0 || fila.duplicados > 0 || !fila.totales_cuadran);
 
   const exportarCSV = () => {
     if (!puedeExportar) return;
@@ -289,11 +297,11 @@ function GenerarCSV() {
         </Box>
 
         <Alert severity="info" sx={{ mb: 3 }}>
-          La planilla se arma con las nominas del periodo. Si aun no estan aprobadas por gerencia, queda pendiente y no se descarga el CSV de deposito.
+          La planilla se arma con las nominas aprobadas del periodo. El envio a gerente se realiza desde Gestion de Nomina; aqui solo se revisa la planilla y se descarga el CSV final.
         </Alert>
 
         <Grid container spacing={2} sx={{ alignItems: 'center' }}>
-          <Grid size={{ xs: 12, md: 5 }}>
+          <Grid size={{ xs: 12, md: 6 }}>
             <FormControl fullWidth>
               <InputLabel>Periodo de nomina</InputLabel>
               <Select value={periodoId} label="Periodo de nomina"
@@ -318,16 +326,7 @@ function GenerarCSV() {
             </Button>
           </Grid>
 
-          <Grid size={{ xs: 12, md: 2 }}>
-            <Button fullWidth variant="outlined" size="large"
-              startIcon={<SendIcon />}
-              onClick={enviarPeriodoAGerente}
-              disabled={!periodoId || cargando}>
-              Enviar
-            </Button>
-          </Grid>
-
-          <Grid size={{ xs: 12, md: 2 }}>
+          <Grid size={{ xs: 12, md: 3 }}>
             <Button fullWidth variant="contained" color="success" size="large"
               startIcon={<DownloadIcon />} onClick={exportarCSV}
               disabled={!puedeExportar}>
@@ -340,12 +339,17 @@ function GenerarCSV() {
         {error && <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>}
         {hayPendientes && (
           <Alert severity="warning" sx={{ mt: 2 }}>
-            Hay nominas pendientes o en borrador. Envia la planilla al gerente y espera aprobacion para descargar el CSV.
+            Hay nominas pendientes o en borrador. En Gestion de Nomina envia las nominas al gerente y espera aprobacion para descargar el CSV.
           </Alert>
         )}
         {hayRechazadas && (
           <Alert severity="error" sx={{ mt: 2 }}>
-            Hay nominas rechazadas. Corrige el detalle, recalcula y vuelve a enviarlas al gerente.
+            Hay nominas rechazadas. Corrige el detalle en Nomina Detalle, recalcula en Gestion de Nomina y vuelve a enviarlas al gerente desde Gestion de Nomina.
+          </Alert>
+        )}
+        {hayInconsistencias && (
+          <Alert severity="error" sx={{ mt: 2 }}>
+            Hay nominas sin detalle, con conceptos duplicados o con cabecera distinta al detalle. Corrige y recalcula antes de exportar.
           </Alert>
         )}
 
@@ -401,6 +405,7 @@ function GenerarCSV() {
                   <TableCell align="right"><strong>Ingresos</strong></TableCell>
                   <TableCell align="right"><strong>Descuentos</strong></TableCell>
                   <TableCell align="right"><strong>Liquido</strong></TableCell>
+                  <TableCell align="center"><strong>Revision</strong></TableCell>
                   <TableCell><strong>Estado</strong></TableCell>
                 </TableRow>
               </TableHead>
@@ -430,6 +435,11 @@ function GenerarCSV() {
                     <TableCell align="right" sx={{ backgroundColor: '#e8f5e9', fontWeight: 'bold', color: 'success.main' }}>
                       {formatearMoneda(d.liquido_depositar)}
                     </TableCell>
+                    <TableCell align="center">
+                      {d.conceptos === 0 || d.duplicados > 0 || !d.totales_cuadran
+                        ? <Chip label="Revisar" color="error" size="small" />
+                        : <Chip label={`${d.conceptos} conceptos`} color="success" size="small" />}
+                    </TableCell>
                     <TableCell>{obtenerEtiquetaEstado(d.estado)}</TableCell>
                   </TableRow>
                 ))}
@@ -443,6 +453,7 @@ function GenerarCSV() {
                   <TableCell align="right" sx={{ backgroundColor: '#c8e6c9', color: 'success.main', fontSize: '1rem' }}>
                     <strong>{formatearMoneda(totales.liquido)}</strong>
                   </TableCell>
+                  <TableCell />
                   <TableCell />
                 </TableRow>
               </TableBody>
