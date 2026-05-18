@@ -73,3 +73,20 @@ export const obtenerAdminActividad = async (): Promise<AdminActividad> => {
     pagination: paginated.pagination,
   };
 };
+
+export const obtenerAuditoriaCambio = async (): Promise<unknown[]> => {
+  const response = await api.get('admin/auditoria-cambio');
+  const data = response.data;
+
+  if (Array.isArray(data)) return data;
+  if (data && typeof data === 'object' && Array.isArray((data as Record<string, unknown>).data)) {
+    return (data as Record<string, unknown>).data as unknown[];
+  }
+
+  // Fallback: try common keys
+  return (
+    (data as Record<string, unknown>)?.auditoria ||
+    (data as Record<string, unknown>)?.auditoriaCambio ||
+    []
+  ) as unknown[];
+};

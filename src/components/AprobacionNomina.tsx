@@ -36,13 +36,14 @@ import type { Descuento } from '../interfaces/descuentos';
 import { obtenerEmpleados } from '../services/empleados.service';
 import { actualizarNomina, obtenerNominas } from '../services/nomina.service';
 import { obtenerDetallesNomina } from '../services/nomina-detalle.service';
-import { obtenerPeriodos } from '../services/periodo.service';
+import { actualizarEstadoPeriodo, obtenerPeriodos } from '../services/periodo.service';
 import { obtenerPuestos } from '../services/puestos.service';
 import { obtenerDepartamentos } from '../services/departamentos.service';
 import { obtenerIngresos } from '../services/tipoIngresos.service';
 import { obtenerDescuentos } from '../services/descuentos.service';
 import { getApiErrorMessage } from '../api/errors';
 import { formatearFecha, formatearMoneda, obtenerNombreEmpleado } from '../utils/relations';
+import { esPeriodoEnRevision, normalizePeriodoEstado, periodoEstadoLabels } from '../utils/payroll';
 
 type TotalesNomina = {
   ingresos: number;
@@ -121,7 +122,8 @@ const esCodigo = (codigo: string, tokens: string[]) =>
 const obtenerEstado = (estado: string) => {
   if (estado === 'P') return <Chip label="Pendiente" color="warning" size="small" />;
   if (estado === 'A') return <Chip label="Aprobada" color="success" size="small" />;
-  if (estado === 'I' || estado === 'R') return <Chip label="Rechazada" color="error" size="small" />;
+  if (estado === 'R') return <Chip label="Rechazada" color="error" size="small" />;
+  if (estado === 'I') return <Chip label="Inactiva" color="default" size="small" />;
   if (estado === 'B') return <Chip label="Borrador" color="default" size="small" />;
   return <Chip label={estado || 'Sin estado'} size="small" />;
 };
@@ -216,10 +218,11 @@ function AprobacionNomina() {
 
   const periodosPendientes = useMemo(() => {
     const ids = new Set(pendientes.map((nomina) => String(nomina.PER_ID)));
-    return periodos.filter((periodo) => ids.has(String(periodo.PER_ID)));
+    return periodos.filter((periodo) => ids.has(String(periodo.PER_ID)) && esPeriodoEnRevision(periodo.PER_ESTADO));
   }, [pendientes, periodos]);
 
   const periodoActivoId = periodoRevisionId || String(periodosPendientes[0]?.PER_ID ?? '');
+  const periodoActivo = periodos.find((periodo) => String(periodo.PER_ID) === periodoActivoId);
 
   const nominasPendientesPeriodo = useMemo(
     () => pendientes.filter((nomina) => periodoActivoId && String(nomina.PER_ID) === periodoActivoId),
@@ -387,7 +390,7 @@ function AprobacionNomina() {
       ? `${formatearFecha(periodo.PER_FECHA_INICIO)} al ${formatearFecha(periodo.PER_FECHA_FIN)}`
       : '';
 
-  const crearPayloadNomina = (nomina: Nomina, fila: FilaPlanilla, estado: 'A' | 'I'): NominaForm => ({
+  const crearPayloadNomina = (nomina: Nomina, fila: FilaPlanilla, estado: 'A' | 'R'): NominaForm => ({
     nom_total_ingresos: redondearMoneda(fila.totalIngresos),
     nom_total_descuento: redondearMoneda(fila.totalEgresos),
     nom_salario_liquido: redondearMoneda(fila.liquido),
@@ -398,7 +401,7 @@ function AprobacionNomina() {
     nom_estado: estado,
   });
 
-  const cambiarEstadoPlanilla = async (estado: 'A' | 'I') => {
+  const cambiarEstadoPlanilla = async (estado: 'A' | 'R') => {
     try {
       setProcesando(true);
       setError('');
@@ -413,11 +416,16 @@ function AprobacionNomina() {
         setError('No hay nominas pendientes para este periodo.');
         return;
       }
+      if (!periodoActivo || !esPeriodoEnRevision(periodoActivo.PER_ESTADO)) {
+        setError('Solo puedes aprobar o rechazar planillas de periodos en revision.');
+        return;
+      }
 
       await Promise.all(filasPlanilla.map((fila) =>
         actualizarNomina(fila.nomina.NOM_ID, crearPayloadNomina(fila.nomina, fila, estado))
       ));
 
+      await actualizarEstadoPeriodo(periodoActivo, estado === 'A' ? 'APROBADO' : 'ABIERTO');
       setMensaje(estado === 'A' ? 'Planilla aprobada correctamente' : 'Planilla rechazada correctamente');
       await cargarDatos();
     } catch (err: unknown) {
@@ -463,7 +471,7 @@ function AprobacionNomina() {
                 {periodosPendientes.length === 0 && <MenuItem value="">Sin periodos pendientes</MenuItem>}
                 {periodosPendientes.map((periodo) => (
                   <MenuItem key={periodo.PER_ID} value={String(periodo.PER_ID)}>
-                    {obtenerEtiquetaPeriodo(periodo)}
+                    {obtenerEtiquetaPeriodo(periodo)} - {periodoEstadoLabels[normalizePeriodoEstado(periodo.PER_ESTADO) || 'EN_REVISION']}
                   </MenuItem>
                 ))}
               </Select>
@@ -498,7 +506,7 @@ function AprobacionNomina() {
               color="error"
               startIcon={<CancelIcon />}
               disabled={procesando || filasPlanilla.length === 0}
-              onClick={() => cambiarEstadoPlanilla('I')}
+              onClick={() => cambiarEstadoPlanilla('R')}
             >
               Rechazar planilla
             </Button>

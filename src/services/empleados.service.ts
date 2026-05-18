@@ -3,8 +3,8 @@ import type { Empleado, EmpleadoForm } from '../interfaces/empleados';
 
 const ENDPOINT = 'empleados';
 
-export const obtenerEmpleados = async (): Promise<Empleado[]> => {
-  const response = await api.get<Empleado[]>(`${ENDPOINT}/`);
+export const obtenerEmpleados = async (params?: Record<string, unknown>): Promise<Empleado[]> => {
+  const response = await api.get<Empleado[]>(`${ENDPOINT}/`, { params });
   return response.data;
 };
 

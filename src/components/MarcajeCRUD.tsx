@@ -31,6 +31,8 @@ import {
 } from '../services/marcaje.service';
 
 import { obtenerEmpleados } from '../services/empleados.service';
+import { useAuth } from '../context/AuthContext';
+import { isRole } from '../auth/access';
 import { obtenerHorarios } from '../services/horario.service';
 
 import type { Marcaje } from '../interfaces/marcaje';
@@ -108,6 +110,7 @@ const calcularDiferencia = (
 };
 
 function MarcajeCRUD() {
+  const authCtx = useAuth();
   const [datos, setDatos] = useState<Marcaje[]>([]);
   const [empleados, setEmpleados] = useState<Empleado[]>([]);
   const [horarios, setHorarios] = useState<Horario[]>([]);
@@ -134,7 +137,20 @@ function MarcajeCRUD() {
 
       try {
         const [empleadosData, horariosData] = await Promise.all([
-          obtenerEmpleados(),
+          // si es supervisor de asistencia, filtrar por SED_ID del usuario
+          (async () => {
+            try {
+              const auth = authCtx;
+              if (auth && isRole(auth.user as any, 'SUPER\u005FVISOR_ASISTENCIA')) {
+                const sed = (auth.user as any)?.SED_ID ?? (auth.user as any)?.sed_id ?? '';
+                return await obtenerEmpleados(sed ? { sed_id: String(sed) } : undefined);
+              }
+            } catch (e) {
+              // ignore and fallback
+            }
+
+            return await obtenerEmpleados();
+          })(),
           obtenerHorarios(),
         ]);
 
@@ -151,7 +167,7 @@ function MarcajeCRUD() {
     };
 
     cargarCatalogos();
-  }, []);
+    }, []);
 
   const horarioSeleccionado = horarios.find(
     (horario) => horario.HOR_ID === empleadoSeleccionado?.HOR_ID

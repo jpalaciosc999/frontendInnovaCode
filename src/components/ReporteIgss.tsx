@@ -37,7 +37,13 @@ import {
   Cell,
 } from 'recharts';
 
-import { getReporteIgss, descargarPdfIgss } from '../services/reporte_igss.service';
+import {
+  getReporteIgss,
+  descargarPdfIgss,
+  descargarCsvIgss,
+  subirReciboIgss,
+  registrarNumeroRecibo,
+} from '../services/reporte_igss.service';
 import { obtenerPeriodos } from '../services/periodo.service';
 import { obtenerDepartamentos } from '../services/departamentos.service';
 import { getApiErrorMessage } from '../api/errors';
@@ -143,6 +149,12 @@ export default function ReporteIgss() {
     ...(estado ? { estado } : {}),
   };
 
+  const [reciboMode, setReciboMode] = useState('');
+  const [manualRecibo, setManualRecibo] = useState('');
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [subiendo, setSubiendo] = useState(false);
+  const [guardandoNumero, setGuardandoNumero] = useState(false);
+
   return (
     <Box>
       {/* ── Header ── */}
@@ -166,14 +178,35 @@ export default function ReporteIgss() {
           </Box>
         </Box>
 
-        <Button
-          variant="outlined"
-          startIcon={<PictureAsPdfIcon />}
-          size="small"
-          onClick={() => descargarPdfIgss(pdfParams)}
-        >
-          Descargar PDF
-        </Button>
+        <Box sx={{ display: 'flex', gap: 1 }}>
+          <Button
+            variant="outlined"
+            startIcon={<PictureAsPdfIcon />}
+            size="small"
+            onClick={() => descargarPdfIgss(pdfParams)}
+          >
+            Descargar PDF
+          </Button>
+
+          <Button
+            variant="outlined"
+            size="small"
+            onClick={() => descargarCsvIgss(pdfParams)}
+          >
+            Descargar CSV
+          </Button>
+
+          <Button
+            variant="contained"
+            size="small"
+            onClick={() => {
+              const input = document.getElementById('igss-recibo-file') as HTMLInputElement | null;
+              input?.click();
+            }}
+          >
+            Adjuntar factura de pago
+          </Button>
+        </Box>
       </Box>
 
       {/* ── Filtros ── */}
@@ -229,6 +262,102 @@ export default function ReporteIgss() {
               </Select>
             </FormControl>
           </Grid>
+        </Grid>
+      </Paper>
+
+      <input
+        id="igss-recibo-file"
+        type="file"
+        accept="application/pdf,image/*"
+        style={{ display: 'none' }}
+        onChange={(e) => {
+          const f = e.target.files?.[0] ?? null;
+          setSelectedFile(f);
+        }}
+      />
+
+      {selectedFile && (
+        <Paper sx={{ p: 2, mb: 3 }}>
+          <Typography variant="subtitle2">Archivo seleccionado: {selectedFile.name}</Typography>
+          <Box sx={{ display: 'flex', gap: 1, mt: 1 }}>
+            <Button
+              size="small"
+              onClick={async () => {
+                if (!periodoId) {
+                  setError('Selecciona un período antes de subir el recibo');
+                  return;
+                }
+                try {
+                  setSubiendo(true);
+                  setError('');
+                  await subirReciboIgss(Number(periodoId), selectedFile);
+                  setSelectedFile(null);
+                } catch (err) {
+                  setError(getApiErrorMessage(err, 'Error al subir el recibo'));
+                } finally {
+                  setSubiendo(false);
+                }
+              }}
+            >
+              {subiendo ? 'Subiendo...' : 'Subir recibo'}
+            </Button>
+
+            <Button size="small" onClick={() => setSelectedFile(null)}>
+              Cancelar
+            </Button>
+          </Box>
+        </Paper>
+      )}
+
+      <Paper sx={{ p: 2, mb: 3 }}>
+        <Grid container spacing={2} sx={{ alignItems: 'center' }}>
+          <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+            <FormControl fullWidth size="small">
+              <InputLabel>Número de recibo IGSS</InputLabel>
+              <Select
+                label="Número de recibo IGSS"
+                value={reciboMode}
+                onChange={(e: SelectChangeEvent) => setReciboMode(e.target.value)}
+              >
+                <MenuItem value="">Ninguno</MenuItem>
+                <MenuItem value="manual">Ingresar manualmente</MenuItem>
+              </Select>
+            </FormControl>
+          </Grid>
+
+          {reciboMode === 'manual' && (
+            <Grid size={{ xs: 12, sm: 6, md: 8 }}>
+              <Box sx={{ display: 'flex', gap: 1 }}>
+                <input
+                  placeholder="Número de recibo"
+                  value={manualRecibo}
+                  onChange={(e) => setManualRecibo(e.target.value)}
+                  style={{ flex: 1, padding: '8px 10px', borderRadius: 4, border: '1px solid #ccc' }}
+                />
+                <Button
+                  variant="contained"
+                  size="small"
+                  onClick={async () => {
+                    if (!periodoId) {
+                      setError('Selecciona un período antes de registrar el número de recibo');
+                      return;
+                    }
+                    try {
+                      setGuardandoNumero(true);
+                      setError('');
+                      await registrarNumeroRecibo(Number(periodoId), manualRecibo);
+                    } catch (err) {
+                      setError(getApiErrorMessage(err, 'Error al registrar número de recibo'));
+                    } finally {
+                      setGuardandoNumero(false);
+                    }
+                  }}
+                >
+                  {guardandoNumero ? 'Guardando...' : 'Guardar'}
+                </Button>
+              </Box>
+            </Grid>
+          )}
         </Grid>
       </Paper>
 
@@ -486,7 +615,9 @@ export default function ReporteIgss() {
               <TableHead>
                 <TableRow>
                   <TableCell>Empleado</TableCell>
+                  <TableCell>DPI</TableCell>
                   <TableCell>Puesto</TableCell>
+                  <TableCell align="right">Días trabajados</TableCell>
                   <TableCell align="right">Salario base</TableCell>
                   <TableCell align="right">Patr. 12.67%</TableCell>
                   <TableCell align="right">Laboral 4.83%</TableCell>
@@ -495,7 +626,7 @@ export default function ReporteIgss() {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {empleados.map((emp) => (
+                {empleados.map((emp: any) => (
                   <TableRow key={emp.EMP_ID} hover>
                     <TableCell>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -509,12 +640,27 @@ export default function ReporteIgss() {
                         >
                           {emp.INICIALES}
                         </Avatar>
-                        <Typography variant="body2">{emp.EMPLEADO}</Typography>
+                        <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+                          <Typography variant="body2">{emp.EMPLEADO}</Typography>
+                          {emp.SUSPENDIDO && (
+                            <Typography variant="caption" color="warning.main">Suspendido</Typography>
+                          )}
+                        </Box>
                       </Box>
                     </TableCell>
+
+                    <TableCell>
+                      <Typography variant="body2">{emp.EMP_DPI ?? '—'}</Typography>
+                    </TableCell>
+
                     <TableCell>
                       <Typography variant="body2">{emp.PUESTO}</Typography>
                     </TableCell>
+
+                    <TableCell align="right">
+                      <Typography variant="body2">{emp.DIAS_TRABAJADOS ?? '—'}</Typography>
+                    </TableCell>
+
                     <TableCell align="right">
                       <Typography variant="body2">{fmtQDec(emp.SALARIO_BASE)}</Typography>
                     </TableCell>
@@ -541,7 +687,7 @@ export default function ReporteIgss() {
 
                 {empleados.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={7} align="center">
+                    <TableCell colSpan={9} align="center">
                       <Typography variant="body2" color="text.secondary" sx={{ py: 3 }}>
                         No hay datos para el período seleccionado
                       </Typography>

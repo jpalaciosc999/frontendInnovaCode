@@ -43,7 +43,7 @@ type FilaHistorialContrato = {
     ticId?: number | string;
     empId?: number | string;
     motivoCambio?: string;
-    origen: 'historico' | 'actual';
+    esActual: boolean;
 };
 
 function EmpleadoContratoCRUD() {
@@ -93,6 +93,11 @@ function EmpleadoContratoCRUD() {
     const esContratoIndefinido = (ticId: number | string) => {
         const tipo = obtenerTipoContrato(ticId);
         return tipo?.TIC_NOMBRE.toLowerCase().includes('indefinido') ?? false;
+    };
+
+    const esContratoActual = (value: unknown) => {
+        if (typeof value === 'boolean') return value;
+        return String(value ?? '').trim() === '1';
     };
 
     const obtenerDetalleEmpleado = (empId: number | string | undefined) => {
@@ -186,7 +191,7 @@ function EmpleadoContratoCRUD() {
     };
 
     const filasHistorial = useMemo<FilaHistorialContrato[]>(() => {
-        const filasHistoricas: FilaHistorialContrato[] = datos.map((contrato) => ({
+        return datos.map((contrato) => ({
             id: `historico-${contrato.TCO_ID}`,
             contratoId: contrato.TCO_ID,
             fechaInicio: contrato.TCO_FECHA_INICIO,
@@ -195,40 +200,29 @@ function EmpleadoContratoCRUD() {
             ticId: contrato.TIC_ID,
             empId: obtenerContratoEmpleadoId(contrato),
             motivoCambio: contrato.TCO_MOTIVO_CAMBIO,
-            origen: 'historico'
-        }));
-
-        const filasContratoActual: FilaHistorialContrato[] = empleados
-            .filter((empleado) => empleado.TIC_ID)
-            .map((empleado) => ({
-                id: `empleado-${empleado.EMP_ID}`,
-                fechaInicio: empleado.EMP_FECHA_INICIO_CONTRATO || empleado.EMP_FECHA_CONTRATACION,
-                fechaFin: empleado.EMP_FECHA_FIN_CONTRATO || '',
-                estado: empleado.EMP_ESTADO,
-                ticId: empleado.TIC_ID,
-                empId: empleado.EMP_ID,
-                motivoCambio: '',
-                origen: 'actual' as const
-            }))
-            .filter((filaActual) => {
-                const existeMismoPeriodo = filasHistoricas.some((filaHistorica) =>
-                    String(filaHistorica.empId ?? '') === String(filaActual.empId ?? '') &&
-                    String(filaHistorica.ticId ?? '') === String(filaActual.ticId ?? '') &&
-                    String(filaHistorica.fechaInicio || '').slice(0, 10) === String(filaActual.fechaInicio || '').slice(0, 10) &&
-                    String(filaHistorica.fechaFin || '').slice(0, 10) === String(filaActual.fechaFin || '').slice(0, 10)
-                );
-
-                return !existeMismoPeriodo;
-            });
-
-        return [...filasContratoActual, ...filasHistoricas].sort((a, b) => {
+            esActual: esContratoActual(contrato.TCO_ES_ACTUAL)
+        })).sort((a, b) => {
             const empleadoA = String(a.empId ?? '').padStart(10, '0');
             const empleadoB = String(b.empId ?? '').padStart(10, '0');
             if (empleadoA !== empleadoB) return empleadoA.localeCompare(empleadoB);
+            if (a.esActual !== b.esActual) return a.esActual ? -1 : 1;
 
             return String(a.fechaInicio || '').localeCompare(String(b.fechaInicio || ''));
         });
-    }, [datos, empleados]);
+    }, [datos]);
+
+    const empleadosConContratosActualesDuplicados = useMemo(() => {
+        const conteo = new Map<string, number>();
+        filasHistorial.forEach((fila) => {
+            if (!fila.esActual || !fila.empId) return;
+            const key = String(fila.empId);
+            conteo.set(key, (conteo.get(key) ?? 0) + 1);
+        });
+
+        return Array.from(conteo.entries())
+            .filter(([, total]) => total > 1)
+            .map(([empId]) => obtenerDetalleEmpleado(empId));
+    }, [filasHistorial, empleados]);
 
     const filasFiltradas = useMemo(
         () =>
@@ -263,8 +257,7 @@ function EmpleadoContratoCRUD() {
                 </Box>
 
                 <Alert severity="info">
-                    Esta vista muestra cada periodo de contrato asignado por empleado. Si un empleado cambia de contrato,
-                    debe verse una fila para el contrato anterior y otra para el nuevo periodo.
+                    Esta vista usa EMP_EMPLEADO_CONTRATO como relacion empleado-contrato. EMP_TIPO_CONTRATO se trata solo como catalogo; cada empleado debe tener como maximo un contrato vigente.
                 </Alert>
             </Paper>
 
@@ -288,6 +281,12 @@ function EmpleadoContratoCRUD() {
                 {relacionesError && (
                     <Alert severity="warning" sx={{ mb: 2 }}>
                         {relacionesError}
+                    </Alert>
+                )}
+
+                {empleadosConContratosActualesDuplicados.length > 0 && (
+                    <Alert severity="error" sx={{ mb: 2 }}>
+                        Hay empleados con mas de un contrato vigente: {empleadosConContratosActualesDuplicados.join(', ')}.
                     </Alert>
                 )}
 
@@ -367,6 +366,7 @@ function EmpleadoContratoCRUD() {
                                 <TableCell><strong>Empleado</strong></TableCell>
                                 <TableCell><strong>Tipo de contrato</strong></TableCell>
                                 <TableCell><strong>Estado</strong></TableCell>
+                                <TableCell><strong>Vigente</strong></TableCell>
                                 <TableCell><strong>Fecha inicio</strong></TableCell>
                                 <TableCell><strong>Fecha fin</strong></TableCell>
                                 <TableCell><strong>Motivo cambio</strong></TableCell>
@@ -398,6 +398,11 @@ function EmpleadoContratoCRUD() {
                                                 )}
                                             </TableCell>
                                             <TableCell>{obtenerChipEstado(fila.estado)}</TableCell>
+                                            <TableCell>
+                                                {fila.esActual
+                                                    ? <Chip label="Actual" color="primary" size="small" />
+                                                    : <Chip label="Historico" size="small" />}
+                                            </TableCell>
                                             <TableCell>{formatearFecha(fila.fechaInicio)}</TableCell>
                                             <TableCell>
                                                 {fila.ticId && esContratoIndefinido(fila.ticId)
@@ -418,7 +423,7 @@ function EmpleadoContratoCRUD() {
                                                     </Button>
                                                 ) : (
                                                     <Typography variant="caption" color="text.secondary">
-                                                        Editar en empleados
+                                                        Sin accion
                                                     </Typography>
                                                 )}
                                             </TableCell>
@@ -427,7 +432,7 @@ function EmpleadoContratoCRUD() {
                                 })
                             ) : (
                                 <TableRow>
-                                    <TableCell colSpan={7} align="center">
+                                    <TableCell colSpan={8} align="center">
                                         No hay registros de contratos
                                     </TableCell>
                                 </TableRow>

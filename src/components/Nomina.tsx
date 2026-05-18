@@ -44,13 +44,20 @@ import {
 } from '../services/nomina.service';
 import { obtenerDetallesNomina } from '../services/nomina-detalle.service';
 import { obtenerEmpleados } from '../services/empleados.service';
-import { obtenerPeriodos } from '../services/periodo.service';
+import { actualizarEstadoPeriodo, obtenerPeriodos } from '../services/periodo.service';
 import { obtenerPuestos } from '../services/puestos.service';
 import { obtenerDepartamentos } from '../services/departamentos.service';
 import { obtenerIngresos } from '../services/tipoIngresos.service';
 import { obtenerDescuentos } from '../services/descuentos.service';
 import { getApiErrorMessage } from '../api/errors';
 import { formatearFecha, formatearMoneda, obtenerNombreEmpleado } from '../utils/relations';
+import {
+  esPeriodoAbierto,
+  esPeriodoAprobado,
+  normalizePeriodoEstado,
+  periodoEstadoLabels,
+} from '../utils/payroll';
+import PeriodoBadge from './common/PeriodoBadge';
 
 type TotalesNomina = {
   ingresos: number;
@@ -242,6 +249,19 @@ function NominaCRUD() {
     [periodos]
   );
 
+  const periodosAbiertos = useMemo(
+    () => periodos.filter((periodo) => esPeriodoAbierto(periodo.PER_ESTADO)),
+    [periodos]
+  );
+
+  const periodoGeneracion = periodosPorId.get(String(generacionForm.per_id));
+  const periodoPlanilla = periodosPorId.get(String(planillaPeriodoId));
+  const periodoPlanillaAbierto = esPeriodoAbierto(periodoPlanilla?.PER_ESTADO);
+  const periodoPlanillaAprobado = esPeriodoAprobado(periodoPlanilla?.PER_ESTADO);
+  const periodoGeneracionBloqueado = ['APROBADO', 'CERRADO'].includes(normalizePeriodoEstado(periodoGeneracion?.PER_ESTADO || ''));
+  const periodoPlanillaLectura = ['APROBADO', 'CERRADO'].includes(normalizePeriodoEstado(periodoPlanilla?.PER_ESTADO || ''));
+  const periodoActivo = periodoPlanilla || periodoGeneracion;
+
   const empleadosGenerables = useMemo(() => {
     const periodo = periodosPorId.get(String(generacionForm.per_id));
     return empleados.filter((empleado) => {
@@ -407,18 +427,26 @@ function NominaCRUD() {
 
   const planillaTieneInconsistencias = filasPlanilla.some((fila) => fila.conceptos === 0 || fila.duplicados > 0 || !fila.cuadra);
   const planillaPuedeEnviar = filasPlanilla.length > 0
+    && periodoPlanillaAbierto
     && !planillaTieneInconsistencias
-    && filasPlanilla.some((fila) => ['B', 'I'].includes(fila.nomina.NOM_ESTADO));
+    && filasPlanilla.some((fila) => ['B', 'R'].includes(fila.nomina.NOM_ESTADO));
   const planillaPuedeExportar = filasPlanilla.length > 0
+    && periodoPlanillaAprobado
     && !planillaTieneInconsistencias
     && filasPlanilla.every((fila) => fila.nomina.NOM_ESTADO === 'A');
-  const nominasEliminables = filasPlanilla.filter((fila) => ['B', 'I'].includes(fila.nomina.NOM_ESTADO));
-  const planillaPuedeEliminar = nominasEliminables.length > 0;
+  const nominasEliminables = filasPlanilla.filter((fila) => ['B', 'R'].includes(fila.nomina.NOM_ESTADO));
+  const planillaPuedeEliminar = periodoPlanillaAbierto && nominasEliminables.length > 0;
 
   const obtenerEtiquetaPeriodo = (periodo?: Periodo) =>
     periodo
       ? `${formatearFecha(periodo.PER_FECHA_INICIO)} al ${formatearFecha(periodo.PER_FECHA_FIN)}`
       : '';
+
+  const obtenerEtiquetaPeriodoConEstado = (periodo: Periodo) => {
+    const estado = normalizePeriodoEstado(periodo.PER_ESTADO);
+    const etiquetaEstado = estado ? periodoEstadoLabels[estado] : periodo.PER_ESTADO;
+    return `${obtenerEtiquetaPeriodo(periodo)} - ${etiquetaEstado}`;
+  };
 
   const crearPayloadNomina = (
     datosForm: NominaForm,
@@ -447,6 +475,10 @@ function NominaCRUD() {
   const generarNominaPeriodo = async (recalcular = false) => {
     if (!generacionForm.per_id || !generacionForm.fecha_generacion) {
       setError('Periodo y fecha de generacion son obligatorios para generar nomina');
+      return;
+    }
+    if (!esPeriodoAbierto(periodoGeneracion?.PER_ESTADO)) {
+      setError('Solo puedes generar o recalcular nomina en periodos abiertos.');
       return;
     }
 
@@ -505,8 +537,12 @@ function NominaCRUD() {
         setError('La planilla tiene inconsistencias. Corrige duplicados o recalcula antes de enviarla.');
         return;
       }
+      if (!periodoPlanilla || !periodoPlanillaAbierto) {
+        setError('Solo puedes enviar a revision una planilla de un periodo abierto.');
+        return;
+      }
 
-      const enviables = filasPlanilla.filter((fila) => ['B', 'I'].includes(fila.nomina.NOM_ESTADO));
+      const enviables = filasPlanilla.filter((fila) => ['B', 'R'].includes(fila.nomina.NOM_ESTADO));
       if (enviables.length === 0) {
         setMensaje('No hay nominas en borrador o rechazadas para enviar.');
         return;
@@ -528,6 +564,7 @@ function NominaCRUD() {
         cantidad: fila.conceptos,
       }, 'P'))));
 
+      await actualizarEstadoPeriodo(periodoPlanilla, 'EN_REVISION');
       setMensaje('Planilla enviada al gerente. Queda pendiente de aprobacion.');
       await cargarDatos();
     } catch (err: unknown) {
@@ -546,7 +583,7 @@ function NominaCRUD() {
       }
 
       if (!planillaPuedeEliminar) {
-        setError('Solo se pueden eliminar nominas en Borrador o Rechazadas.');
+        setError('Solo se pueden eliminar nominas en Borrador o Rechazadas de un periodo abierto.');
         return;
       }
 
@@ -658,8 +695,10 @@ function NominaCRUD() {
   const obtenerChipEstado = (estado: string) => {
     if (estado === 'A' || estado === 'Activo')
       return <Chip label="Aprobada" color="success" size="small" />;
-    if (estado === 'I' || estado === 'Inactivo')
+    if (estado === 'R' || estado === 'Rechazada')
       return <Chip label="Rechazada" color="error" size="small" />;
+    if (estado === 'I' || estado === 'Inactivo')
+      return <Chip label="Inactiva" color="default" size="small" />;
     if (estado === 'P' || estado === 'Pendiente')
       return <Chip label="Pendiente" color="warning" size="small" />;
     if (estado === 'B' || estado === 'Borrador')
@@ -678,12 +717,23 @@ function NominaCRUD() {
   return (
     <Box sx={{ py: 2 }}>
       <Paper elevation={3} sx={{ p: 3, mb: 3 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 3 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 3, flexWrap: 'wrap' }}>
           <CalculateIcon color="primary" />
           <Typography variant="h4" sx={{ fontWeight: 'bold' }}>
             Generar Nomina
           </Typography>
+          {periodoActivo && (
+            <Box sx={{ ml: 'auto' }}>
+              <PeriodoBadge estado={periodoActivo.PER_ESTADO} />
+            </Box>
+          )}
         </Box>
+
+        {periodoActivo && periodoPlanillaLectura && (
+          <Alert severity="warning" sx={{ mb: 2 }}>
+            Período cerrado o aprobado - sólo lectura. No se pueden generar ni editar registros de nómina.
+          </Alert>
+        )}
 
         <Alert severity="info" sx={{ mb: 2 }}>
           Genera automaticamente las nominas del periodo en estado Borrador. Luego revisa los conceptos y usa Enviar para pasarlas a Pendiente de aprobacion gerencial.
@@ -700,7 +750,12 @@ function NominaCRUD() {
                 onChange={handleGeneracionChange}
               >
                 <MenuItem value="">Seleccione periodo</MenuItem>
-                {periodos.map((periodo) => (
+                {periodosAbiertos.length === 0 && (
+                  <MenuItem value="" disabled>
+                    No hay periodos abiertos
+                  </MenuItem>
+                )}
+                {periodosAbiertos.map((periodo) => (
                   <MenuItem key={periodo.PER_ID} value={String(periodo.PER_ID)}>
                     {obtenerEtiquetaPeriodo(periodo)} - Pago {formatearFecha(periodo.PER_FECHA_PAGO)}
                   </MenuItem>
@@ -748,7 +803,7 @@ function NominaCRUD() {
                 variant="contained"
                 startIcon={<CalculateIcon />}
                 onClick={() => generarNominaPeriodo(false)}
-                disabled={generando}
+                disabled={generando || periodoGeneracionBloqueado}
               >
                 {generando ? 'Generando...' : 'Generar nomina del periodo'}
               </Button>
@@ -758,7 +813,7 @@ function NominaCRUD() {
                 color="warning"
                 startIcon={<CalculateIcon />}
                 onClick={() => generarNominaPeriodo(true)}
-                disabled={generando}
+                disabled={generando || periodoGeneracionBloqueado}
               >
                 Recalcular planilla
               </Button>
@@ -791,7 +846,7 @@ function NominaCRUD() {
                 <MenuItem value="">Seleccione periodo</MenuItem>
                 {periodos.map((periodo) => (
                   <MenuItem key={periodo.PER_ID} value={String(periodo.PER_ID)}>
-                    {obtenerEtiquetaPeriodo(periodo)} - Pago {formatearFecha(periodo.PER_FECHA_PAGO)}
+                    {obtenerEtiquetaPeriodoConEstado(periodo)} - Pago {formatearFecha(periodo.PER_FECHA_PAGO)}
                   </MenuItem>
                 ))}
               </Select>
@@ -839,7 +894,7 @@ function NominaCRUD() {
 
           <Grid size={{ xs: 12, md: 1 }}>
             <Chip
-              label={`${filasPlanilla.length} filas`}
+              label={periodoPlanilla ? periodoEstadoLabels[normalizePeriodoEstado(periodoPlanilla.PER_ESTADO) || 'ABIERTO'] : `${filasPlanilla.length} filas`}
               color={filasPlanilla.length > 0 ? 'primary' : 'default'}
               sx={{ width: '100%' }}
             />

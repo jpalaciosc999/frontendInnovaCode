@@ -46,6 +46,7 @@ import {
 } from '../services/nomina-asignacion.service';
 import { getApiErrorMessage } from '../api/errors';
 import { formatearFecha, formatearMoneda, obtenerNombreEmpleado } from '../utils/relations';
+import PeriodoBadge from './common/PeriodoBadge';
 
 const initialForm: NominaAsignacionForm = {
   per_id: '',
@@ -121,6 +122,10 @@ function NominaAsignaciones() {
     () => new Map(periodos.map((periodo) => [String(periodo.PER_ID), periodo])),
     [periodos]
   );
+
+  const normalizePeriodoEstado = (estado: string) => String(estado || '').trim().toUpperCase();
+  const periodoForm = periodosPorId.get(String(form.per_id));
+  const periodoFormBloqueado = ['APROBADO', 'CERRADO'].includes(normalizePeriodoEstado(periodoForm?.PER_ESTADO || ''));
 
   const puestosPorId = useMemo(
     () => new Map(puestos.map((puesto) => [String(puesto.PUE_ID), puesto])),
@@ -253,6 +258,10 @@ function NominaAsignaciones() {
     try {
       setError('');
       setMensaje('');
+      if (periodoFormBloqueado) {
+        setError('No se pueden guardar asignaciones en periodos aprobados o cerrados.');
+        return;
+      }
       if (!validar()) return;
 
       if (editandoId !== null) {
@@ -324,16 +333,27 @@ function NominaAsignaciones() {
   return (
     <Box sx={{ py: 2 }}>
       <Paper elevation={3} sx={{ p: 3, mb: 3 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 3 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 3, flexWrap: 'wrap' }}>
           <AssignmentIcon color="primary" />
           <Typography variant="h4" sx={{ fontWeight: 'bold' }}>
             Asignaciones por Periodo
           </Typography>
+          {periodoForm && (
+            <Box sx={{ ml: 'auto' }}>
+              <PeriodoBadge estado={periodoForm.PER_ESTADO} />
+            </Box>
+          )}
         </Box>
 
         <Alert severity="info" sx={{ mb: 2 }}>
           Aqui se capturan ingresos y egresos variables antes de generar la nomina. La generacion toma estas asignaciones y crea el detalle final.
         </Alert>
+
+        {periodoFormBloqueado && (
+          <Alert severity="warning" sx={{ mb: 2 }}>
+            Este periodo está {normalizePeriodoEstado(periodoForm?.PER_ESTADO)}. No se pueden agregar ni modificar asignaciones.
+          </Alert>
+        )}
 
         {conceptoConMontoSugerido && (
           <Alert severity={montoSugeridoActual > 0 ? 'success' : 'warning'} sx={{ mb: 2 }}>
@@ -451,7 +471,7 @@ function NominaAsignaciones() {
 
           <Grid size={{ xs: 12 }}>
             <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-              <Button variant="contained" startIcon={<SaveIcon />} onClick={guardar}>
+              <Button variant="contained" startIcon={<SaveIcon />} onClick={guardar} disabled={cargando || periodoFormBloqueado}>
                 {editandoId ? 'Actualizar asignacion' : 'Guardar asignacion'}
               </Button>
               <Button variant="outlined" color="secondary" startIcon={<CleaningServicesIcon />} onClick={limpiarFormulario}>
@@ -517,10 +537,23 @@ function NominaAsignaciones() {
                       <TableCell>{asignacion.NAS_ESTADO === 'A' ? 'Activa' : 'Inactiva'}</TableCell>
                       <TableCell>
                         <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                          <Button size="small" variant="outlined" startIcon={<EditIcon />} onClick={() => editar(asignacion)}>
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            startIcon={<EditIcon />}
+                            onClick={() => editar(asignacion)}
+                            disabled={['APROBADO', 'CERRADO'].includes(normalizePeriodoEstado(periodosPorId.get(String(asignacion.PER_ID))?.PER_ESTADO || ''))}
+                          >
                             Editar
                           </Button>
-                          <Button size="small" variant="contained" color="error" startIcon={<DeleteIcon />} onClick={() => eliminar(asignacion.NAS_ID)}>
+                          <Button
+                            size="small"
+                            variant="contained"
+                            color="error"
+                            startIcon={<DeleteIcon />}
+                            onClick={() => eliminar(asignacion.NAS_ID)}
+                            disabled={['APROBADO', 'CERRADO'].includes(normalizePeriodoEstado(periodosPorId.get(String(asignacion.PER_ID))?.PER_ESTADO || ''))}
+                          >
                             Eliminar
                           </Button>
                         </Box>

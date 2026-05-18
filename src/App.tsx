@@ -28,6 +28,7 @@ import MarcajePage from './components/MarcajeCRUD';
 import EmpleadoContrato from './components/EmpleadoContrato';
 import Sede from './components/Sede';
 import Bitacora from './components/Bitacora';
+import Auditoria from './components/Auditoria';
 import Liquidacion from './components/Liquidacion';
 import Nomina from './components/Nomina';
 import NominaAsignaciones from './components/NominaAsignaciones';
@@ -99,6 +100,7 @@ function Layout() {
           <Route path="/sede" element={guarded('/sede', <Sede />)} />
           <Route path="/sucursales" element={guarded('/sucursales', <Sede />)} />
           <Route path="/bitacora" element={guarded('/bitacora', <Bitacora />)} />
+          <Route path="/auditoria" element={guarded('/auditoria', <Auditoria />)} />
           <Route path="/liquidacion" element={guarded('/liquidacion', <Liquidacion />)} />
           <Route path="/nomina-asignaciones" element={guarded('/nomina-asignaciones', <NominaAsignaciones />)} />
           <Route path="/nomina" element={guarded('/nomina', <Nomina />)} />

@@ -118,6 +118,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   );
 };
 
+// Roles añadidos
+export const ROLE_AUDITORIA = 'AUDITORIA';
+export const ROLE_ANALISTA_NOMINA = 'ANALISTA_NOMINA';
+export const ROLE_SUPERVISOR_ASISTENCIA = 'SUPERVISOR_ASISTENCIA';
+
 export const useAuth = () => {
   const ctx = useContext(AuthContext);
   if (!ctx) throw new Error('useAuth debe usarse dentro de AuthProvider');

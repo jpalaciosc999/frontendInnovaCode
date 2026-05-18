@@ -2,6 +2,8 @@
 import type {
   ReporteIsrResponse,
   ReporteIsrParams,
+  ReporteIsrProyeccionResponse,
+  ReporteIsrProyeccionParams,
   IsrEmpleadoFila,
   IsrMensual,
 } from '../interfaces/reporteIsr';
@@ -198,6 +200,17 @@ export const getReporteIsr = async (
   return { empleados: rowsFiltrados, resumen, mensual };
 };
 
+export const getReporteIsrProyeccion = async (
+  params: ReporteIsrProyeccionParams
+): Promise<ReporteIsrProyeccionResponse> => {
+  const response = await api.get<ReporteIsrProyeccionResponse>('/reportes/isr/proyeccion', {
+    params: {
+      per_id: params.periodoId,
+    },
+  });
+  return response.data;
+};
+
 export const descargarPdfIsr = async (params: ReporteIsrParams): Promise<void> => {
   const response = await api.get(`/api/reportes/isr/pdf`, {
     params,
@@ -209,6 +222,25 @@ export const descargarPdfIsr = async (params: ReporteIsrParams): Promise<void> =
   const link = document.createElement('a');
   link.href = url;
   link.download = `reporte-isr-${params.anioFiscal}.pdf`;
+  link.click();
+  URL.revokeObjectURL(url);
+};
+
+export const descargarPdfIsrProyeccion = async (
+  params: ReporteIsrProyeccionParams
+): Promise<void> => {
+  const response = await api.get('/reportes/isr/proyeccion/pdf', {
+    params: {
+      per_id: params.periodoId,
+    },
+    responseType: 'blob',
+  });
+  const url = URL.createObjectURL(
+    new Blob([response.data], { type: 'application/pdf' })
+  );
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `reporte-isr-proyeccion-${params.periodoId}.pdf`;
   link.click();
   URL.revokeObjectURL(url);
 };

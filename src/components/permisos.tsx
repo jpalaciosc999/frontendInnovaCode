@@ -7,6 +7,9 @@ import {
   eliminarPermiso
 } from '../services/permisos.service';
 import { obtenerAdminCatalogo } from '../services/admin.service';
+import { obtenerEmpleados } from '../services/empleados.service';
+import { useAuth } from '../context/AuthContext';
+import { isRole } from '../auth/access';
 
 import {
   Alert,
@@ -78,6 +81,7 @@ const esErrorDuplicado = (err: unknown) => {
 };
 
 function Permisos() {
+  const authCtx = useAuth();
   const [datos, setDatos] = useState<Permiso[]>([]);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState('');
@@ -96,6 +100,17 @@ function Permisos() {
       const catalogo = await obtenerAdminCatalogo();
       setDatos(catalogo.permisos);
       setRolPermisos(catalogo.rolPermisos);
+
+      // Cargar empleados filtrados si el usuario es supervisor de asistencia
+      try {
+        const auth = authCtx;
+        if (auth && isRole(auth.user as any, 'SUPER\u005FVISOR_ASISTENCIA')) {
+          const sed = (auth.user as any)?.SED_ID ?? (auth.user as any)?.sed_id ?? '';
+          await obtenerEmpleados(sed ? { sed_id: String(sed) } : undefined);
+        }
+      } catch (e) {
+        // no bloquear la carga de permisos si falla
+      }
     } catch (err: any) {
       setError('Error cargando permisos: ' + err.message);
     } finally {

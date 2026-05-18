@@ -41,12 +41,22 @@ import {
   Cell,
 } from 'recharts';
 
-import { getReporteIsr, descargarPdfIsr } from '../services/reporte_isr.service';
+import {
+  getReporteIsr,
+  getReporteIsrProyeccion,
+  descargarPdfIsr,
+  descargarPdfIsrProyeccion,
+} from '../services/reporte_isr.service';
 import { obtenerDepartamentos } from '../services/departamentos.service';
+import { obtenerPeriodos } from '../services/periodo.service';
 import { getApiErrorMessage } from '../api/errors';
 
-import type { ReporteIsrResponse } from '../interfaces/reporteIsr';
+import type {
+  ReporteIsrResponse,
+  ReporteIsrProyeccionResponse,
+} from '../interfaces/reporteIsr';
 import type { Departamento } from '../interfaces/departamentos';
+import type { Periodo } from '../interfaces/periodo';
 
 // â”€â”€ helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
@@ -82,17 +92,45 @@ function estadoColor(estado: string): 'success' | 'warning' | 'default' {
 export default function ReporteIsr() {
   const [anioFiscal, setAnioFiscal] = useState(new Date().getFullYear());
   const [departamentoId, setDepartamentoId] = useState('');
+  const [periodoId, setPeriodoId] = useState('');
   const [tipoRenta, setTipoRenta] = useState('Relacion de dependencia');
   const [estado, setEstado] = useState('');
 
   const [departamentos, setDepartamentos] = useState<Departamento[]>([]);
+  const [periodos, setPeriodos] = useState<Periodo[]>([]);
   const [reporte, setReporte] = useState<ReporteIsrResponse | null>(null);
+  const [proyeccion, setProyeccion] = useState<ReporteIsrProyeccionResponse | null>(null);
   const [cargando, setCargando] = useState(false);
+  const [cargandoProyeccion, setCargandoProyeccion] = useState(false);
   const [error, setError] = useState('');
+  const [errorProyeccion, setErrorProyeccion] = useState('');
 
   useEffect(() => {
     obtenerDepartamentos().then(setDepartamentos).catch(() => {});
+    obtenerPeriodos().then(setPeriodos).catch(() => {});
   }, []);
+
+  const cargarProyeccion = useCallback(async () => {
+    if (!periodoId) {
+      setProyeccion(null);
+      setErrorProyeccion('');
+      return;
+    }
+
+    try {
+      setCargandoProyeccion(true);
+      setErrorProyeccion('');
+      const data = await getReporteIsrProyeccion({ periodoId: Number(periodoId) });
+      setProyeccion(data);
+    } catch (err) {
+      setErrorProyeccion(getApiErrorMessage(err, 'Error al cargar la proyección ISR'));
+      setProyeccion(null);
+    } finally {
+      setCargandoProyeccion(false);
+    }
+  }, [periodoId]);
+
+  useEffect(() => { cargarProyeccion(); }, [cargarProyeccion]);
 
   const cargarReporte = useCallback(async () => {
     try {
@@ -174,6 +212,21 @@ export default function ReporteIsr() {
 
           <Grid size={{ xs: 12, sm: 6, md: 3 }}>
             <FormControl fullWidth size="small">
+              <InputLabel>Periodo</InputLabel>
+              <Select label="Periodo" value={periodoId}
+                onChange={(e: SelectChangeEvent) => setPeriodoId(e.target.value)}>
+                <MenuItem value="">Seleccione un periodo</MenuItem>
+                {periodos.map((periodo) => (
+                  <MenuItem key={periodo.PER_ID} value={String(periodo.PER_ID)}>
+                    {`${periodo.PER_FECHA_INICIO} al ${periodo.PER_FECHA_FIN} (${periodo.PER_ESTADO})`}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          </Grid>
+
+          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+            <FormControl fullWidth size="small">
               <InputLabel>Tipo de renta</InputLabel>
               <Select label="Tipo de renta" value={tipoRenta}
                 onChange={(e: SelectChangeEvent) => setTipoRenta(e.target.value)}>
@@ -245,6 +298,98 @@ export default function ReporteIsr() {
               </Paper>
             </Grid>
           </Grid>
+
+          <Paper sx={{ p: 2, mb: 3 }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
+              <Box>
+                <Typography variant="h6" sx={{ fontWeight: 700 }}>Proyección anual por empleado</Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Renta acumulada y retención proyectada para el periodo seleccionado.
+                </Typography>
+              </Box>
+              <Button
+                variant="outlined"
+                startIcon={<PictureAsPdfIcon />}
+                size="small"
+                disabled={!periodoId || cargandoProyeccion || !proyeccion?.empleados?.length}
+                onClick={() => periodoId && descargarPdfIsrProyeccion({ periodoId: Number(periodoId) })}
+              >
+                Descargar constancia ISR
+              </Button>
+            </Box>
+
+            {errorProyeccion && <Alert severity="error" sx={{ mb: 2 }}>{errorProyeccion}</Alert>}
+
+            {!periodoId ? (
+              <Alert severity="info" sx={{ mb: 2 }}>
+                Seleccione un periodo para ver la proyección anual ISR por empleado.
+              </Alert>
+            ) : cargandoProyeccion ? (
+              <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+                <CircularProgress />
+              </Box>
+            ) : proyeccion?.empleados?.length ? (
+              <>
+                {proyeccion.resumen ? (
+                  <Grid container spacing={2} sx={{ mb: 2 }}>
+                    <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+                      <Paper sx={{ p: 2 }}>
+                        <Typography variant="body2" color="text.secondary">Empleados</Typography>
+                        <Typography variant="h5" sx={{ fontWeight: 700 }}>{proyeccion.resumen.totalEmpleados}</Typography>
+                      </Paper>
+                    </Grid>
+                    <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+                      <Paper sx={{ p: 2 }}>
+                        <Typography variant="body2" color="text.secondary">Renta acumulada</Typography>
+                        <Typography variant="h5" sx={{ fontWeight: 700 }}>{fmtQDec(proyeccion.resumen.totalRentaAcumulada)}</Typography>
+                      </Paper>
+                    </Grid>
+                    <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+                      <Paper sx={{ p: 2 }}>
+                        <Typography variant="body2" color="text.secondary">ISR proyectado año</Typography>
+                        <Typography variant="h5" sx={{ fontWeight: 700 }}>{fmtQDec(proyeccion.resumen.totalIsrProyectado)}</Typography>
+                      </Paper>
+                    </Grid>
+                    <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+                      <Paper sx={{ p: 2 }}>
+                        <Typography variant="body2" color="text.secondary">ISR pendiente</Typography>
+                        <Typography variant="h5" sx={{ fontWeight: 700 }}>{fmtQDec(proyeccion.resumen.totalIsrPendiente)}</Typography>
+                      </Paper>
+                    </Grid>
+                  </Grid>
+                ) : null}
+
+                <TableContainer component={Paper} sx={{ overflowX: 'auto' }}>
+                  <Table size="small" sx={{ minWidth: 900 }}>
+                    <TableHead>
+                      <TableRow>
+                        <TableCell>Empleado</TableCell>
+                        <TableCell align="right">Renta acumulada</TableCell>
+                        <TableCell align="right">Renta proyectada anual</TableCell>
+                        <TableCell align="right">ISR proyectado año</TableCell>
+                        <TableCell align="right">ISR retenido a la fecha</TableCell>
+                        <TableCell align="right">ISR pendiente</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {proyeccion.empleados.map((fila) => (
+                        <TableRow key={fila.EMP_ID} hover>
+                          <TableCell>{fila.EMPLEADO}</TableCell>
+                          <TableCell align="right">{fmtQDec(fila.RENTA_ACUMULADA)}</TableCell>
+                          <TableCell align="right">{fmtQDec(fila.RENTA_PROYECTADA_ANUAL)}</TableCell>
+                          <TableCell align="right">{fmtQDec(fila.ISR_PROYECTADO_ANIO)}</TableCell>
+                          <TableCell align="right">{fmtQDec(fila.ISR_RETENIDO_A_LA_FECHA)}</TableCell>
+                          <TableCell align="right">{fmtQDec(fila.ISR_PENDIENTE)}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              </>
+            ) : (
+              <Alert severity="warning">No hay datos de proyección para el periodo seleccionado.</Alert>
+            )}
+          </Paper>
 
           {/* â”€â”€ GrÃ¡fico mensual + Panel legal â”€â”€ */}
           <Grid container spacing={2} sx={{ mb: 3 }}>
