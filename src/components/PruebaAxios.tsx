@@ -84,6 +84,9 @@ const initialForm: EmpleadoForm = {
 
 const getToday = () => new Date().toISOString().slice(0, 10);
 
+const soloDigitos = (valor: string) => valor.replace(/\D+/g, '');
+const limitarLongitud = (valor: string, maxLength: number) => valor.slice(0, maxLength);
+
 type ContratoEmpleadoSnapshot = {
   tic_id: string;
   fecha_inicio: string;
@@ -191,7 +194,9 @@ function PruebaAxios() {
       setCargando(true);
       setError('');
       const data = await obtenerEmpleados();
-      setDatos(data);
+      setDatos([...data].sort((a, b) =>
+        `${a.EMP_NOMBRE} ${a.EMP_APELLIDO}`.localeCompare(`${b.EMP_NOMBRE} ${b.EMP_APELLIDO}`, 'es', { sensitivity: 'base' })
+      ));
     } catch (err: any) {
       setError('Error cargando empleados: ' + (err.response?.data?.error || err.message));
     } finally {
@@ -203,7 +208,9 @@ function PruebaAxios() {
     try {
       setCargandoHorarios(true);
       const data = await obtenerHorarios();
-      setHorarios(data);
+      setHorarios([...data].sort((a, b) =>
+        String(a.HOR_DESCRIPCION ?? '').localeCompare(String(b.HOR_DESCRIPCION ?? ''), 'es', { sensitivity: 'base' })
+      ));
     } catch (err: any) {
       setError('Error cargando horarios: ' + (err.response?.data?.error || err.message));
     } finally {
@@ -215,7 +222,9 @@ function PruebaAxios() {
     try {
       setCargandoPuestos(true);
       const data = await obtenerPuestos();
-      setPuestos(data);
+      setPuestos([...data].sort((a, b) =>
+        String(a.PUE_NOMBRE ?? '').localeCompare(String(b.PUE_NOMBRE ?? ''), 'es', { sensitivity: 'base' })
+      ));
     } catch (err: any) {
       setError('Error cargando puestos: ' + (err.response?.data?.error || err.message));
     } finally {
@@ -227,7 +236,9 @@ function PruebaAxios() {
     try {
       setCargandoSedes(true);
       const data = await obtenerSedes();
-      setSedes(data);
+      setSedes([...data].sort((a, b) =>
+        String(a.SED_NOMBRE ?? '').localeCompare(String(b.SED_NOMBRE ?? ''), 'es', { sensitivity: 'base' })
+      ));
     } catch (err: any) {
       setError('Error cargando sedes: ' + (err.response?.data?.error || err.message));
     } finally {
@@ -239,7 +250,9 @@ function PruebaAxios() {
     try {
       setCargandoTiposContrato(true);
       const data = await obtenerTiposContrato();
-      setTiposContrato(data);
+      setTiposContrato([...data].sort((a, b) =>
+        String(a.TIC_NOMBRE ?? '').localeCompare(String(b.TIC_NOMBRE ?? ''), 'es', { sensitivity: 'base' })
+      ));
     } catch (err: any) {
       setError('Error cargando tipos de contrato: ' + (err.response?.data?.error || err.message));
     } finally {
@@ -269,11 +282,39 @@ function PruebaAxios() {
     setModalHorarios(false);
   };
 
+  const horariosMap = useMemo(
+    () => new Map(horarios.map((hor) => [String(hor.HOR_ID), hor])),
+    [horarios]
+  );
+
+  const sedesMap = useMemo(
+    () => new Map(sedes.map((sede) => [String(sede.SED_ID), sede])),
+    [sedes]
+  );
+
+  const puestosMap = useMemo(
+    () => new Map(puestos.map((puesto) => [String(puesto.PUE_ID), puesto])),
+    [puestos]
+  );
+
+  const tiposContratoMap = useMemo(
+    () => new Map(tiposContrato.map((tipo) => [String(tipo.TIC_ID), tipo])),
+    [tiposContrato]
+  );
+
+  const fotosEmpleados = useMemo(
+    () => new Map(datos.map((empleado) => [
+      empleado.EMP_ID,
+      normalizarFotoEmpleado(empleado.EMP_FOTO) || normalizarFotoEmpleado(empleado.emp_foto)
+    ])),
+    [datos]
+  );
+
   const obtenerPuestoEmpleado = (empleado: Empleado) =>
-    puestos.find((puesto) => puesto.PUE_ID === empleado.PUE_ID);
+    puestosMap.get(String(empleado.PUE_ID));
 
   const obtenerDepartamentoPuesto = (pueId: number | string | undefined) => {
-    const puesto = puestos.find((item) => String(item.PUE_ID) === String(pueId));
+    const puesto = puestosMap.get(String(pueId ?? ''));
     return puesto?.DEP_ID ? `Departamento #${puesto.DEP_ID}` : 'Sin departamento asignado';
   };
 
@@ -291,7 +332,7 @@ function PruebaAxios() {
     empleado.EMP_SUELDO ?? obtenerPuestoEmpleado(empleado)?.PUE_SALARIO_BASE ?? 0;
 
   const obtenerTipoContrato = (ticId: number | string | undefined) =>
-    tiposContrato.find((tipo) => String(tipo.TIC_ID) === String(ticId));
+    tiposContratoMap.get(String(ticId ?? ''));
 
   const esContratoIndefinido = (ticId: number | string | undefined) => {
     const tipo = obtenerTipoContrato(ticId);
@@ -299,7 +340,7 @@ function PruebaAxios() {
   };
 
   const obtenerFotoEmpleado = (empleado: Empleado) =>
-    normalizarFotoEmpleado(empleado.EMP_FOTO) || normalizarFotoEmpleado(empleado.emp_foto);
+    fotosEmpleados.get(empleado.EMP_ID) ?? '';
 
   const obtenerInicialesEmpleado = (empleado: Pick<Empleado, 'EMP_NOMBRE' | 'EMP_APELLIDO'>) =>
     `${empleado.EMP_NOMBRE?.[0] ?? ''}${empleado.EMP_APELLIDO?.[0] ?? ''}`.toUpperCase() || 'E';
@@ -365,6 +406,13 @@ function PruebaAxios() {
         dep_id: puesto?.DEP_ID ? String(puesto.DEP_ID) : '',
         emp_sueldo: puesto ? String(puesto.PUE_SALARIO_BASE) : prev.emp_sueldo
       }));
+      return;
+    }
+
+    if (['emp_dpi', 'emp_nit', 'emp_telefono'].includes(name)) {
+      const maxLength = name === 'emp_dpi' ? 13 : name === 'emp_nit' ? 9 : 8;
+      const soloNumeros = limitarLongitud(soloDigitos(value), maxLength);
+      setForm((prev) => ({ ...prev, [name as string]: soloNumeros }));
       return;
     }
 
@@ -558,7 +606,7 @@ function PruebaAxios() {
   };
 
   const obtenerChipHorario = (horId: number) => {
-    const hor = horarios.find((h) => h.HOR_ID === horId);
+    const hor = horariosMap.get(String(horId));
     return (
       <Chip
         label={hor ? hor.HOR_DESCRIPCION : `Horario #${horId}`}
@@ -582,7 +630,7 @@ function PruebaAxios() {
   };
 
   const obtenerChipSede = (sedId: number) => {
-    const sede = sedes.find((s) => s.SED_ID === sedId);
+    const sede = sedesMap.get(String(sedId));
     return (
       <Chip
         label={sede ? sede.SED_NOMBRE : `Sede #${sedId}`}
@@ -594,7 +642,7 @@ function PruebaAxios() {
   };
 
   const obtenerChipPuesto = (pueId: number) => {
-    const puesto = puestos.find((p) => p.PUE_ID === pueId);
+    const puesto = puestosMap.get(String(pueId));
     return (
       <Chip
         label={puesto ? puesto.PUE_NOMBRE : `Puesto #${pueId}`}
@@ -606,7 +654,7 @@ function PruebaAxios() {
   };
 
   const obtenerChipTipoContrato = (ticId: number) => {
-    const tipo = tiposContrato.find((t) => t.TIC_ID === ticId);
+    const tipo = tiposContratoMap.get(String(ticId));
     return (
       <Chip
         label={tipo ? `${tipo.TIC_NOMBRE} - ${tipo.TIC_TIPO_JORNADA}` : `Contrato #${ticId}`}
@@ -741,6 +789,12 @@ function PruebaAxios() {
               value={form.emp_dpi}
               onChange={handleChange}
               required
+              inputProps={{
+                inputMode: 'numeric',
+                pattern: '[0-9]*',
+                maxLength: 13
+              }}
+              helperText="Solo números. Máximo 13 dígitos para DPI."
             />
           </Grid>
 
@@ -752,6 +806,12 @@ function PruebaAxios() {
               value={form.emp_nit}
               onChange={handleChange}
               required
+              inputProps={{
+                inputMode: 'numeric',
+                pattern: '[0-9]*',
+                maxLength: 9
+              }}
+              helperText="Solo números. Máximo 9 dígitos para NIT."
             />
           </Grid>
 
@@ -763,6 +823,12 @@ function PruebaAxios() {
               value={form.emp_telefono}
               onChange={handleChange}
               required
+              inputProps={{
+                inputMode: 'numeric',
+                pattern: '[0-9]*',
+                maxLength: 8
+              }}
+              helperText="Solo números. Máximo 8 dígitos para teléfono guatemalteco."
             />
           </Grid>
 
