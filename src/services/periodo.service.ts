@@ -1,5 +1,5 @@
 import api from '../api/axios';
-import type { Periodo, PeriodoForm } from '../interfaces/periodo';
+import type { Periodo, PeriodoEstado, PeriodoForm } from '../interfaces/periodo';
 
 const ENDPOINT = 'periodo';
 
@@ -36,6 +36,17 @@ export const crearPeriodo = async (data: PeriodoForm): Promise<void> => {
 
 export const actualizarPeriodo = async (id: number, data: PeriodoForm): Promise<void> => {
   await api.put(`${ENDPOINT}/${id}`, formatPeriodoPayload(data));
+};
+
+export const actualizarEstadoPeriodo = async (
+  periodo: Periodo,
+  estado: PeriodoEstado,
+  motivo?: string
+): Promise<void> => {
+  await api.put(`${ENDPOINT}/${periodo.PER_ID}/estado`, {
+    estado,
+    motivo,
+  });
 };
 
 export const eliminarPeriodo = async (id: number): Promise<void> => {

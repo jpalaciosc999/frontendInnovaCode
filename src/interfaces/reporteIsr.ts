@@ -43,9 +43,39 @@ export interface ReporteIsrResponse {
   mensual: IsrMensual[];
 }
 
+export interface IsrProyeccionFila {
+  EMP_ID: number;
+  EMPLEADO: string;
+  RENTA_ACUMULADA: number;
+  RENTA_PROYECTADA_ANUAL: number;
+  ISR_PROYECTADO_ANIO: number;
+  ISR_RETENIDO_A_LA_FECHA: number;
+  ISR_PENDIENTE: number;
+  DEPARTAMENTO?: string;
+  PUESTO?: string;
+}
+
+export interface IsrProyeccionResumen {
+  totalEmpleados: number;
+  totalRentaAcumulada: number;
+  totalRentaProyectada: number;
+  totalIsrProyectado: number;
+  totalIsrRetenido: number;
+  totalIsrPendiente: number;
+}
+
+export interface ReporteIsrProyeccionResponse {
+  empleados: IsrProyeccionFila[];
+  resumen?: IsrProyeccionResumen;
+}
+
 export interface ReporteIsrParams {
   anioFiscal: number;
   departamentoId?: number;
   tipoRenta?: string;
   estado?: string;
+}
+
+export interface ReporteIsrProyeccionParams {
+  periodoId: number;
 }

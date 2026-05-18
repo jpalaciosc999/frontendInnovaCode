@@ -8,6 +8,8 @@ Este documento describe los cambios necesarios para que el modulo de RRHH funcio
 - `EMP_EMPLEADO_CONTRATO` es la fuente real del historial de contratos.
 - Cada empleado debe tener como maximo un contrato vigente con `TCO_ES_ACTUAL = 1`.
 - Al cambiar contrato, el backend debe cerrar el periodo anterior y crear uno nuevo en una transaccion.
+- El estado maestro de periodo debe fluir como `ABIERTO -> EN_REVISION -> APROBADO -> CERRADO`.
+- En nomina, `R` es Rechazada e `I` queda reservado para Inactiva.
 - No se deben eliminar fisicamente registros historicos en produccion; se deben anular o inactivar.
 - Nomina debe calcularse contra datos vigentes dentro del periodo de nomina, no solo contra el estado actual del empleado.
 - Los ingresos y egresos variables deben asignarse primero a empleado/periodo. `EMP_NOMINA_DETALLE` debe ser resultado final de la generacion, no la pantalla principal de captura operativa.
@@ -28,9 +30,15 @@ Este documento describe los cambios necesarios para que el modulo de RRHH funcio
    - prestamos;
    - asistencia/suspensiones.
 5. Contabilidad revisa la planilla en estado `B` (Borrador).
-6. Contabilidad envia a gerente: estado `P` (Pendiente).
-7. Gerencia aprueba/rechaza: estado `A` o `I`.
-8. Solo con estado `A` y detalle cuadrado se descarga CSV.
+6. Contabilidad envia a gerente: nomina estado `P` (Pendiente) y periodo `EN_REVISION`.
+7. Gerencia aprueba/rechaza: nomina estado `A` o `R`.
+8. Si aprueba, periodo `APROBADO`; si rechaza, periodo vuelve a `ABIERTO`.
+9. Solo con nomina `A`, periodo `APROBADO` y detalle cuadrado se descarga CSV.
+
+Scripts listos:
+
+- Migracion Oracle: `docs/sql/2026-05-18_contratos_modelo_migration.sql`
+- Logica backend: `docs/backend-cambio-contrato.md`
 
 ## Flujo Cambio de Contrato
 

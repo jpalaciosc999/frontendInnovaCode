@@ -39,6 +39,7 @@ export const permisosVista = {
   roles: [{ modulo: 'ADMIN', permiso: 'Gestionar roles' }],
   permisos: [{ modulo: 'ADMIN', permiso: 'Gestionar permisos' }],
   bitacora: [{ modulo: 'ADMIN', permiso: 'Ver bitacora' }],
+  auditoria: [{ modulo: 'AUDITORIA', permiso: 'Ver auditoria' }, { modulo: 'ADMIN', permiso: 'Ver bitacora' }],
   usuarioBitacora: [
     { modulo: 'AUDITORIA', permiso: 'Ver usuario bitacora' },
     { modulo: 'ADMIN', permiso: 'Ver bitacora' },
@@ -83,6 +84,7 @@ const pathToVista: Record<string, keyof typeof permisosVista> = {
   '/permisos': 'permisos',
   '/rol-permisos': 'rolPermisos',
   '/bitacora': 'bitacora',
+  '/auditoria': 'auditoria',
   '/usuario-bitacora': 'usuarioBitacora',
   '/empleados': 'empleados',
   '/departamentos': 'empleados',
@@ -120,6 +122,16 @@ const pathToVista: Record<string, keyof typeof permisosVista> = {
   '/aprobacion-nomina': 'nominas',
 };
 
+function getNormalizedRole(usuario: AuthUserWithPermissions | null | undefined) {
+  return normalizePermiso(
+    String(usuario?.rol_nombre ?? usuario?.ROL_NOMBRE ?? usuario?.rol ?? usuario?.role ?? '')
+  );
+}
+
+export function isRole(usuario: AuthUserWithPermissions | null | undefined, roleName: string) {
+  return getNormalizedRole(usuario) === normalizePermiso(roleName);
+}
+
 const reportPaths = new Set([
   '/reporte-marcajes',
   '/reporte-igss',
@@ -153,6 +165,10 @@ function isAdminUser(usuario: AuthUserWithPermissions | null | undefined) {
     String(usuario?.rol_nombre ?? usuario?.ROL_NOMBRE ?? usuario?.rol ?? usuario?.role ?? '')
   );
   return ['admin', 'administrador'].includes(role);
+}
+
+export function canClosePeriodo(usuario: AuthUserWithPermissions | null | undefined) {
+  return isAdminUser(usuario) || isFullAccessUser(usuario);
 }
 
 export function tienePermiso(
@@ -208,6 +224,26 @@ export function getVistaForPath(path: string) {
 export function canAccessPath(usuario: AuthUserWithPermissions | null | undefined, path: string) {
   if (path === '/') return true;
   if (isAdminUser(usuario) && reportPaths.has(path)) return true;
+  // Role-specific shortcuts
+  if (isRole(usuario, 'auditoria')) {
+    if (['/auditoria', '/bitacora', '/usuario-bitacora'].includes(path)) return true;
+  }
+
+  if (isRole(usuario, 'analista_nomina') || isRole(usuario, 'analista nomina') || isRole(usuario, 'analista-nomina')) {
+    const allowed = new Set([
+      '/nomina',
+      '/nomina-asignaciones',
+      '/periodo',
+      '/empleados',
+      '/reporte-igss',
+      '/reporte-isr',
+    ]);
+    if (allowed.has(path)) return true;
+  }
+
+  if (isRole(usuario, 'supervisor_asistencia') || isRole(usuario, 'supervisor asistencia') || isRole(usuario, 'supervisor-asistencia')) {
+    if (['/marcajes', '/permisos'].includes(path)) return true;
+  }
   const vista = getVistaForPath(path);
   if (!vista) return false;
   return puedeVerVista(usuario, vista);

@@ -1,4 +1,13 @@
-export type AppRole = 'EMPLEADO' | 'RRHH' | 'ADMIN' | 'CONTABILIDAD' | 'GERENTE' | 'SUPREMO';
+export type AppRole =
+  | 'EMPLEADO'
+  | 'RRHH'
+  | 'ADMIN'
+  | 'CONTABILIDAD'
+  | 'GERENTE'
+  | 'AUDITORIA'
+  | 'ANALISTA_NOMINA'
+  | 'SUPERVISOR_ASISTENCIA'
+  | 'SUPREMO';
 
 export type AppView = {
   key: string;
@@ -14,6 +23,9 @@ export const roleLabels: Record<AppRole, string> = {
   ADMIN: 'Admin',
   CONTABILIDAD: 'Contabilidad',
   GERENTE: 'Gerente',
+  AUDITORIA: 'Auditoria',
+  ANALISTA_NOMINA: 'Analista de Nomina',
+  SUPERVISOR_ASISTENCIA: 'Supervisor de Asistencia',
   SUPREMO: 'Supremo',
 };
 
@@ -23,6 +35,9 @@ export const roleOrder: AppRole[] = [
   'ADMIN',
   'CONTABILIDAD',
   'GERENTE',
+  'AUDITORIA',
+  'ANALISTA_NOMINA',
+  'SUPERVISOR_ASISTENCIA',
   'SUPREMO',
 ];
 
@@ -31,19 +46,19 @@ export const AUTH_USER_CHANGED_EVENT = 'auth-user-changed';
 export const appViews: AppView[] = [
   { key: 'marcaje', text: 'Marcaje', path: '/marcajes', roles: ['EMPLEADO'] },
 
-  { key: 'resumen-marcaje', text: 'Resumen de Marcaje', path: '/resumen-marcaje', roles: ['RRHH'] },
-  { key: 'reporte-marcajes', text: 'Reporte de Marcajes', path: '/reporte-marcajes', roles: ['RRHH', 'ADMIN'] },
+  { key: 'resumen-marcaje', text: 'Resumen de Marcaje', path: '/resumen-marcaje', roles: ['RRHH', 'SUPERVISOR_ASISTENCIA'] },
+  { key: 'reporte-marcajes', text: 'Reporte de Marcajes', path: '/reporte-marcajes', roles: ['RRHH', 'ADMIN', 'AUDITORIA', 'SUPERVISOR_ASISTENCIA'] },
   { key: 'reporte-vacaciones', text: 'Reporte de Vacaciones', path: '/reporte-vacaciones', roles: ['RRHH', 'ADMIN'] },
   { key: 'registro-empleados', text: 'Registro de Empleados', path: '/empleados', roles: ['RRHH'] },
   { key: 'departamentos', text: 'Departamentos', path: '/departamentos', roles: ['RRHH'] },
   { key: 'puestos', text: 'Puestos', path: '/puestos', roles: ['RRHH'] },
   { key: 'sucursales', text: 'Sucursales', path: '/sucursales', roles: ['RRHH'] },
-  { key: 'horarios', text: 'Horarios', path: '/horarios', roles: ['RRHH'] },
+  { key: 'horarios', text: 'Horarios', path: '/horarios', roles: ['RRHH', 'SUPERVISOR_ASISTENCIA'] },
   { key: 'cuenta-bancaria', text: 'Cuenta Bancaria', path: '/cuenta-bancaria', roles: ['RRHH'] },
   { key: 'kpis', text: 'KPIs', path: '/kpis', roles: ['RRHH'] },
   { key: 'kpi-resultado', text: 'Resultados KPI', path: '/kpi-resultado', roles: ['RRHH'] },
-  { key: 'suspensiones-igss', text: 'Suspensiones de IGSS', path: '/suspensiones-igss', roles: ['RRHH'] },
-  { key: 'control-laboral', text: 'Control Laboral', path: '/control-laboral', roles: ['RRHH'] },
+  { key: 'suspensiones-igss', text: 'Suspensiones de IGSS', path: '/suspensiones-igss', roles: ['RRHH', 'SUPERVISOR_ASISTENCIA'] },
+  { key: 'control-laboral', text: 'Control Laboral', path: '/control-laboral', roles: ['RRHH', 'SUPERVISOR_ASISTENCIA'] },
   { key: 'empleado-contrato', text: 'Empleado Contrato', path: '/empleado-contrato', roles: ['RRHH'] },
   { key: 'tipo-contrato', text: 'Tipo Contrato', path: '/tipo-contrato', roles: ['RRHH'] },
 
@@ -51,28 +66,28 @@ export const appViews: AppView[] = [
   { key: 'asignacion-permisos', text: 'Permisos', path: '/permisos', roles: ['ADMIN'] },
   { key: 'registro-usuarios', text: 'Usuarios', path: '/usuarios', roles: ['ADMIN'] },
   { key: 'roles-permisos', text: 'Roles y Permisos', path: '/rol-permisos', roles: ['ADMIN'] },
-  { key: 'bitacora', text: 'Bitácora', path: '/bitacora', roles: ['ADMIN'] },
-  { key: 'usuario-bitacora', text: 'Trazabilidad Usuario-Bitácora', path: '/usuario-bitacora', roles: ['ADMIN'] },
+  { key: 'bitacora', text: 'Bitácora', path: '/bitacora', roles: ['ADMIN', 'AUDITORIA'] },
+  { key: 'usuario-bitacora', text: 'Trazabilidad Usuario-Bitácora', path: '/usuario-bitacora', roles: ['ADMIN', 'AUDITORIA'] },
 
-  { key: 'nomina-asignaciones', text: 'Asignaciones Nomina', path: '/nomina-asignaciones', roles: ['CONTABILIDAD'] },
-  { key: 'nomina', text: 'Nomina', path: '/nomina', roles: ['CONTABILIDAD'] },
-  { key: 'nomina-detalle', text: 'Nomina Detalle', path: '/nomina-detalle', roles: ['CONTABILIDAD'] },
-  { key: 'periodos', text: 'Periodos', path: '/periodo', roles: ['CONTABILIDAD'] },
-  { key: 'tipo-ingresos', text: 'Ingresos', path: '/tipo-ingresos', roles: ['CONTABILIDAD'] },
-  { key: 'descuentos', text: 'Descuentos', path: '/descuentos', roles: ['CONTABILIDAD'] },
-  { key: 'prestamos', text: 'Prestamos', path: '/prestamos', roles: ['CONTABILIDAD'] },
-  { key: 'liquidacion', text: 'Liquidacion', path: '/liquidacion', roles: ['CONTABILIDAD'] },
-  { key: 'calculadora-igss', text: 'Calculadora IGSS', path: '/calculadora-igss', roles: ['CONTABILIDAD'] },
-  { key: 'calculadora-isr', text: 'Calculadora ISR', path: '/calculadora-isr', roles: ['CONTABILIDAD'] },
-  { key: 'generar-csv', text: 'Generar CSV Deposito', path: '/generar-csv', roles: ['CONTABILIDAD'] },
-  { key: 'reporte-igss', text: 'Reporte IGSS', path: '/reporte-igss', roles: ['ADMIN', 'CONTABILIDAD'] },
-  { key: 'reporte-isr', text: 'Reporte ISR Anual', path: '/reporte-isr', roles: ['ADMIN', 'CONTABILIDAD'] },
-  { key: 'reporte-aguinaldo', text: 'Reporte Aguinaldo/Bono 14', path: '/reporte-aguinaldo', roles: ['ADMIN', 'CONTABILIDAD', 'RRHH'] },
-  { key: 'reporte-descuentos', text: 'Reporte de Descuentos', path: '/reporte-descuentos', roles: ['ADMIN', 'CONTABILIDAD'] },
-  { key: 'reporte-liquidacion', text: 'Reporte de Liquidaciones', path: '/reporte-liquidacion', roles: ['ADMIN', 'CONTABILIDAD'] },
-  { key: 'reporte-kpi', text: 'Reporte KPIs', path: '/reporte-kpi', roles: ['ADMIN', 'RRHH', 'GERENTE'] },
-  { key: 'reporte-horas-extra', text: 'Reporte Horas Extra', path: '/reporte-horas-extra', roles: ['ADMIN', 'GERENTE', 'CONTABILIDAD'] },
-  { key: 'dashboard-ejecutivo', text: 'Dashboard Ejecutivo', path: '/dashboard-ejecutivo', roles: ['ADMIN','GERENTE'] },
+  { key: 'nomina-asignaciones', text: 'Asignaciones Nomina', path: '/nomina-asignaciones', roles: ['CONTABILIDAD', 'ANALISTA_NOMINA'] },
+  { key: 'nomina', text: 'Nomina', path: '/nomina', roles: ['CONTABILIDAD', 'ANALISTA_NOMINA'] },
+  { key: 'nomina-detalle', text: 'Nomina Detalle', path: '/nomina-detalle', roles: ['CONTABILIDAD', 'ANALISTA_NOMINA'] },
+  { key: 'periodos', text: 'Periodos', path: '/periodo', roles: ['CONTABILIDAD', 'ANALISTA_NOMINA'] },
+  { key: 'tipo-ingresos', text: 'Ingresos', path: '/tipo-ingresos', roles: ['CONTABILIDAD', 'ANALISTA_NOMINA'] },
+  { key: 'descuentos', text: 'Descuentos', path: '/descuentos', roles: ['CONTABILIDAD', 'ANALISTA_NOMINA'] },
+  { key: 'prestamos', text: 'Prestamos', path: '/prestamos', roles: ['CONTABILIDAD', 'ANALISTA_NOMINA'] },
+  { key: 'liquidacion', text: 'Liquidacion', path: '/liquidacion', roles: ['CONTABILIDAD', 'ANALISTA_NOMINA'] },
+  { key: 'calculadora-igss', text: 'Calculadora IGSS', path: '/calculadora-igss', roles: ['CONTABILIDAD', 'ANALISTA_NOMINA'] },
+  { key: 'calculadora-isr', text: 'Calculadora ISR', path: '/calculadora-isr', roles: ['CONTABILIDAD', 'ANALISTA_NOMINA'] },
+  { key: 'generar-csv', text: 'Generar CSV Deposito', path: '/generar-csv', roles: ['CONTABILIDAD', 'ANALISTA_NOMINA'] },
+  { key: 'reporte-igss', text: 'Reporte IGSS', path: '/reporte-igss', roles: ['ADMIN', 'CONTABILIDAD', 'ANALISTA_NOMINA', 'AUDITORIA'] },
+  { key: 'reporte-isr', text: 'Reporte ISR Anual', path: '/reporte-isr', roles: ['ADMIN', 'CONTABILIDAD', 'ANALISTA_NOMINA', 'AUDITORIA'] },
+  { key: 'reporte-aguinaldo', text: 'Reporte Aguinaldo/Bono 14', path: '/reporte-aguinaldo', roles: ['ADMIN', 'CONTABILIDAD', 'RRHH', 'ANALISTA_NOMINA', 'AUDITORIA'] },
+  { key: 'reporte-descuentos', text: 'Reporte de Descuentos', path: '/reporte-descuentos', roles: ['ADMIN', 'CONTABILIDAD', 'ANALISTA_NOMINA', 'AUDITORIA'] },
+  { key: 'reporte-liquidacion', text: 'Reporte de Liquidaciones', path: '/reporte-liquidacion', roles: ['ADMIN', 'CONTABILIDAD', 'ANALISTA_NOMINA', 'AUDITORIA'] },
+  { key: 'reporte-kpi', text: 'Reporte KPIs', path: '/reporte-kpi', roles: ['ADMIN', 'RRHH', 'GERENTE', 'AUDITORIA'] },
+  { key: 'reporte-horas-extra', text: 'Reporte Horas Extra', path: '/reporte-horas-extra', roles: ['ADMIN', 'GERENTE', 'CONTABILIDAD', 'ANALISTA_NOMINA', 'AUDITORIA', 'SUPERVISOR_ASISTENCIA'] },
+  { key: 'dashboard-ejecutivo', text: 'Dashboard Ejecutivo', path: '/dashboard-ejecutivo', roles: ['ADMIN', 'GERENTE', 'AUDITORIA'] },
   { key: 'aprobacion-nomina', text: 'Aprobacion de Nomina', path: '/aprobacion-nomina', roles: ['GERENTE'] },
 ];
 
@@ -121,6 +136,29 @@ export const allViews = [...appViews, ...legacyViews];
       { text: 'Reporte Horas Extra', path: '/reporte-horas-extra', key: 'reporte-horas-extra' },
       { text: 'Aprobacion de Nomina', path: '/aprobacion-nomina', key: 'aprobacion-nomina' },
     ],
+    AUDITORIA: [
+      { text: 'Reporte de Marcajes', path: '/reporte-marcajes', key: 'reporte-marcajes' },
+      { text: 'Reporte IGSS', path: '/reporte-igss', key: 'reporte-igss' },
+      { text: 'Reporte ISR Anual', path: '/reporte-isr', key: 'reporte-isr' },
+      { text: 'Reporte Aguinaldo/Bono 14', path: '/reporte-aguinaldo', key: 'reporte-aguinaldo' },
+      { text: 'Reporte de Descuentos', path: '/reporte-descuentos', key: 'reporte-descuentos' },
+      { text: 'Reporte de Liquidaciones', path: '/reporte-liquidacion', key: 'reporte-liquidacion' },
+      { text: 'Reporte KPIs', path: '/reporte-kpi', key: 'reporte-kpi' },
+      { text: 'Reporte Horas Extra', path: '/reporte-horas-extra', key: 'reporte-horas-extra' },
+      { text: 'Dashboard Ejecutivo', path: '/dashboard-ejecutivo', key: 'dashboard-ejecutivo' },
+    ],
+    ANALISTA_NOMINA: [
+      { text: 'Reporte IGSS', path: '/reporte-igss', key: 'reporte-igss' },
+      { text: 'Reporte ISR Anual', path: '/reporte-isr', key: 'reporte-isr' },
+      { text: 'Reporte Aguinaldo/Bono 14', path: '/reporte-aguinaldo', key: 'reporte-aguinaldo' },
+      { text: 'Reporte de Descuentos', path: '/reporte-descuentos', key: 'reporte-descuentos' },
+      { text: 'Reporte de Liquidaciones', path: '/reporte-liquidacion', key: 'reporte-liquidacion' },
+      { text: 'Reporte Horas Extra', path: '/reporte-horas-extra', key: 'reporte-horas-extra' },
+    ],
+    SUPERVISOR_ASISTENCIA: [
+      { text: 'Reporte de Marcajes', path: '/reporte-marcajes', key: 'reporte-marcajes' },
+      { text: 'Reporte Horas Extra', path: '/reporte-horas-extra', key: 'reporte-horas-extra' },
+    ],
     SUPREMO: [
       { text: 'Reporte de Marcajes', path: '/reporte-marcajes', key: 'reporte-marcajes' },
       { text: 'Reporte IGSS', path: '/reporte-igss', key: 'reporte-igss' },
@@ -149,6 +187,9 @@ export function normalizeRole(value: unknown): AppRole | null {
   if (normalized === 'ADMIN' || normalized === 'ADMINISTRADOR') return 'ADMIN';
   if (normalized === 'CONTABILIDAD' || normalized === 'CONTADOR') return 'CONTABILIDAD';
   if (normalized === 'GERENTE' || normalized === 'MANAGER') return 'GERENTE';
+  if (normalized === 'AUDITORIA' || normalized === 'AUDITOR') return 'AUDITORIA';
+  if (normalized === 'ANALISTANOMINA' || normalized === 'ANALISTADENOMINA') return 'ANALISTA_NOMINA';
+  if (normalized === 'SUPERVISORASISTENCIA' || normalized === 'SUPERVISORDEASISTENCIA') return 'SUPERVISOR_ASISTENCIA';
   if (normalized === 'SUPREMO' || normalized === 'SUPERADMIN' || normalized === 'ROOT') return 'SUPREMO';
 
   return null;

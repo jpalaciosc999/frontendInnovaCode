@@ -147,7 +147,10 @@ function Navbar() {
     ADMIN: true,
     CONTABILIDAD: true,
     GERENTE: true,
-      REPORTES: true,
+    AUDITORIA: true,
+    ANALISTA_NOMINA: true,
+    SUPERVISOR_ASISTENCIA: true,
+    REPORTES: true,
   });
 
   const location = useLocation();

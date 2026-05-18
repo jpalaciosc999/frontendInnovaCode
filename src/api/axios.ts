@@ -9,6 +9,7 @@ const statusMessages: Record<number, string> = {
   403: 'No tienes permisos',
   404: 'Ruta inexistente o recurso no encontrado',
   409: 'Conflicto de datos',
+  423: 'El período está cerrado y no puede modificarse.',
 };
 
 const api = axios.create({
@@ -51,6 +52,9 @@ api.interceptors.response.use(
 
     if (status === 403) {
       window.dispatchEvent(new Event(ACCESS_FORBIDDEN_EVENT));
+      if (window.location.pathname !== '/access-denied') {
+        window.location.href = '/access-denied';
+      }
     }
 
     return Promise.reject(error);

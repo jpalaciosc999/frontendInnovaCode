@@ -1,9 +1,31 @@
 import type { Empleado } from '../interfaces/empleados';
+import type { PeriodoEstado } from '../interfaces/periodo';
 import type { Puesto } from '../interfaces/puestos';
 
 export const SALARIO_MENSUAL_DEFAULT = 4000;
 export const TASA_IGSS_LABORAL = 0.0483;
 export const TASA_IGSS_PATRONAL = 0.1267;
+
+export const PERIODO_ESTADOS: PeriodoEstado[] = ['ABIERTO', 'EN_REVISION', 'APROBADO', 'CERRADO'];
+
+export const periodoEstadoLabels: Record<PeriodoEstado, string> = {
+  ABIERTO: 'Abierto',
+  EN_REVISION: 'En revision',
+  APROBADO: 'Aprobado',
+  CERRADO: 'Cerrado',
+};
+
+export const normalizePeriodoEstado = (estado?: string | null): PeriodoEstado | '' => {
+  const normalized = String(estado ?? '').trim().toUpperCase();
+  if (normalized === 'A') return 'ABIERTO';
+  if (normalized === 'I') return 'CERRADO';
+  return PERIODO_ESTADOS.includes(normalized as PeriodoEstado) ? normalized as PeriodoEstado : '';
+};
+
+export const esPeriodoAbierto = (estado?: string | null) => normalizePeriodoEstado(estado) === 'ABIERTO';
+export const esPeriodoEnRevision = (estado?: string | null) => normalizePeriodoEstado(estado) === 'EN_REVISION';
+export const esPeriodoAprobado = (estado?: string | null) => normalizePeriodoEstado(estado) === 'APROBADO';
+export const esPeriodoCerrado = (estado?: string | null) => normalizePeriodoEstado(estado) === 'CERRADO';
 
 export function obtenerSueldoMensual(
   empleado: Pick<Empleado, 'EMP_SUELDO'>,

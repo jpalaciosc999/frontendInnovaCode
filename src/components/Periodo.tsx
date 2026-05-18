@@ -5,15 +5,28 @@ import {
   obtenerPeriodos,
   crearPeriodo,
   actualizarPeriodo,
-  eliminarPeriodo
+  eliminarPeriodo,
+  actualizarEstadoPeriodo,
 } from '../services/periodo.service';
 import { getApiErrorMessage } from '../api/errors';
+import {
+  PERIODO_ESTADOS,
+  normalizePeriodoEstado,
+  periodoEstadoLabels,
+} from '../utils/payroll';
+import { useAuth } from '../context/AuthContext';
+import { canClosePeriodo } from '../auth/access';
 
 import {
   Alert,
   Box,
   Button,
   Chip,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogContentText,
+  DialogTitle,
   FormControl,
   Grid,
   InputLabel,
@@ -43,7 +56,7 @@ const initialForm: PeriodoForm = {
   fecha_inicio: '',
   fecha_fin: '',
   fecha_pago: '',
-  estado: ''
+  estado: 'ABIERTO'
 };
 
 const toInputDate = (value?: string) => {
@@ -82,6 +95,9 @@ function Periodos() {
   const [modoEdicion, setModoEdicion] = useState(false);
   const [perId, setPerId] = useState<number | null>(null);
   const [form, setForm] = useState<PeriodoForm>(initialForm);
+  const [cerrarDialogOpen, setCerrarDialogOpen] = useState(false);
+  const [motivoCierre, setMotivoCierre] = useState('');
+  const { user } = useAuth();
 
   const cargarPeriodos = async () => {
     try {
@@ -113,7 +129,7 @@ function Periodos() {
   };
 
   const validarFormulario = () => {
-    if (!form.fecha_inicio || !form.fecha_fin || !form.fecha_pago || !form.estado.trim()) {
+    if (!form.fecha_inicio || !form.fecha_fin || !form.fecha_pago || !String(form.estado).trim()) {
       setError('Todos los campos son obligatorios');
       return false;
     }
@@ -174,14 +190,44 @@ function Periodos() {
       fecha_inicio: toInputDate(per.PER_FECHA_INICIO),
       fecha_fin: toInputDate(per.PER_FECHA_FIN),
       fecha_pago: toInputDate(per.PER_FECHA_PAGO),
-      estado: per.PER_ESTADO || ''
+      estado: normalizePeriodoEstado(per.PER_ESTADO) || per.PER_ESTADO || 'ABIERTO'
     });
   };
 
+  const cerrarPeriodo = async () => {
+    if (!perId) return;
+    if (!motivoCierre.trim()) {
+      setError('Debe ingresar un motivo para cerrar el periodo');
+      return;
+    }
+
+    const periodo = datos.find((periodoItem) => periodoItem.PER_ID === perId);
+    if (!periodo) {
+      setError('No se encontro el periodo seleccionado');
+      return;
+    }
+
+    try {
+      setError('');
+      setMensaje('');
+      await actualizarEstadoPeriodo(periodo, 'CERRADO', motivoCierre.trim());
+      setMensaje('Periodo cerrado correctamente');
+      setCerrarDialogOpen(false);
+      setMotivoCierre('');
+      limpiarFormulario();
+      await cargarPeriodos();
+    } catch (err: unknown) {
+      setError(getApiErrorMessage(err, 'Error cerrando periodo'));
+    }
+  };
+
   const obtenerChipEstado = (estado: string) => {
-    return estado === 'A'
-      ? <Chip label="Activo" color="success" size="small" />
-      : <Chip label="Inactivo" color="default" size="small" />;
+    const estadoNormalizado = normalizePeriodoEstado(estado);
+    if (estadoNormalizado === 'ABIERTO') return <Chip label="Abierto" color="success" size="small" />;
+    if (estadoNormalizado === 'EN_REVISION') return <Chip label="En revision" color="warning" size="small" />;
+    if (estadoNormalizado === 'APROBADO') return <Chip label="Aprobado" color="primary" size="small" />;
+    if (estadoNormalizado === 'CERRADO') return <Chip label="Cerrado" color="default" size="small" />;
+    return <Chip label={estado || 'Sin estado'} size="small" />;
   };
 
   if (cargando) {
@@ -207,7 +253,7 @@ function Periodos() {
         </Typography>
 
         <Alert severity="info" sx={{ mb: 2 }}>
-          La nomina calcula salario, bonificaciones, prestamos, IGSS, ISR y liquido segun el rango: quincenal o mensual.
+          El periodo controla el bloqueo maestro de nomina: ABIERTO permite generar, EN_REVISION bloquea cambios, APROBADO habilita CSV y CERRADO deja el periodo finalizado.
         </Alert>
 
         <Grid container spacing={3}>
@@ -253,9 +299,11 @@ function Periodos() {
                 label="Estado"
                 onChange={handleChange}
               >
-                <MenuItem value="">Seleccione</MenuItem>
-                <MenuItem value="A">Activo</MenuItem>
-                <MenuItem value="I">Inactivo</MenuItem>
+                {PERIODO_ESTADOS.map((estado) => (
+                  <MenuItem key={estado} value={estado}>
+                    {periodoEstadoLabels[estado]}
+                  </MenuItem>
+                ))}
               </Select>
             </FormControl>
           </Grid>
@@ -274,7 +322,7 @@ function Periodos() {
           )}
 
           <Grid size={{ xs: 12 }}>
-            <Box sx={{ display: 'flex', gap: 2, mt: 1 }}>
+            <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mt: 1 }}>
               <Button
                 variant="contained"
                 startIcon={<SaveIcon />}
@@ -282,6 +330,15 @@ function Periodos() {
               >
                 {modoEdicion ? 'Actualizar' : 'Guardar'}
               </Button>
+              {modoEdicion && perId !== null && canClosePeriodo(user) && normalizePeriodoEstado(form.estado) !== 'CERRADO' && (
+                <Button
+                  variant="contained"
+                  color="error"
+                  onClick={() => setCerrarDialogOpen(true)}
+                >
+                  Cerrar período
+                </Button>
+              )}
               <Button
                 variant="outlined"
                 color="secondary"
@@ -294,6 +351,31 @@ function Periodos() {
           </Grid>
         </Grid>
       </Paper>
+      <Dialog open={cerrarDialogOpen} onClose={() => setCerrarDialogOpen(false)}>
+        <DialogTitle>Cerrar período</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            Estás a punto de cerrar este periodo. Una vez cerrado no se podrán modificar registros de nómina, asignaciones ni detalle para este periodo.
+          </DialogContentText>
+          <TextField
+            autoFocus
+            margin="dense"
+            label="Motivo de cierre"
+            type="text"
+            fullWidth
+            multiline
+            minRows={3}
+            value={motivoCierre}
+            onChange={(event) => setMotivoCierre(event.target.value)}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setCerrarDialogOpen(false)}>Cancelar</Button>
+          <Button onClick={cerrarPeriodo} color="error" variant="contained">
+            Confirmar cierre
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       <Paper elevation={3} sx={{ p: 3 }}>
         <Typography variant="h6" sx={{ mb: 2 }}>
