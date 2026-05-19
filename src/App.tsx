@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
+import { Suspense, lazy } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
-import { Box, Container, CssBaseline } from '@mui/material';
+import { Box, Container, CssBaseline, CircularProgress } from '@mui/material';
 
 import { AuthProvider, useAuth } from './context/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -8,46 +9,46 @@ import LoginPage from './components/LoginPage';
 import Navbar from './components/Navbar';
 import AccessDenied from './components/common/AccessDenied';
 
-import Home from './pages/Home';
-import PruebaAxios from './components/PruebaAxios';
-import Departamentos from './components/Departamentos';
-import Puestos from './components/Puestos';
-import Roles from './components/Roles';
-import Prestamos from './components/Prestamos';
-import Permisos from './components/permisos';
-import RolPermisosView from './components/RolPermisos';
-import Periodo from './components/Periodo';
-import ControlLaboral from './components/ControlLaboral';
-import CuentaBancaria from './components/CuentaBancaria';
-import Descuentos from './components/descuentos';
-import TipoIngresos from './components/tipoIngresos';
-import NominaDetallePage from './components/NominaDetallePage';
-import KPIPage from './components/KPIPage';
-import KPIResultadoPage from './components/KPIResultadoPage';
-import MarcajePage from './components/MarcajeCRUD';
-import EmpleadoContrato from './components/EmpleadoContrato';
-import Sede from './components/Sede';
-import Bitacora from './components/Bitacora';
-import Auditoria from './components/Auditoria';
-import Liquidacion from './components/Liquidacion';
-import Nomina from './components/Nomina';
-import NominaAsignaciones from './components/NominaAsignaciones';
-import Usuario from './components/Usuario';
-import TipoContrato from './components/TipoContrato';
-import UsuarioBitacora from './components/UsuarioBitacora';
-import HorarioCRUD from './components/HorarioCRUD';
-import SuspensionIgss from './components/SuspensionIgss';
-import AprobacionNomina from './components/AprobacionNomina';
-import ReporteMarcajes from './components/ReporteMarcajes';
-import ReporteIgss from './components/ReporteIgss';
-import ReporteIsr from './components/ReporteIsr';
-import ReporteAguinaldo from './components/ReporteAguinaldo';
-import ReporteVacaciones from './components/ReporteVacaciones';
-import ReporteDescuentos from './components/ReporteDescuentos';
-import ReporteKpi        from './components/ReporteKpi';
-import ReporteHorasExtra from './components/ReporteHorasExtra';
-import DashboardEjecutivo from './components/DashboardEjecutivo';
-import ReporteLiquidacion from './components/ReporteLiquidacion';
+const Home = lazy(() => import('./pages/Home'));
+const PruebaAxios = lazy(() => import('./components/PruebaAxios'));
+const Departamentos = lazy(() => import('./components/Departamentos'));
+const Puestos = lazy(() => import('./components/Puestos'));
+const Roles = lazy(() => import('./components/Roles'));
+const Prestamos = lazy(() => import('./components/Prestamos'));
+const Permisos = lazy(() => import('./components/permisos'));
+const RolPermisosView = lazy(() => import('./components/RolPermisos'));
+const Periodo = lazy(() => import('./components/Periodo'));
+const ControlLaboral = lazy(() => import('./components/ControlLaboral'));
+const CuentaBancaria = lazy(() => import('./components/CuentaBancaria'));
+const Descuentos = lazy(() => import('./components/descuentos'));
+const TipoIngresos = lazy(() => import('./components/tipoIngresos'));
+const NominaDetallePage = lazy(() => import('./components/NominaDetallePage'));
+const KPIPage = lazy(() => import('./components/KPIPage'));
+const KPIResultadoPage = lazy(() => import('./components/KPIResultadoPage'));
+const MarcajePage = lazy(() => import('./components/MarcajeCRUD'));
+const EmpleadoContrato = lazy(() => import('./components/EmpleadoContrato'));
+const Sede = lazy(() => import('./components/Sede'));
+const Bitacora = lazy(() => import('./components/Bitacora'));
+const Auditoria = lazy(() => import('./components/Auditoria'));
+const Liquidacion = lazy(() => import('./components/Liquidacion'));
+const Nomina = lazy(() => import('./components/Nomina'));
+const NominaAsignaciones = lazy(() => import('./components/NominaAsignaciones'));
+const Usuario = lazy(() => import('./components/Usuario'));
+const TipoContrato = lazy(() => import('./components/TipoContrato'));
+const UsuarioBitacora = lazy(() => import('./components/UsuarioBitacora'));
+const HorarioCRUD = lazy(() => import('./components/HorarioCRUD'));
+const SuspensionIgss = lazy(() => import('./components/SuspensionIgss'));
+const AprobacionNomina = lazy(() => import('./components/AprobacionNomina'));
+const ReporteMarcajes = lazy(() => import('./components/ReporteMarcajes'));
+const ReporteIgss = lazy(() => import('./components/ReporteIgss'));
+const ReporteIsr = lazy(() => import('./components/ReporteIsr'));
+const ReporteAguinaldo = lazy(() => import('./components/ReporteAguinaldo'));
+const ReporteVacaciones = lazy(() => import('./components/ReporteVacaciones'));
+const ReporteDescuentos = lazy(() => import('./components/ReporteDescuentos'));
+const ReporteKpi = lazy(() => import('./components/ReporteKpi'));
+const ReporteHorasExtra = lazy(() => import('./components/ReporteHorasExtra'));
+const ReporteLiquidacion = lazy(() => import('./components/ReporteLiquidacion'));
+const DashboardEjecutivo = lazy(() => import('./components/DashboardEjecutivo'));
 
 function GuardedRoute({
   path,
@@ -77,8 +78,13 @@ function Layout() {
       <Navbar />
 
       <Container maxWidth="xl" sx={{ py: 3 }}>
-        <Routes>
-          <Route path="/" element={<Home />} />
+        <Suspense fallback={
+          <Box sx={{ minHeight: '60vh', display: 'grid', placeItems: 'center' }}>
+            <CircularProgress />
+          </Box>
+        }>
+          <Routes>
+            <Route path="/" element={<Home />} />
 
           <Route path="/empleados" element={guarded('/empleados', <PruebaAxios />)} />
           <Route path="/departamentos" element={guarded('/departamentos', <Departamentos />)} />
@@ -131,6 +137,7 @@ function Layout() {
 
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
+      </Suspense>
       </Container>
     </Box>
   );

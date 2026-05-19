@@ -4,6 +4,7 @@ import type { Horario } from '../interfaces/horario';
 import type { Puesto } from '../interfaces/puestos';
 import type { Sede } from '../interfaces/sede';
 import type { TipoContrato } from '../interfaces/tipoContrato';
+import type { Departamento } from '../interfaces/departamentos';
 
 import {
   obtenerEmpleados,
@@ -16,6 +17,7 @@ import { obtenerHorarios } from '../services/horario.service';
 import { obtenerPuestos } from '../services/puestos.service';
 import { obtenerSedes } from '../services/sede.service';
 import { obtenerTiposContrato } from '../services/tipoContrato.service';
+import { obtenerDepartamentos } from '../services/departamentos.service';
 
 import {
   Alert,
@@ -71,6 +73,7 @@ const initialForm: EmpleadoForm = {
   emp_telefono: '',
   emp_fecha_contratacion: '',
   emp_estado: '',
+  dep_id: '',
   hor_id: '',
   sed_id: '',
   pue_id: '',
@@ -172,22 +175,19 @@ function PruebaAxios() {
   const [puestos, setPuestos] = useState<Puesto[]>([]);
   const [sedes, setSedes] = useState<Sede[]>([]);
   const [tiposContrato, setTiposContrato] = useState<TipoContrato[]>([]);
+  const [departamentos, setDepartamentos] = useState<Departamento[]>([]);
 
   const [cargandoHorarios, setCargandoHorarios] = useState(false);
   const [cargandoPuestos, setCargandoPuestos] = useState(false);
   const [cargandoSedes, setCargandoSedes] = useState(false);
   const [cargandoTiposContrato, setCargandoTiposContrato] = useState(false);
+  const [cargandoDeps, setCargandoDeps] = useState(false);
 
   const [filtroHor, setFiltroHor] = useState('');
   const [filters, setFilters] = useState(initialFilters);
   const [perfilEmpleado, setPerfilEmpleado] = useState<Empleado | null>(null);
-  const modalDepartamentos = false;
-  const setModalDepartamentos = (_open: boolean) => {};
-  const filtroDep = '';
-  const setFiltroDep = (_value: string) => {};
-  const cargandoDeps = false;
-  const departamentosFiltrados: any[] = [];
-  const seleccionarDepartamento = (_dep: any) => {};
+  const [modalDepartamentos, setModalDepartamentos] = useState(false);
+  const [filtroDep, setFiltroDep] = useState('');
 
   const cargarEmpleados = async () => {
     try {
@@ -260,12 +260,27 @@ function PruebaAxios() {
     }
   };
 
+  const cargarDepartamentos = async () => {
+    try {
+      setCargandoDeps(true);
+      const data = await obtenerDepartamentos();
+      setDepartamentos([...data].sort((a, b) =>
+        String(a.DEP_NOMBRE ?? '').localeCompare(String(b.DEP_NOMBRE ?? ''), 'es', { sensitivity: 'base' })
+      ));
+    } catch (err: any) {
+      setError('Error cargando departamentos: ' + (err.response?.data?.error || err.message));
+    } finally {
+      setCargandoDeps(false);
+    }
+  };
+
   useEffect(() => {
     cargarEmpleados();
     cargarHorarios();
     cargarPuestos();
     cargarSedes();
     cargarTiposContrato();
+    cargarDepartamentos();
   }, []);
 
   const abrirModalHorarios = async () => {
@@ -273,6 +288,14 @@ function PruebaAxios() {
     setFiltroHor('');
     if (horarios.length === 0) {
       await cargarHorarios();
+    }
+  };
+
+  const abrirModalDepartamentos = async () => {
+    setModalDepartamentos(true);
+    setFiltroDep('');
+    if (departamentos.length === 0) {
+      await cargarDepartamentos();
     }
   };
 
@@ -302,6 +325,11 @@ function PruebaAxios() {
     [tiposContrato]
   );
 
+  const departamentosMap = useMemo(
+    () => new Map(departamentos.map((dep) => [String(dep.DEP_ID), dep])),
+    [departamentos]
+  );
+
   const fotosEmpleados = useMemo(
     () => new Map(datos.map((empleado) => [
       empleado.EMP_ID,
@@ -315,7 +343,15 @@ function PruebaAxios() {
 
   const obtenerDepartamentoPuesto = (pueId: number | string | undefined) => {
     const puesto = puestosMap.get(String(pueId ?? ''));
-    return puesto?.DEP_ID ? `Departamento #${puesto.DEP_ID}` : 'Sin departamento asignado';
+    if (!puesto?.DEP_ID) return 'Sin departamento asignado';
+    const departamento = departamentosMap.get(String(puesto.DEP_ID));
+    return departamento ? departamento.DEP_NOMBRE : `Departamento #${puesto.DEP_ID}`;
+  };
+
+  const obtenerDepartamentoSeleccionado = (depId: number | string | undefined) => {
+    if (!depId) return '';
+    const departamento = departamentosMap.get(String(depId));
+    return departamento ? departamento.DEP_NOMBRE : `Departamento #${depId}`;
   };
 
   const formatearMoneda = (valor: number | string | undefined) => {
@@ -380,6 +416,20 @@ function PruebaAxios() {
       String(hor.HOR_ID).includes(texto)
     ));
   }, [filtroHor, horarios]);
+
+  const departamentosFiltrados = useMemo(() => {
+    const texto = filtroDep.toLowerCase();
+    return departamentos.filter((dep) => (
+      String(dep.DEP_ID).includes(texto) ||
+      String(dep.DEP_NOMBRE ?? '').toLowerCase().includes(texto) ||
+      String(dep.DEP_DESCRIPCION ?? '').toLowerCase().includes(texto)
+    ));
+  }, [filtroDep, departamentos]);
+
+  const seleccionarDepartamento = (dep: Departamento) => {
+    setForm((prev) => ({ ...prev, dep_id: String(dep.DEP_ID) }));
+    setModalDepartamentos(false);
+  };
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement> | SelectChangeEvent
@@ -861,27 +911,23 @@ function PruebaAxios() {
             </FormControl>
           </Grid>
 
-          <Grid size={{ xs: 12, md: 6 }} sx={{ display: 'none' }}>
-            <TextField
-              fullWidth
-              label="Departamento"
-              value=""
-              placeholder="Haz clic para seleccionar un departamento"
-              slotProps={{
-                input: {
-                  readOnly: true,
-                  endAdornment: (
-                    <InputAdornment position="end">
-                      <IconButton edge="end">
-                        <BusinessIcon color="primary" />
-                      </IconButton>
-                    </InputAdornment>
-                  ),
-                  sx: { cursor: 'pointer' }
-                }
-              }}
-              required
-            />
+          <Grid size={{ xs: 12, md: 6 }}>
+            <FormControl fullWidth required disabled={cargandoDeps}>
+              <InputLabel>Departamento</InputLabel>
+              <Select
+                name="dep_id"
+                value={form.dep_id}
+                label="Departamento"
+                onChange={handleChange}
+              >
+                <MenuItem value="">Seleccione departamento</MenuItem>
+                {departamentos.map((dep) => (
+                  <MenuItem key={dep.DEP_ID} value={String(dep.DEP_ID)}>
+                    {dep.DEP_NOMBRE} {dep.DEP_DESCRIPCION ? `- ${dep.DEP_DESCRIPCION}` : ''}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
           </Grid>
 
           <Grid size={{ xs: 12, md: 6 }}>
@@ -1020,16 +1066,6 @@ function PruebaAxios() {
               />
             </Grid>
           )}
-
-          <Grid size={{ xs: 12, md: 6 }}>
-            <TextField
-              fullWidth
-              label="Departamento del puesto"
-              value={form.pue_id ? obtenerDepartamentoPuesto(form.pue_id) : ''}
-              placeholder="Se completa al seleccionar puesto"
-              slotProps={{ input: { readOnly: true } }}
-            />
-          </Grid>
 
           <Grid size={{ xs: 12, md: 6 }}>
             <TextField
