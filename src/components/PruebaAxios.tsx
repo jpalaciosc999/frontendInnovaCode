@@ -64,6 +64,7 @@ import BadgeIcon from '@mui/icons-material/Badge';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import PhotoCameraIcon from '@mui/icons-material/PhotoCamera';
 import ArticleIcon from '@mui/icons-material/Article';
+import { useUnsavedFormGuard } from '../hooks/useUnsavedFormGuard';
 
 const initialForm: EmpleadoForm = {
   emp_nombre: '',
@@ -561,7 +562,7 @@ function PruebaAxios() {
       setError('');
       setMensaje('');
 
-      if (!validarFormulario()) return;
+      if (!validarFormulario()) return false;
 
       const payload: EmpleadoForm = {
         ...form,
@@ -578,10 +579,14 @@ function PruebaAxios() {
 
       limpiarFormulario();
       await cargarEmpleados();
+      return true;
     } catch (err: any) {
       setError('Error guardando empleado: ' + (err.response?.data?.error || err.message));
+      return false;
     }
   };
+
+  useUnsavedFormGuard(form, initialForm, guardarEmpleado);
 
   const handleEliminar = async (id: number) => {
     if (!window.confirm('¿Deseas eliminar este empleado?')) return;

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { ReactNode } from 'react';
+import type { MouseEvent, ReactNode } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import {
   AppBar,
@@ -58,6 +58,7 @@ import {
   roleOrder,
 } from '../config/roleViews';
 import { useAuth } from '../context/AuthContext';
+import { useUnsavedChanges } from '../context/UnsavedChangesContext';
   import { reportesPorRol } from '../config/roleViews';
 
 type MenuItemType = {
@@ -155,6 +156,7 @@ function Navbar() {
 
   const location = useLocation();
   const menuSections = useMemo(() => buildMenuSections(), []);
+  const { requestNavigation } = useUnsavedChanges();
 
   useEffect(() => {
     const syncCurrentRole = () => setCurrentRole(getCurrentUserRole());
@@ -203,6 +205,18 @@ function Navbar() {
     ...extraSx,
   });
 
+  const handleNavigation =
+    (path: string) =>
+    (event: MouseEvent<HTMLElement>) => {
+      event.preventDefault();
+
+      if (location.pathname !== path) {
+        requestNavigation(path);
+      }
+
+      setOpen(false);
+    };
+
   const renderSubItem = (item: MenuItemType) => {
     const isActive = location.pathname === item.path;
 
@@ -212,7 +226,7 @@ function Navbar() {
         component={NavLink}
         to={item.path}
         selected={isActive}
-        onClick={toggleDrawer(false)}
+        onClick={handleNavigation(item.path)}
         sx={getMenuItemSx(isActive, { pl: 4 })}
       >
         <ListItemIcon
@@ -281,7 +295,7 @@ function Navbar() {
               component={NavLink}
               to="/"
               selected={location.pathname === '/'}
-              onClick={toggleDrawer(false)}
+              onClick={handleNavigation('/')}
               sx={getMenuItemSx(location.pathname === '/')}
             >
               <ListItemIcon
@@ -320,7 +334,7 @@ function Navbar() {
                           component={NavLink}
                           to={reporte.path}
                           selected={isActive}
-                          onClick={toggleDrawer(false)}
+                          onClick={handleNavigation(reporte.path)}
                           sx={getMenuItemSx(isActive, { pl: 4 })}
                         >
                           <ListItemIcon

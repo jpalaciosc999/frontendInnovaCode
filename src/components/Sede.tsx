@@ -29,6 +29,7 @@ import CleaningServicesIcon from '@mui/icons-material/CleaningServices';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
+import { useUnsavedFormGuard } from '../hooks/useUnsavedFormGuard';
 
 const initialForm: SedeForm = {
   sed_nombre: '',
@@ -89,7 +90,7 @@ function SedeCRUD() {
       setError('');
       setMensaje('');
 
-      if (!validar()) return;
+      if (!validar()) return false;
 
       if (modoEdicion && id !== null) {
         await actualizarSede(id, form);
@@ -101,10 +102,14 @@ function SedeCRUD() {
 
       limpiarFormulario();
       await cargarDatos();
+      return true;
     } catch (err: any) {
       setError('Error guardando: ' + (err.response?.data?.error || err.message));
+      return false;
     }
   };
+
+  useUnsavedFormGuard(form, initialForm, guardar);
 
   const handleEliminar = async (idEliminar: number) => {
     if (!window.confirm('¿Deseas eliminar esta sede?')) return;

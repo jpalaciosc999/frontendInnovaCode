@@ -31,6 +31,7 @@ import CleaningServicesIcon from '@mui/icons-material/CleaningServices';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import ScheduleIcon from '@mui/icons-material/Schedule';
+import { useUnsavedFormGuard } from '../hooks/useUnsavedFormGuard';
 
 const initialForm: HorarioForm = {
   hor_descripcion: '',
@@ -126,7 +127,7 @@ function HorarioCRUD() {
       setError('');
       setMensaje('');
 
-      if (!validar()) return;
+      if (!validar()) return false;
 
       if (modoEdicion && id !== null) {
         await actualizarHorario(id, form);
@@ -138,10 +139,14 @@ function HorarioCRUD() {
 
       limpiarFormulario();
       await cargarDatos();
+      return true;
     } catch (err: any) {
       setError('Error guardando: ' + (err.response?.data?.error || err.message));
+      return false;
     }
   };
+
+  useUnsavedFormGuard(form, initialForm, guardar);
 
   const handleEliminar = async (idEliminar: number) => {
     if (!window.confirm('¿Deseas eliminar este horario?')) return;
