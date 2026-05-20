@@ -4,6 +4,7 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import { Box, Container, CssBaseline, CircularProgress } from '@mui/material';
 
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { UnsavedChangesProvider } from './context/UnsavedChangesContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import LoginPage from './components/LoginPage';
 import Navbar from './components/Navbar';
@@ -74,17 +75,18 @@ function Layout() {
   );
 
   return (
-    <Box sx={{ minHeight: '100vh', bgcolor: 'grey.100' }}>
-      <Navbar />
+    <UnsavedChangesProvider>
+      <Box sx={{ minHeight: '100vh', bgcolor: 'grey.100' }}>
+        <Navbar />
 
-      <Container maxWidth="xl" sx={{ py: 3 }}>
-        <Suspense fallback={
-          <Box sx={{ minHeight: '60vh', display: 'grid', placeItems: 'center' }}>
-            <CircularProgress />
-          </Box>
-        }>
-          <Routes>
-            <Route path="/" element={<Home />} />
+        <Container maxWidth="xl" sx={{ py: 3 }}>
+          <Suspense fallback={
+            <Box sx={{ minHeight: '60vh', display: 'grid', placeItems: 'center' }}>
+              <CircularProgress />
+            </Box>
+          }>
+            <Routes>
+              <Route path="/" element={<Home />} />
 
           <Route path="/empleados" element={guarded('/empleados', <PruebaAxios />)} />
           <Route path="/departamentos" element={guarded('/departamentos', <Departamentos />)} />
@@ -136,10 +138,11 @@ function Layout() {
           <Route path="/dashboard-ejecutivo" element={guarded('/dashboard-ejecutivo', <DashboardEjecutivo />)} />
 
           <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </Suspense>
-      </Container>
-    </Box>
+            </Routes>
+          </Suspense>
+        </Container>
+      </Box>
+    </UnsavedChangesProvider>
   );
 }
 

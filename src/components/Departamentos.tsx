@@ -36,6 +36,7 @@ import CleaningServicesIcon from '@mui/icons-material/CleaningServices';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import BusinessIcon from '@mui/icons-material/Business';
+import { useUnsavedFormGuard } from '../hooks/useUnsavedFormGuard';
 
 const initialForm: DepartamentoForm = {
   nombre: '',
@@ -99,7 +100,7 @@ function Departamentos() {
       setError('');
       setMensaje('');
 
-      if (!validarFormulario()) return;
+      if (!validarFormulario()) return false;
 
       if (modoEdicion && depId !== null) {
         await actualizarDepartamento(depId, form);
@@ -111,13 +112,17 @@ function Departamentos() {
 
       limpiarFormulario();
       await cargarDepartamentos();
+      return true;
     } catch (err: any) {
       setError(
         'Error guardando departamento: ' +
         (err.response?.data?.error || err.message)
       );
+      return false;
     }
   };
+
+  useUnsavedFormGuard(form, initialForm, guardarDepartamento);
 
   const handleEliminar = async (id: number) => {
     if (!window.confirm('¿Deseas eliminar este departamento?')) return;

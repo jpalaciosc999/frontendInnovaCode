@@ -38,6 +38,7 @@ import CleaningServicesIcon from '@mui/icons-material/CleaningServices';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import WorkIcon from '@mui/icons-material/Work';
+import { useUnsavedFormGuard } from '../hooks/useUnsavedFormGuard';
 
 const initialForm: PuestoForm = {
   codigo: '',
@@ -119,7 +120,7 @@ function Puestos() {
       setError('');
       setMensaje('');
 
-      if (!validarFormulario()) return;
+      if (!validarFormulario()) return false;
 
       if (modoEdicion && puestoId !== null) {
         await actualizarPuesto(puestoId, form);
@@ -131,12 +132,16 @@ function Puestos() {
 
       limpiarFormulario();
       await cargarPuestos();
+      return true;
     } catch (err: any) {
       setError(
         'Error guardando puesto: ' + (err.response?.data?.error || err.message)
       );
+      return false;
     }
   };
+
+  useUnsavedFormGuard(form, initialForm, guardarPuesto);
 
   const handleEliminar = async (id: number) => {
     if (!window.confirm('¿Deseas eliminar este puesto?')) return;
