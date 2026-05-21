@@ -54,6 +54,7 @@ import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
 import AddIcon from '@mui/icons-material/Add';
+import { useUnsavedFormGuard } from '../hooks/useUnsavedFormGuard';
 
 const initialForm: NominaDetalleForm = {
     det_referencia: null,
@@ -380,13 +381,13 @@ function NominaDetalleCRUD() {
         try {
             setError('');
             setMensaje('');
-            if (!validarFormulario()) return;
+            if (!validarFormulario()) return false;
 
             const dataLimpia = limpiarDatos(form);
             const duplicado = obtenerConceptoDuplicado(dataLimpia);
             if (duplicado) {
                 setError('Esta nomina ya tiene ese concepto en el detalle. Edita el registro existente o elimina el duplicado antes de guardar otro.');
-                return;
+                return false;
             }
             const detalleAnterior = detalleId !== null
                 ? datos.find((detalle) => detalle.DET_ID === detalleId)
@@ -404,10 +405,14 @@ function NominaDetalleCRUD() {
 
             limpiarFormulario();
             await cargarDatos();
+            return true;
         } catch (err: unknown) {
             setError(getApiErrorMessage(err, 'Error guardando registro'));
+            return false;
         }
     };
+
+    useUnsavedFormGuard(form, initialForm, guardarDetalle);
 
     const handleEliminar = async (id: number) => {
         const detalleAnterior = datos.find((detalle) => detalle.DET_ID === id);

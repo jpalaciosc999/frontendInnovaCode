@@ -41,6 +41,7 @@ import CleaningServicesIcon from '@mui/icons-material/CleaningServices';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
+import { useUnsavedFormGuard } from '../hooks/useUnsavedFormGuard';
 
 const initialForm: LiquidacionForm = {
   liq_fecha_salida: '',
@@ -166,7 +167,7 @@ function LiquidacionCRUD() {
     try {
       setError('');
       setMensaje('');
-      if (!validar()) return;
+      if (!validar()) return false;
 
       if (modoEdicion && liqId !== null) {
         await actualizarLiquidacion(liqId, form);
@@ -178,10 +179,14 @@ function LiquidacionCRUD() {
 
       limpiarFormulario();
       await cargarDatos();
+      return true;
     } catch (err: unknown) {
       setError(getApiErrorMessage(err, 'Error guardando liquidacion'));
+      return false;
     }
   };
+
+  useUnsavedFormGuard(form, initialForm, guardar);
 
   const handleEliminar = async (idEliminar: number) => {
     if (!window.confirm('Deseas eliminar esta liquidacion?')) return;

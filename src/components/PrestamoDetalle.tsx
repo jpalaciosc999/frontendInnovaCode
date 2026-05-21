@@ -43,6 +43,7 @@ import CleaningServicesIcon from '@mui/icons-material/CleaningServices';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
+import { useUnsavedFormGuard } from '../hooks/useUnsavedFormGuard';
 
 const initialForm: PrestamoDetalleForm = {
   pde_numero_cuota: '',
@@ -188,7 +189,7 @@ function PrestamoDetalleView() {
     try {
       setError('');
       setMensaje('');
-      if (!validarFormulario()) return;
+      if (!validarFormulario()) return false;
 
       const detalleAnterior = detalleId !== null
         ? datos.find((detalle) => detalle.PDE_ID === detalleId)
@@ -209,10 +210,14 @@ function PrestamoDetalleView() {
 
       limpiarFormulario();
       await cargarPrestamoDetalles();
+      return true;
     } catch (err: unknown) {
       setError(getApiErrorMessage(err, 'Error al guardar'));
+      return false;
     }
   };
+
+  useUnsavedFormGuard(form, initialForm, guardarPrestamoDetalle);
 
   const handleEliminar = async (id: number) => {
     if (!window.confirm('¿Deseas eliminar este detalle?')) return;

@@ -51,6 +51,7 @@ import CleaningServicesIcon from '@mui/icons-material/CleaningServices';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
+import { useUnsavedFormGuard } from '../hooks/useUnsavedFormGuard';
 
 const initialForm: PeriodoForm = {
   fecha_inicio: '',
@@ -151,7 +152,7 @@ function Periodos() {
     try {
       setError('');
       setMensaje('');
-      if (!validarFormulario()) return;
+      if (!validarFormulario()) return false;
 
       if (modoEdicion && perId !== null) {
         await actualizarPeriodo(perId, form);
@@ -162,10 +163,14 @@ function Periodos() {
       }
       limpiarFormulario();
       await cargarPeriodos();
+      return true;
     } catch (err: unknown) {
       setError(getApiErrorMessage(err, 'Error guardando periodo'));
+      return false;
     }
   };
+
+  useUnsavedFormGuard(form, initialForm, guardarPeriodo);
 
   const handleEliminar = async (id: number) => {
     if (!window.confirm('¿Deseas eliminar este periodo?')) return;
