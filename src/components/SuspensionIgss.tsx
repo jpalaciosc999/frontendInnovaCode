@@ -39,6 +39,7 @@ import {
   eliminarSuspensionIgss,
   obtenerSuspensionesIgss
 } from '../services/suspensionIgss.service';
+import { useUnsavedFormGuard } from '../hooks/useUnsavedFormGuard';
 
 // Regla IGSS: días 1-3 empleador paga 100%, días 4+ IGSS paga 66.67%
 const calcularImpacto = (salarioDiario: number, dias: number) => {
@@ -164,7 +165,7 @@ function SuspensionIGSS() {
     try {
       setError('');
       setMensaje('');
-      if (!validar()) return;
+      if (!validar()) return false;
 
       const payload: SuspensionIgssForm = {
         ...form,
@@ -183,10 +184,14 @@ function SuspensionIGSS() {
 
       limpiarFormulario();
       await cargarDatos();
+      return true;
     } catch (err: any) {
       setError('Error al guardar: ' + (err.response?.data?.error || err.message));
+      return false;
     }
   };
+
+  useUnsavedFormGuard(form, initialForm, guardar);
 
   const handleEliminar = async (idEliminar: number) => {
     if (!window.confirm('¿Deseas eliminar esta suspensión?')) return;

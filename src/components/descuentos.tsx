@@ -37,6 +37,7 @@ import CleaningServicesIcon from '@mui/icons-material/CleaningServices';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import PercentIcon from '@mui/icons-material/Percent';
+import { useUnsavedFormGuard } from '../hooks/useUnsavedFormGuard';
 
 const initialForm: DescuentoForm = {
   tds_codigo: '',
@@ -266,7 +267,7 @@ function DescuentoCRUD() {
     try {
       setError('');
       setMensaje('');
-      if (!validar()) return;
+      if (!validar()) return false;
 
       if (modoEdicion && id !== null) {
         await actualizarDescuento(id, form);
@@ -278,10 +279,14 @@ function DescuentoCRUD() {
 
       limpiarFormulario();
       await cargarDatos();
+      return true;
     } catch (err: unknown) {
       setError(getApiErrorMessage(err, 'Error guardando descuento'));
+      return false;
     }
   };
+
+  useUnsavedFormGuard(form, initialForm, guardar);
 
   const handleEliminar = async (idEliminar: number) => {
     if (!window.confirm('¿Deseas eliminar este descuento?')) return;

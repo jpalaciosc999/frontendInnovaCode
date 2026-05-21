@@ -41,6 +41,7 @@ import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import ManageAccountsIcon from '@mui/icons-material/ManageAccounts';
 import { useAuth } from '../context/AuthContext';
+import { useUnsavedFormGuard } from '../hooks/useUnsavedFormGuard';
 
 const initialForm: UsuarioForm = {
   username: '',
@@ -421,7 +422,7 @@ function UsuarioCRUD() {
       setError('');
       setMensaje('');
 
-      if (!validar()) return;
+      if (!validar()) return false;
 
       const payload: UsuarioForm = {
         ...form,
@@ -437,7 +438,7 @@ function UsuarioCRUD() {
         const usuarioId = toFiniteNumber(id);
         if (usuarioId === undefined) {
           setError('No se puede actualizar: el usuario seleccionado no trae un ID válido');
-          return;
+          return false;
         }
 
         await actualizarUsuario(usuarioId, payload);
@@ -449,10 +450,14 @@ function UsuarioCRUD() {
 
       limpiarFormulario();
       await cargarDatos();
+      return true;
     } catch (err: any) {
       setError('Error guardando usuario: ' + (err.response?.data?.error || err.message));
+      return false;
     }
   };
+
+  useUnsavedFormGuard(form, initialForm, guardar);
 
   const handleEditar = (u: Usuario) => {
     const usuarioId = getUsuarioId(u);

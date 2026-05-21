@@ -41,6 +41,7 @@ import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
 import PeopleIcon from '@mui/icons-material/People';
 import ShieldIcon from '@mui/icons-material/Shield';
 import { useAuth } from '../context/AuthContext';
+import { useUnsavedFormGuard } from '../hooks/useUnsavedFormGuard';
 
 const rolesBase = new Set([
   'ADMIN',
@@ -201,7 +202,7 @@ function Roles() {
       setError('');
       setMensaje('');
 
-      if (!validarFormulario()) return;
+      if (!validarFormulario()) return false;
 
       const payload: RolForm = {
         ...form,
@@ -221,10 +222,14 @@ function Roles() {
 
       limpiarFormulario();
       await cargarRoles();
+      return true;
     } catch (err: any) {
       setError('Error guardando rol: ' + (err.response?.data?.error || err.message));
+      return false;
     }
   };
+
+  useUnsavedFormGuard(form, crearFormularioInicial(), guardarRol);
 
   const handleEditar = (rol: Rol) => {
     setModoEdicion(true);

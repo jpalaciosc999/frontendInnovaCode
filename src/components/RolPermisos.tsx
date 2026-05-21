@@ -41,6 +41,7 @@ import AutoFixHighIcon from '@mui/icons-material/AutoFixHigh';
 import { normalizeRole } from '../config/roleViews';
 import { suggestedPermissionNamesByRole } from '../config/permissionSuggestions';
 import { useAuth } from '../context/AuthContext';
+import { useUnsavedFormGuard } from '../hooks/useUnsavedFormGuard';
 
 const initialForm: RolPermisoForm = {
   per_id: '',
@@ -182,7 +183,7 @@ function RolPermisosView() {
       setError('');
       setMensaje('');
 
-      if (!validarFormulario()) return;
+      if (!validarFormulario()) return false;
 
       if (modoEdicion && rpeId !== null) {
         await actualizarRolPermiso(rpeId, form);
@@ -194,10 +195,14 @@ function RolPermisosView() {
 
       limpiarFormulario();
       await cargarDatos();
+      return true;
     } catch (err: any) {
       setError('Error guardando: ' + (err.response?.data?.error || err.message));
+      return false;
     }
   };
+
+  useUnsavedFormGuard(form, initialForm, guardarRolPermiso);
 
   const asignarPermisosSugeridos = async () => {
     try {

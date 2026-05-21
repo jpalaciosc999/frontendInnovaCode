@@ -41,6 +41,7 @@ import AccountBalanceIcon   from '@mui/icons-material/AccountBalance';
 import SearchIcon           from '@mui/icons-material/Search';
 import CloseIcon            from '@mui/icons-material/Close';
 import PersonSearchIcon     from '@mui/icons-material/PersonSearch';
+import { useUnsavedFormGuard } from '../hooks/useUnsavedFormGuard';
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
 const BANCOS_GUATEMALA = [
@@ -186,7 +187,7 @@ function CuentaBancariaPage() {
   const guardarCuenta = async () => {
     try {
       setError(''); setMensaje('');
-      if (!validarFormulario()) return;
+      if (!validarFormulario()) return false;
       const payload = obtenerPayloadCuenta();
       if (modoEdicion && cueId !== null) {
         await actualizarCuenta(cueId, payload);
@@ -197,10 +198,14 @@ function CuentaBancariaPage() {
       }
       limpiarFormulario();
       await cargarCuentas();
+      return true;
     } catch (err: any) {
       setError('Error guardando cuenta: ' + (err.response?.data?.error || err.message));
+      return false;
     }
   };
+
+  useUnsavedFormGuard(form, initialForm, guardarCuenta);
 
   const handleEliminar = async (id: number) => {
     if (!window.confirm('¿Deseas eliminar esta cuenta bancaria?')) return;

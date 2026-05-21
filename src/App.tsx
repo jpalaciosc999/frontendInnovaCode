@@ -1,10 +1,10 @@
-import type { ReactNode } from 'react';
+import type { FormEvent, KeyboardEvent, MouseEvent, ReactNode } from 'react';
 import { Suspense, lazy } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { Box, Container, CssBaseline, CircularProgress } from '@mui/material';
 
 import { AuthProvider, useAuth } from './context/AuthContext';
-import { UnsavedChangesProvider } from './context/UnsavedChangesContext';
+import { UnsavedChangesProvider, useUnsavedChanges } from './context/UnsavedChangesContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import LoginPage from './components/LoginPage';
 import Navbar from './components/Navbar';
@@ -67,6 +67,79 @@ function GuardedRoute({
   return <>{children}</>;
 }
 
+function UnsavedAwareContainer({ children }: { children: ReactNode }) {
+  const { setHasUnsavedChanges } = useUnsavedChanges();
+
+  const markUnsavedChange = (event: FormEvent<HTMLElement>) => {
+    const target = event.target;
+
+    if (
+      target instanceof HTMLInputElement ||
+      target instanceof HTMLTextAreaElement ||
+      target instanceof HTMLSelectElement
+    ) {
+      const ignoredTypes = ['button', 'submit', 'reset', 'hidden'];
+      if (target instanceof HTMLInputElement && ignoredTypes.includes(target.type)) return;
+
+      setHasUnsavedChanges(true);
+    }
+  };
+
+  const markMuiControlInteraction = (event: MouseEvent<HTMLElement>) => {
+    const target = event.target;
+
+    if (!(target instanceof HTMLElement)) return;
+
+    const interactiveControl = target.closest(
+      [
+        'input',
+        'textarea',
+        'select',
+        '[role="combobox"]',
+        '[role="spinbutton"]',
+        '[contenteditable="true"]',
+        '.MuiSelect-select',
+        '.MuiCheckbox-root',
+        '.MuiRadio-root',
+        '.MuiSwitch-root',
+      ].join(',')
+    );
+
+    if (!interactiveControl) return;
+    if (interactiveControl instanceof HTMLInputElement) {
+      const ignoredTypes = ['button', 'submit', 'reset', 'hidden'];
+      if (ignoredTypes.includes(interactiveControl.type)) return;
+    }
+
+    setHasUnsavedChanges(true);
+  };
+
+  const markKeyboardControlInteraction = (event: KeyboardEvent<HTMLElement>) => {
+    const target = event.target;
+
+    if (!(target instanceof HTMLElement)) return;
+    if (!target.matches('input, textarea, select, [role="combobox"], [contenteditable="true"]')) return;
+
+    const ignoredKeys = ['Tab', 'Shift', 'Control', 'Alt', 'Meta', 'Escape'];
+    if (ignoredKeys.includes(event.key)) return;
+
+    setHasUnsavedChanges(true);
+  };
+
+  return (
+    <Container
+      maxWidth="xl"
+      onChangeCapture={markUnsavedChange}
+      onInputCapture={markUnsavedChange}
+      onClickCapture={markMuiControlInteraction}
+      onKeyDownCapture={markKeyboardControlInteraction}
+      sx={{ py: 3 }}
+    >
+      {children}
+    </Container>
+  );
+}
+
 function Layout() {
   const guarded = (path: string, element: ReactNode) => (
     <GuardedRoute path={path}>
@@ -79,7 +152,7 @@ function Layout() {
       <Box sx={{ minHeight: '100vh', bgcolor: 'grey.100' }}>
         <Navbar />
 
-        <Container maxWidth="xl" sx={{ py: 3 }}>
+        <UnsavedAwareContainer>
           <Suspense fallback={
             <Box sx={{ minHeight: '60vh', display: 'grid', placeItems: 'center' }}>
               <CircularProgress />
@@ -140,7 +213,7 @@ function Layout() {
           <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </Suspense>
-        </Container>
+        </UnsavedAwareContainer>
       </Box>
     </UnsavedChangesProvider>
   );

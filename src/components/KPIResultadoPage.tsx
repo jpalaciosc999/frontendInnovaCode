@@ -40,6 +40,7 @@ import CleaningServicesIcon from '@mui/icons-material/CleaningServices';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AssessmentIcon from '@mui/icons-material/Assessment';
+import { useUnsavedFormGuard } from '../hooks/useUnsavedFormGuard';
 
 const initialForm: KPIResultadoForm = {
   kre_monto_total: '',
@@ -153,7 +154,7 @@ function KPIResultadoCRUD() {
       setError('');
       setMensaje('');
 
-      if (!validarFormulario()) return;
+      if (!validarFormulario()) return false;
 
       if (modoEdicion && idActual !== null) {
         await actualizarResultado(idActual, form);
@@ -165,10 +166,14 @@ function KPIResultadoCRUD() {
 
       limpiarFormulario();
       await cargarDatos();
+      return true;
     } catch (err: any) {
       setError('Error al guardar: ' + (err.response?.data?.error || err.message));
+      return false;
     }
   };
+
+  useUnsavedFormGuard(form, initialForm, guardar);
 
   const handleEditar = (r: KPIResultado) => {
     setModoEdicion(true);

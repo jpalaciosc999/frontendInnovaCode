@@ -41,6 +41,7 @@ import CleaningServicesIcon from '@mui/icons-material/CleaningServices';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EventRepeatIcon from '@mui/icons-material/EventRepeat';
+import { useUnsavedFormGuard } from '../hooks/useUnsavedFormGuard';
 
 const initialForm: IngresoForm = {
     tis_codigo: '',
@@ -274,7 +275,7 @@ function TipoIngresos() {
             setError('');
             setMensaje('');
 
-            if (!validarFormulario()) return;
+            if (!validarFormulario()) return false;
 
             if (modoEdicion && ingresoId !== null) {
                 await actualizarIngreso(ingresoId, form);
@@ -286,10 +287,14 @@ function TipoIngresos() {
 
             limpiarFormulario();
             await cargarIngresos();
+            return true;
         } catch (err: unknown) {
             setError(getApiErrorMessage(err, 'Error al guardar ingreso'));
+            return false;
         }
     };
+
+    useUnsavedFormGuard(form, initialForm, guardarIngreso);
 
     const handleEliminar = async (id: number) => {
         if (!window.confirm('¿Deseas eliminar este concepto de ingreso?')) return;

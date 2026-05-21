@@ -30,6 +30,7 @@ import CleaningServicesIcon from '@mui/icons-material/CleaningServices';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import { useUnsavedFormGuard } from '../hooks/useUnsavedFormGuard';
 
 const initialForm: KPIForm = {
   kpi_nombre: '',
@@ -88,7 +89,7 @@ function KPICRUD() {
       setError('');
       setMensaje('');
 
-      if (!validarFormulario()) return;
+      if (!validarFormulario()) return false;
 
       if (modoEdicion && kpiId !== null) {
         await actualizarKPI(kpiId, form);
@@ -100,10 +101,14 @@ function KPICRUD() {
 
       limpiarFormulario();
       await cargarDatos();
+      return true;
     } catch (err: any) {
       setError('Error guardando KPI: ' + (err.response?.data?.error || err.message));
+      return false;
     }
   };
+
+  useUnsavedFormGuard(form, initialForm, guardarKPI);
 
   const handleEliminar = async (id: number) => {
     if (!window.confirm('¿Deseas eliminar este KPI?')) return;

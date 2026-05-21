@@ -42,6 +42,7 @@ import KeyIcon from '@mui/icons-material/Key';
 import AutoFixHighIcon from '@mui/icons-material/AutoFixHigh';
 import { suggestedPermissions } from '../config/permissionSuggestions';
 import { getApiErrorMessage } from '../api/errors';
+import { useUnsavedFormGuard } from '../hooks/useUnsavedFormGuard';
 
 const initialForm: PermisoForm = {
   per_nombre_permiso: '',
@@ -173,7 +174,7 @@ function Permisos() {
       setError('');
       setMensaje('');
 
-      if (!validarFormulario()) return;
+      if (!validarFormulario()) return false;
 
       const payload: PermisoForm = {
         per_nombre_permiso: normalizarNombrePermiso(form.per_nombre_permiso),
@@ -191,10 +192,14 @@ function Permisos() {
 
       limpiarFormulario();
       await cargarPermisos();
+      return true;
     } catch (err: any) {
       setError('Error guardando permiso: ' + (err.response?.data?.error || err.message));
+      return false;
     }
   };
+
+  useUnsavedFormGuard(form, initialForm, guardarPermiso);
 
   const crearPermisosSugeridos = async () => {
     try {

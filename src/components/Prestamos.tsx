@@ -40,6 +40,7 @@ import {
 import { obtenerEmpleados } from '../services/empleados.service';
 import { getApiErrorMessage } from '../api/errors';
 import { formatearFecha, formatearMoneda, obtenerNombreEmpleado } from '../utils/relations';
+import { useUnsavedFormGuard } from '../hooks/useUnsavedFormGuard';
 
 const initialForm: PrestamoForm = {
   emp_id: '',
@@ -164,7 +165,7 @@ function PrestamoCRUD() {
     try {
       setError('');
       setMensaje('');
-      if (!validar()) return;
+      if (!validar()) return false;
 
       const payload = obtenerPayload();
       if (modoEdicion && id !== null) {
@@ -177,10 +178,14 @@ function PrestamoCRUD() {
 
       limpiarFormulario();
       await cargarDatos();
+      return true;
     } catch (err: unknown) {
       setError(getApiErrorMessage(err, 'Error guardando prestamo'));
+      return false;
     }
   };
+
+  useUnsavedFormGuard(form, initialForm, guardar);
 
   const handleEliminar = async (idEliminar: number) => {
     if (!window.confirm('Deseas eliminar este prestamo?')) return;

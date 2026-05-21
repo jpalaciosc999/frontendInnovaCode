@@ -47,6 +47,7 @@ import {
 import { getApiErrorMessage } from '../api/errors';
 import { formatearFecha, formatearMoneda, obtenerNombreEmpleado } from '../utils/relations';
 import PeriodoBadge from './common/PeriodoBadge';
+import { useUnsavedFormGuard } from '../hooks/useUnsavedFormGuard';
 
 const initialForm: NominaAsignacionForm = {
   per_id: '',
@@ -260,9 +261,9 @@ function NominaAsignaciones() {
       setMensaje('');
       if (periodoFormBloqueado) {
         setError('No se pueden guardar asignaciones en periodos aprobados o cerrados.');
-        return;
+        return false;
       }
-      if (!validar()) return;
+      if (!validar()) return false;
 
       if (editandoId !== null) {
         await actualizarNominaAsignacion(editandoId, form);
@@ -274,10 +275,14 @@ function NominaAsignaciones() {
 
       limpiarFormulario();
       await cargarDatos();
+      return true;
     } catch (err: unknown) {
       setError(getApiErrorMessage(err, 'Error guardando asignacion.'));
+      return false;
     }
   };
+
+  useUnsavedFormGuard(form, initialForm, guardar);
 
   const editar = (asignacion: NominaAsignacion) => {
     setEditandoId(asignacion.NAS_ID);

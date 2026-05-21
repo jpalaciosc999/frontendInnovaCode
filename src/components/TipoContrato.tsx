@@ -33,6 +33,7 @@ import CleaningServicesIcon from '@mui/icons-material/CleaningServices';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import DescriptionIcon from '@mui/icons-material/Description';
+import { useUnsavedFormGuard } from '../hooks/useUnsavedFormGuard';
 
 const initialForm: TipoContratoForm = {
   tic_nombre: '',
@@ -123,7 +124,7 @@ function TipoContratoCRUD() {
       setError('');
       setMensaje('');
 
-      if (!validar()) return;
+      if (!validar()) return false;
 
       const payload: TipoContratoForm = {
         ...form,
@@ -140,10 +141,14 @@ function TipoContratoCRUD() {
 
       limpiarFormulario();
       await cargarDatos();
+      return true;
     } catch (err: any) {
       setError('Error guardando: ' + (err.response?.data?.error || err.message));
+      return false;
     }
   };
+
+  useUnsavedFormGuard(form, initialForm, guardar);
 
   const handleEliminar = async (idEliminar: number) => {
     if (!window.confirm('¿Deseas eliminar este tipo de contrato?')) return;

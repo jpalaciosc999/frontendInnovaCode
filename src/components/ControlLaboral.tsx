@@ -41,6 +41,7 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import AssignmentIndIcon from '@mui/icons-material/AssignmentInd';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CancelIcon from '@mui/icons-material/Cancel';
+import { useUnsavedFormGuard } from '../hooks/useUnsavedFormGuard';
 
 const getToday = () => new Date().toISOString().slice(0, 10);
 const VACATION_DAYS_PER_YEAR = 15;
@@ -296,7 +297,7 @@ function ControlLaboralPage() {
   const guardarControl = async () => {
     try {
       setError(''); setMensaje('');
-      if (!validarFormulario()) return;
+      if (!validarFormulario()) return false;
       const payload = buildPayload();
 
       if (modoEdicion && ctlId !== null) {
@@ -308,10 +309,14 @@ function ControlLaboralPage() {
       }
       limpiarFormulario();
       await cargarControles();
+      return true;
     } catch (err: any) {
       setError('Error guardando control: ' + (err.response?.data?.error || err.message));
+      return false;
     }
   };
+
+  useUnsavedFormGuard(form, initialForm, guardarControl);
 
   const cambiarEstado = async (ctl: ControlLaboral, nuevoEstado: 'A' | 'R') => {
     try {
