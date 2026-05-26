@@ -6,6 +6,8 @@ import {
   actualizarHorario,
   eliminarHorario
 } from '../services/horario.service';
+import { getApiErrorMessage } from '../api/errors';
+import { ERROR_MESSAGES, validarDescripcion } from '../utils/fieldValidation';
 
 import {
   Alert,
@@ -61,8 +63,8 @@ function HorarioCRUD() {
       setError('');
       const data = await obtenerHorarios();
       setDatos(data);
-    } catch (err: any) {
-      setError('Error cargando horarios: ' + (err.response?.data?.error || err.message));
+    } catch (err: unknown) {
+      setError(getApiErrorMessage(err, 'Error cargando horarios'));
     } finally {
       setCargando(false);
     }
@@ -105,6 +107,11 @@ function HorarioCRUD() {
       return false;
     }
 
+    if (!validarDescripcion(form.hor_descripcion)) {
+      setError(`Descripción: ${ERROR_MESSAGES.DESCRIPCION}`);
+      return false;
+    }
+
     const alMenosUnDia =
       form.hor_lunes ||
       form.hor_martes ||
@@ -140,8 +147,8 @@ function HorarioCRUD() {
       limpiarFormulario();
       await cargarDatos();
       return true;
-    } catch (err: any) {
-      setError('Error guardando: ' + (err.response?.data?.error || err.message));
+    } catch (err: unknown) {
+      setError(getApiErrorMessage(err, 'Error guardando horario'));
       return false;
     }
   };
@@ -160,8 +167,8 @@ function HorarioCRUD() {
       if (id === idEliminar) limpiarFormulario();
 
       await cargarDatos();
-    } catch (err: any) {
-      setError('Error eliminando: ' + (err.response?.data?.error || err.message));
+    } catch (err: unknown) {
+      setError(getApiErrorMessage(err, 'Error eliminando horario'));
     }
   };
 

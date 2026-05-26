@@ -7,6 +7,7 @@ import {
     eliminarIngreso
 } from '../services/tipoIngresos.service';
 import { getApiErrorMessage } from '../api/errors';
+import { validarCodigo, validarNombre, validarDescripcion, ERROR_MESSAGES } from '../utils/fieldValidation';
 
 import {
     Alert,
@@ -267,6 +268,22 @@ function TipoIngresos() {
             setError('Codigo, nombre, valor no negativo y recurrencia son obligatorios');
             return false;
         }
+
+        if (!validarCodigo(form.tis_codigo)) {
+            setError(`Código: ${ERROR_MESSAGES.CODIGO}`);
+            return false;
+        }
+
+        if (!validarNombre(form.tis_nombre)) {
+            setError(`Nombre: ${ERROR_MESSAGES.NOMBRE}`);
+            return false;
+        }
+
+        if (!validarDescripcion(form.tis_descripcion)) {
+            setError(`Descripción: ${ERROR_MESSAGES.DESCRIPCION}`);
+            return false;
+        }
+
         return true;
     };
 
@@ -361,6 +378,7 @@ function TipoIngresos() {
                                 value={form.tis_codigo}
                                 onChange={handleChange}
                                 placeholder="Ej: BONO01"
+                                helperText="Solo letras y números (sin espacios)"
                             />
                         </Grid>
                         <Grid size={{ xs: 12, md: 5 }}>
@@ -370,6 +388,7 @@ function TipoIngresos() {
                                 name="tis_nombre"
                                 value={form.tis_nombre}
                                 onChange={handleChange}
+                                helperText="Solo letras, números, espacios y acentos"
                             />
                         </Grid>
                         <Grid size={{ xs: 12, md: 4 }}>
@@ -396,6 +415,7 @@ function TipoIngresos() {
                                 name="tis_descripcion"
                                 value={form.tis_descripcion}
                                 onChange={handleChange}
+                                helperText="Se permiten: letras, números, espacios, puntos, comas, guiones y paréntesis"
                             />
                         </Grid>
                         <Grid size={{ xs: 12, md: 2 }}>

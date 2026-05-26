@@ -1,5 +1,5 @@
 import type { FormEvent, KeyboardEvent, MouseEvent, ReactNode } from 'react';
-import { Suspense, lazy } from 'react';
+import { Suspense, lazy, useEffect } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { Box, Container, CssBaseline, CircularProgress } from '@mui/material';
 
@@ -9,6 +9,7 @@ import ProtectedRoute from './components/ProtectedRoute';
 import LoginPage from './components/LoginPage';
 import Navbar from './components/Navbar';
 import AccessDenied from './components/common/AccessDenied';
+import { sanitizeFieldValue, shouldSkipInputSanitization } from './utils/fieldValidation';
 
 const Home = lazy(() => import('./pages/Home'));
 const PruebaAxios = lazy(() => import('./components/PruebaAxios'));
@@ -140,6 +141,128 @@ function UnsavedAwareContainer({ children }: { children: ReactNode }) {
   );
 }
 
+const isTextEntryTarget = (target: EventTarget | null): target is HTMLInputElement | HTMLTextAreaElement =>
+  target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement;
+
+const getInputLabel = (target: HTMLInputElement | HTMLTextAreaElement) => {
+  const ariaLabel = target.getAttribute('aria-label');
+  if (ariaLabel) return ariaLabel;
+
+  const labelledBy = target.getAttribute('aria-labelledby');
+  if (labelledBy) {
+    const labelText = labelledBy
+      .split(/\s+/)
+      .map((id) => document.getElementById(id)?.textContent ?? '')
+      .join(' ')
+      .trim();
+    if (labelText) return labelText;
+  }
+
+  if (target.id) {
+    const explicitLabel = document.querySelector<HTMLLabelElement>(`label[for="${CSS.escape(target.id)}"]`);
+    if (explicitLabel?.textContent) return explicitLabel.textContent;
+  }
+
+  const formControlLabel = target.closest('.MuiFormControl-root')?.querySelector('label')?.textContent;
+  return formControlLabel ?? '';
+};
+
+const getSanitizedElementValue = (target: HTMLInputElement | HTMLTextAreaElement, value: string) => {
+  const inputType = target instanceof HTMLTextAreaElement ? 'textarea' : target.type;
+
+  return sanitizeFieldValue(target.name, value, {
+    inputType,
+    label: getInputLabel(target),
+    placeholder: target.placeholder,
+  });
+};
+
+const shouldSanitizeElement = (target: HTMLInputElement | HTMLTextAreaElement) => {
+  if (target.readOnly || target.disabled) return false;
+  if (target instanceof HTMLInputElement && shouldSkipInputSanitization(target.type)) return false;
+
+  return true;
+};
+
+const setNativeInputValue = (target: HTMLInputElement | HTMLTextAreaElement, value: string) => {
+  const prototype = Object.getPrototypeOf(target);
+  const descriptor = Object.getOwnPropertyDescriptor(prototype, 'value');
+
+  descriptor?.set?.call(target, value);
+};
+
+const replaceSelectedText = (target: HTMLInputElement | HTMLTextAreaElement, text: string) => {
+  const start = target.selectionStart ?? target.value.length;
+  const end = target.selectionEnd ?? target.value.length;
+  const nextValue = `${target.value.slice(0, start)}${text}${target.value.slice(end)}`;
+  const nextCursorPosition = start + text.length;
+
+  setNativeInputValue(target, getSanitizedElementValue(target, nextValue));
+  target.setSelectionRange(nextCursorPosition, nextCursorPosition);
+  target.dispatchEvent(new Event('input', { bubbles: true }));
+};
+
+function InputCharacterGuard() {
+  useEffect(() => {
+    const handleBeforeInput = (event: InputEvent) => {
+      if (!isTextEntryTarget(event.target) || !shouldSanitizeElement(event.target)) return;
+      if (event.isComposing || event.data === null) return;
+      if (event.inputType.startsWith('delete') || event.inputType.startsWith('history')) return;
+
+      const sanitizedText = getSanitizedElementValue(event.target, event.data);
+      if (sanitizedText === event.data) return;
+
+      event.preventDefault();
+      if (sanitizedText) replaceSelectedText(event.target, sanitizedText);
+    };
+
+    const handlePaste = (event: ClipboardEvent) => {
+      if (!isTextEntryTarget(event.target) || !shouldSanitizeElement(event.target)) return;
+
+      const pastedText = event.clipboardData?.getData('text') ?? '';
+      const sanitizedText = getSanitizedElementValue(event.target, pastedText);
+      if (sanitizedText === pastedText) return;
+
+      event.preventDefault();
+      if (sanitizedText) replaceSelectedText(event.target, sanitizedText);
+    };
+
+    const handleDrop = (event: DragEvent) => {
+      if (!isTextEntryTarget(event.target) || !shouldSanitizeElement(event.target)) return;
+
+      const droppedText = event.dataTransfer?.getData('text') ?? '';
+      const sanitizedText = getSanitizedElementValue(event.target, droppedText);
+      if (!droppedText || sanitizedText === droppedText) return;
+
+      event.preventDefault();
+      if (sanitizedText) replaceSelectedText(event.target, sanitizedText);
+    };
+
+    const handleInput = (event: Event) => {
+      if (!isTextEntryTarget(event.target) || !shouldSanitizeElement(event.target)) return;
+
+      const sanitizedValue = getSanitizedElementValue(event.target, event.target.value);
+      if (sanitizedValue === event.target.value) return;
+
+      setNativeInputValue(event.target, sanitizedValue);
+    };
+
+    document.addEventListener('beforeinput', handleBeforeInput, true);
+    document.addEventListener('paste', handlePaste, true);
+    document.addEventListener('drop', handleDrop, true);
+    document.addEventListener('input', handleInput, true);
+
+    return () => {
+      document.removeEventListener('beforeinput', handleBeforeInput, true);
+      document.removeEventListener('paste', handlePaste, true);
+      document.removeEventListener('drop', handleDrop, true);
+      document.removeEventListener('input', handleInput, true);
+    };
+  }, []);
+
+  return null;
+}
+
 function Layout() {
   const guarded = (path: string, element: ReactNode) => (
     <GuardedRoute path={path}>
@@ -150,6 +273,7 @@ function Layout() {
   return (
     <UnsavedChangesProvider>
       <Box sx={{ minHeight: '100vh', bgcolor: 'grey.100' }}>
+        <InputCharacterGuard />
         <Navbar />
 
         <UnsavedAwareContainer>
