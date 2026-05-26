@@ -23,6 +23,7 @@ import {
   Typography,
 } from '@mui/material';
 import SummarizeIcon from '@mui/icons-material/Summarize';
+import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
 import {
   BarChart,
   Bar,
@@ -38,7 +39,6 @@ import {
 
 import {
   getReporteIgss,
-  descargarCsvIgss,
   subirReciboIgss,
   registrarNumeroRecibo,
 } from '../services/reporte_igss.service';
@@ -153,6 +153,10 @@ export default function ReporteIgss() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [subiendo, setSubiendo] = useState(false);
   const [guardandoNumero, setGuardandoNumero] = useState(false);
+  const pdfParams = {
+    ...exportParams,
+    ...(manualRecibo ? { numeroRecibo: manualRecibo } : {}),
+  };
 
   return (
     <Box data-report-pdf-root>
@@ -182,17 +186,11 @@ export default function ReporteIgss() {
             filename={`reporte-igss-${periodoId || 'todos'}.pdf`}
             title="Reporte IGSS"
             endpoint="/api/reportes/igss/pdf"
-            params={exportParams}
+            params={pdfParams}
             disabled={!reporte}
+            label="Descargar factura"
+            startIcon={<ReceiptLongIcon />}
           />
-
-          <Button
-            variant="outlined"
-            size="small"
-            onClick={() => descargarCsvIgss(exportParams)}
-          >
-            Descargar CSV
-          </Button>
 
           <Button
             variant="contained"
@@ -492,7 +490,7 @@ export default function ReporteIgss() {
                 >
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                     <Typography variant="body2" color="text.secondary">Patronal 12.67%</Typography>
-                    <Chip label="Empresa" size="small" color="success" variant="outlined" />
+                    <Chip label="INNOVATECH" size="small" color="success" variant="outlined" />
                   </Box>
                   <Typography variant="body2" sx={{ fontWeight: 600 }}>
                     {fmtQ(resumen?.igssPatronal ?? 0)}
