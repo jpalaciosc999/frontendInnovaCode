@@ -8,6 +8,7 @@ import {
   eliminarRol
 } from '../services/roles.service';
 import { obtenerAdminCatalogo } from '../services/admin.service';
+import { validarNombre, validarDescripcion, ERROR_MESSAGES } from '../utils/fieldValidation';
 
 import {
   Alert,
@@ -169,6 +170,16 @@ function Roles() {
       !form.rol_estado.trim()
     ) {
       setError('Todos los campos son obligatorios');
+      return false;
+    }
+
+    if (!validarNombre(form.rol_nombre)) {
+      setError(`Nombre: ${ERROR_MESSAGES.NOMBRE}`);
+      return false;
+    }
+
+    if (!validarDescripcion(form.rol_descripcion)) {
+      setError(`Descripción: ${ERROR_MESSAGES.DESCRIPCION}`);
       return false;
     }
 
@@ -359,6 +370,7 @@ function Roles() {
               name="rol_nombre"
               value={form.rol_nombre}
               onChange={handleChange}
+              helperText="Solo letras, números, espacios y acentos"
             />
           </Grid>
 
@@ -397,6 +409,7 @@ function Roles() {
               name="rol_descripcion"
               value={form.rol_descripcion}
               onChange={handleChange}
+              helperText="Se permiten: letras, números, espacios, puntos, comas, guiones y paréntesis"
             />
           </Grid>
 

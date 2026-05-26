@@ -6,6 +6,7 @@ import {
   actualizarSede,
   eliminarSede
 } from '../services/sede.service';
+import { validarNombre, ERROR_MESSAGES } from '../utils/fieldValidation';
 
 import {
   Alert,
@@ -82,6 +83,27 @@ function SedeCRUD() {
       setError('Nombre y departamento son obligatorios');
       return false;
     }
+
+    if (!validarNombre(form.sed_nombre)) {
+      setError(`Nombre: ${ERROR_MESSAGES.NOMBRE}`);
+      return false;
+    }
+
+    if (!validarNombre(form.sed_departamento)) {
+      setError(`Departamento: ${ERROR_MESSAGES.NOMBRE}`);
+      return false;
+    }
+
+    if (!validarNombre(form.sed_municipio)) {
+      setError(`Municipio: ${ERROR_MESSAGES.NOMBRE}`);
+      return false;
+    }
+
+    if (!validarNombre(form.sed_zona)) {
+      setError(`Zona: ${ERROR_MESSAGES.NOMBRE}`);
+      return false;
+    }
+
     return true;
   };
 
@@ -173,6 +195,7 @@ function SedeCRUD() {
               name="sed_nombre"
               value={form.sed_nombre}
               onChange={handleChange}
+              helperText="Solo letras, números, espacios y acentos"
             />
           </Grid>
 
@@ -193,6 +216,7 @@ function SedeCRUD() {
               name="sed_departamento"
               value={form.sed_departamento}
               onChange={handleChange}
+              helperText="Solo letras, números, espacios y acentos"
             />
           </Grid>
 
@@ -203,6 +227,7 @@ function SedeCRUD() {
               name="sed_municipio"
               value={form.sed_municipio}
               onChange={handleChange}
+              helperText="Solo letras, números, espacios y acentos"
             />
           </Grid>
 
@@ -213,6 +238,7 @@ function SedeCRUD() {
               name="sed_zona"
               value={form.sed_zona}
               onChange={handleChange}
+              helperText="Solo letras, números, espacios y acentos"
             />
           </Grid>
 

@@ -8,6 +8,7 @@ import {
   eliminarTipoContrato
 } from '../services/tipoContrato.service';
 import { obtenerHorarios } from '../services/horario.service';
+import { validarNombre, validarDescripcion, ERROR_MESSAGES } from '../utils/fieldValidation';
 
 import {
   Alert,
@@ -116,6 +117,17 @@ function TipoContratoCRUD() {
       setError('Todos los campos obligatorios deben completarse');
       return false;
     }
+
+    if (!validarNombre(form.tic_nombre)) {
+      setError(`Nombre: ${ERROR_MESSAGES.NOMBRE}`);
+      return false;
+    }
+
+    if (!validarDescripcion(form.tic_descripcion)) {
+      setError(`Descripción: ${ERROR_MESSAGES.DESCRIPCION}`);
+      return false;
+    }
+
     return true;
   };
 
@@ -227,6 +239,7 @@ function TipoContratoCRUD() {
               name="tic_nombre"
               value={form.tic_nombre}
               onChange={handleChange}
+              helperText="Solo letras, números, espacios y acentos"
             />
           </Grid>
 
@@ -247,6 +260,7 @@ function TipoContratoCRUD() {
               name="tic_descripcion"
               value={form.tic_descripcion}
               onChange={handleChange}
+              helperText="Se permiten: letras, números, espacios, puntos, comas, guiones y paréntesis"
             />
           </Grid>
 

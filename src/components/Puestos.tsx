@@ -8,6 +8,7 @@ import {
   eliminarPuesto
 } from '../services/puestos.service';
 import { obtenerDepartamentos } from '../services/departamentos.service';
+import { validarCodigo, validarNombre, validarDescripcion, ERROR_MESSAGES } from '../utils/fieldValidation';
 
 import {
   Alert,
@@ -112,6 +113,22 @@ function Puestos() {
       setError('Nombre, salario, estado y departamento son obligatorios');
       return false;
     }
+
+    if (!validarCodigo(form.codigo)) {
+      setError(`Código: ${ERROR_MESSAGES.CODIGO}`);
+      return false;
+    }
+
+    if (!validarNombre(form.nombre)) {
+      setError(`Nombre: ${ERROR_MESSAGES.NOMBRE}`);
+      return false;
+    }
+
+    if (!validarDescripcion(form.descripcion)) {
+      setError(`Descripción: ${ERROR_MESSAGES.DESCRIPCION}`);
+      return false;
+    }
+
     return true;
   };
 
@@ -212,11 +229,25 @@ function Puestos() {
 
         <Grid container spacing={2}>
           <Grid size={{ xs: 12, md: 3 }}>
-            <TextField fullWidth label="Código" name="codigo" value={form.codigo} onChange={handleChange} />
+            <TextField
+              fullWidth
+              label="Código"
+              name="codigo"
+              value={form.codigo}
+              onChange={handleChange}
+              helperText="Solo letras y números (sin espacios)"
+            />
           </Grid>
 
           <Grid size={{ xs: 12, md: 6 }}>
-            <TextField fullWidth label="Nombre del Puesto" name="nombre" value={form.nombre} onChange={handleChange} />
+            <TextField
+              fullWidth
+              label="Nombre del Puesto"
+              name="nombre"
+              value={form.nombre}
+              onChange={handleChange}
+              helperText="Solo letras, números, espacios y acentos"
+            />
           </Grid>
 
           <Grid size={{ xs: 12, md: 3 }}>
@@ -231,7 +262,14 @@ function Puestos() {
           </Grid>
 
           <Grid size={{ xs: 12, md: 8 }}>
-            <TextField fullWidth label="Descripción" name="descripcion" value={form.descripcion} onChange={handleChange} />
+            <TextField
+              fullWidth
+              label="Descripción"
+              name="descripcion"
+              value={form.descripcion}
+              onChange={handleChange}
+              helperText="Se permiten: letras, números, espacios, puntos, comas, guiones y paréntesis"
+            />
           </Grid>
 
           <Grid size={{ xs: 12, md: 2 }}>

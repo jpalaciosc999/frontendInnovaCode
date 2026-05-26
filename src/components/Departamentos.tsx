@@ -6,6 +6,7 @@ import {
   actualizarDepartamento,
   eliminarDepartamento
 } from '../services/departamentos.service';
+import { validarNombre, validarDescripcion, ERROR_MESSAGES } from '../utils/fieldValidation';
 
 import {
   Alert,
@@ -92,6 +93,17 @@ function Departamentos() {
       setError('Todos los campos son obligatorios');
       return false;
     }
+
+    if (!validarNombre(form.nombre)) {
+      setError(`Nombre: ${ERROR_MESSAGES.NOMBRE}`);
+      return false;
+    }
+
+    if (!validarDescripcion(form.descripcion)) {
+      setError(`Descripción: ${ERROR_MESSAGES.DESCRIPCION}`);
+      return false;
+    }
+
     return true;
   };
 
@@ -192,6 +204,7 @@ function Departamentos() {
               name="nombre"
               value={form.nombre}
               onChange={handleChange}
+              helperText="Solo letras, números, espacios y acentos"
             />
           </Grid>
 
@@ -220,6 +233,7 @@ function Departamentos() {
               rows={2}
               value={form.descripcion}
               onChange={handleChange}
+              helperText="Se permiten: letras, números, espacios, puntos, comas, guiones y paréntesis"
             />
           </Grid>
 
