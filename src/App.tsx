@@ -41,16 +41,7 @@ const UsuarioBitacora = lazy(() => import('./components/UsuarioBitacora'));
 const HorarioCRUD = lazy(() => import('./components/HorarioCRUD'));
 const SuspensionIgss = lazy(() => import('./components/SuspensionIgss'));
 const AprobacionNomina = lazy(() => import('./components/AprobacionNomina'));
-const ReporteMarcajes = lazy(() => import('./components/ReporteMarcajes'));
-const ReporteIgss = lazy(() => import('./components/ReporteIgss'));
-const ReporteIsr = lazy(() => import('./components/ReporteIsr'));
-const ReporteAguinaldo = lazy(() => import('./components/ReporteAguinaldo'));
-const ReporteVacaciones = lazy(() => import('./components/ReporteVacaciones'));
-const ReporteDescuentos = lazy(() => import('./components/ReporteDescuentos'));
-const ReporteKpi = lazy(() => import('./components/ReporteKpi'));
-const ReporteHorasExtra = lazy(() => import('./components/ReporteHorasExtra'));
-const ReporteLiquidacion = lazy(() => import('./components/ReporteLiquidacion'));
-const DashboardEjecutivo = lazy(() => import('./components/DashboardEjecutivo'));
+const ReportesView = lazy(() => import('./components/ReportesView'));
 
 function GuardedRoute({
   path,
@@ -323,16 +314,17 @@ function Layout() {
           <Route path="/irtra" element={<Navigate to="/descuentos" replace />} />
           <Route path="/intecap" element={<Navigate to="/descuentos" replace />} />
           <Route path="/aprobacion-nomina" element={guarded('/aprobacion-nomina', <AprobacionNomina />)} />
-          <Route path="/reporte-marcajes" element={guarded('/reporte-marcajes', <ReporteMarcajes />)} />
-          <Route path="/reporte-igss" element={guarded('/reporte-igss', <ReporteIgss />)} />
-          <Route path="/reporte-isr" element={guarded('/reporte-isr', <ReporteIsr />)} />
-          <Route path="/reporte-aguinaldo" element={guarded('/reporte-aguinaldo', <ReporteAguinaldo />)} />
-          <Route path="/reporte-vacaciones" element={guarded('/reporte-vacaciones', <ReporteVacaciones />)} />
-          <Route path="/reporte-descuentos" element={guarded('/reporte-descuentos', <ReporteDescuentos />)} />
-          <Route path="/reporte-kpi" element={guarded('/reporte-kpi', <ReporteKpi />)} />
-          <Route path="/reporte-horas-extra" element={guarded('/reporte-horas-extra', <ReporteHorasExtra />)} />
-          <Route path="/reporte-liquidacion" element={guarded('/reporte-liquidacion', <ReporteLiquidacion />)} />
-          <Route path="/dashboard-ejecutivo" element={guarded('/dashboard-ejecutivo', <DashboardEjecutivo />)} />
+          <Route path="/reportes" element={guarded('/reportes', <ReportesView />)} />
+          <Route path="/reporte-marcajes" element={<Navigate to="/reportes?reporte=reporte-marcajes" replace />} />
+          <Route path="/reporte-igss" element={<Navigate to="/reportes?reporte=reporte-igss" replace />} />
+          <Route path="/reporte-isr" element={<Navigate to="/reportes?reporte=reporte-isr" replace />} />
+          <Route path="/reporte-aguinaldo" element={<Navigate to="/reportes?reporte=reporte-aguinaldo" replace />} />
+          <Route path="/reporte-vacaciones" element={<Navigate to="/reportes?reporte=reporte-vacaciones" replace />} />
+          <Route path="/reporte-descuentos" element={<Navigate to="/reportes?reporte=reporte-descuentos" replace />} />
+          <Route path="/reporte-kpi" element={<Navigate to="/reportes?reporte=reporte-kpi" replace />} />
+          <Route path="/reporte-horas-extra" element={<Navigate to="/reportes?reporte=reporte-horas-extra" replace />} />
+          <Route path="/reporte-liquidacion" element={<Navigate to="/reportes?reporte=reporte-liquidacion" replace />} />
+          <Route path="/dashboard-ejecutivo" element={<Navigate to="/reportes?reporte=dashboard-ejecutivo" replace />} />
 
           <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>

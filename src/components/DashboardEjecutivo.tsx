@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   Box,
-  Button,
   Chip,
   CircularProgress,
   Divider,
@@ -24,7 +23,6 @@ import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import WorkHistoryIcon from '@mui/icons-material/WorkHistory';
 import EventBusyIcon from '@mui/icons-material/EventBusy';
 import AssignmentTurnedInIcon from '@mui/icons-material/AssignmentTurnedIn';
-import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
 import {
   Bar,
   BarChart,
@@ -44,6 +42,7 @@ import {
 import { getDashboardEjecutivo } from '../services/dashboard_ejecutivo.service';
 import { getApiErrorMessage } from '../api/errors';
 import type { DashboardEjecutivoResponse } from '../interfaces/dashboardEjecutivo';
+import ReportPdfButton from './common/ReportPdfButton';
 
 const MONTH_NAMES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
 
@@ -142,9 +141,10 @@ export default function DashboardEjecutivo() {
   }
 
   const selectedMonthLabel = selectedMonth ? monthLabel(selectedMonth) : 'Periodo actual';
+  const [selectedYear, selectedMonthNumber] = selectedMonth.split('-').map(Number);
 
   return (
-    <Box sx={{ py: 1 }}>
+    <Box sx={{ py: 1 }} data-report-pdf-root>
       <Stack
         direction={{ xs: 'column', md: 'row' }}
         spacing={2}
@@ -168,9 +168,16 @@ export default function DashboardEjecutivo() {
               ))}
             </Select>
           </FormControl>
-          <Button variant="outlined" startIcon={<PictureAsPdfIcon />} disabled>
-            Descargar PDF
-          </Button>
+          <ReportPdfButton
+            filename={`dashboard-ejecutivo-${selectedMonth || 'actual'}.pdf`}
+            title="Dashboard Ejecutivo"
+            endpoint="/api/reportes/dashboard-ejecutivo/pdf"
+            params={{
+              anio: selectedYear,
+              mes: selectedMonthNumber,
+            }}
+            disabled={!data}
+          />
         </Stack>
       </Stack>
 

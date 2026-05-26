@@ -4,7 +4,6 @@ import {
   Alert,
   Avatar,
   Box,
-  Button,
   Chip,
   CircularProgress,
   Divider,
@@ -23,7 +22,6 @@ import {
   Tooltip,
   Typography,
 } from '@mui/material';
-import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
 import SummarizeIcon from '@mui/icons-material/Summarize';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import {
@@ -44,8 +42,6 @@ import {
 import {
   getReporteIsr,
   getReporteIsrProyeccion,
-  descargarPdfIsr,
-  descargarPdfIsrProyeccion,
 } from '../services/reporte_isr.service';
 import { obtenerDepartamentos } from '../services/departamentos.service';
 import { obtenerPeriodos } from '../services/periodo.service';
@@ -57,6 +53,7 @@ import type {
 } from '../interfaces/reporteIsr';
 import type { Departamento } from '../interfaces/departamentos';
 import type { Periodo } from '../interfaces/periodo';
+import ReportPdfButton from './common/ReportPdfButton';
 
 // â”€â”€ helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
@@ -156,15 +153,8 @@ export default function ReporteIsr() {
   const empleados = reporte?.empleados ?? [];
   const mensual   = reporte?.mensual ?? [];
 
-  const pdfParams = {
-    anioFiscal,
-    ...(departamentoId ? { departamentoId: Number(departamentoId) } : {}),
-    tipoRenta,
-    ...(estado ? { estado } : {}),
-  };
-
   return (
-    <Box>
+    <Box data-report-pdf-root>
       {/* â”€â”€ Header â”€â”€ */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 3 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
@@ -176,10 +166,18 @@ export default function ReporteIsr() {
             </Typography>
           </Box>
         </Box>
-        <Button variant="outlined" startIcon={<PictureAsPdfIcon />} size="small"
-          onClick={() => descargarPdfIsr(pdfParams)}>
-          Descargar PDF
-        </Button>
+        <ReportPdfButton
+          filename={`reporte-isr-${anioFiscal}.pdf`}
+          title="Reporte ISR Anual"
+          endpoint="/api/reportes/isr/pdf"
+          params={{
+            anioFiscal,
+            ...(departamentoId ? { departamentoId: Number(departamentoId) } : {}),
+            tipoRenta,
+            ...(estado ? { estado } : {}),
+          }}
+          disabled={!reporte}
+        />
       </Box>
 
       {/* â”€â”€ Filtros â”€â”€ */}
@@ -307,15 +305,14 @@ export default function ReporteIsr() {
                   Renta acumulada y retención proyectada para el periodo seleccionado.
                 </Typography>
               </Box>
-              <Button
-                variant="outlined"
-                startIcon={<PictureAsPdfIcon />}
-                size="small"
+              <ReportPdfButton
+                filename={`constancia-isr-${periodoId || 'periodo'}.pdf`}
+                title="Constancia ISR"
+                label="Descargar constancia ISR"
+                endpoint="/reportes/isr/proyeccion/pdf"
+                params={periodoId ? { periodoId: Number(periodoId), per_id: Number(periodoId) } : undefined}
                 disabled={!periodoId || cargandoProyeccion || !proyeccion?.empleados?.length}
-                onClick={() => periodoId && descargarPdfIsrProyeccion({ periodoId: Number(periodoId) })}
-              >
-                Descargar constancia ISR
-              </Button>
+              />
             </Box>
 
             {errorProyeccion && <Alert severity="error" sx={{ mb: 2 }}>{errorProyeccion}</Alert>}

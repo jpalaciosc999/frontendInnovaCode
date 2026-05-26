@@ -59,7 +59,6 @@ import {
 } from '../config/roleViews';
 import { useAuth } from '../context/AuthContext';
 import { useUnsavedChanges } from '../context/UnsavedChangesContext';
-  import { reportesPorRol } from '../config/roleViews';
 
 type MenuItemType = {
   text: string;
@@ -73,6 +72,19 @@ type MenuSectionType = {
   icon: ReactNode;
   items: MenuItemType[];
 };
+
+const reportPaths = [
+  '/reporte-marcajes',
+  '/reporte-igss',
+  '/reporte-isr',
+  '/reporte-aguinaldo',
+  '/reporte-vacaciones',
+  '/reporte-descuentos',
+  '/reporte-liquidacion',
+  '/reporte-kpi',
+  '/reporte-horas-extra',
+  '/dashboard-ejecutivo',
+];
 
 const viewIcons: Record<string, ReactNode> = {
   marcaje: <FactCheckIcon />,
@@ -123,6 +135,20 @@ const viewIcons: Record<string, ReactNode> = {
   'aprobacion-nomina': <ApprovalIcon />,
 };
 
+const reportViewKeys = new Set([
+  'reportes',
+  'reporte-marcajes',
+  'reporte-igss',
+  'reporte-isr',
+  'reporte-aguinaldo',
+  'reporte-vacaciones',
+  'reporte-descuentos',
+  'reporte-kpi',
+  'reporte-horas-extra',
+  'reporte-liquidacion',
+  'dashboard-ejecutivo',
+]);
+
 const buildMenuSections = (): MenuSectionType[] =>
   roleOrder
     .map((role) => ({
@@ -130,7 +156,7 @@ const buildMenuSections = (): MenuSectionType[] =>
       text: `Rol ${roleLabels[role]}`,
       icon: <FolderIcon />,
       items: appViews
-        .filter((view) => view.roles.includes(role))
+        .filter((view) => view.roles.includes(role) && !reportViewKeys.has(view.key))
         .map((view) => ({
           text: view.text,
           path: view.path,
@@ -170,6 +196,7 @@ function Navbar() {
     };
   }, []);
   const { canAccessPath, logout, user } = useAuth();
+  const canSeeReportes = canAccessPath('/reportes') || reportPaths.some((path) => canAccessPath(path));
   const visibleSections = menuSections
     .map((section) => ({
       ...section,
@@ -311,13 +338,9 @@ function Navbar() {
 
             <Divider sx={{ my: 0.5 }} />
 
-            {currentRole && reportesPorRol[currentRole]?.length > 0 && (
+            {canSeeReportes && (
               <Box>
-                <ListItemButton
-                  onClick={() => toggleSection('REPORTES')}
-                  selected={false}
-                  sx={getMenuItemSx(false)}
-                >
+                <ListItemButton onClick={() => toggleSection('REPORTES')} selected={false} sx={getMenuItemSx(false)}>
                   <ListItemIcon sx={{ color: 'inherit', minWidth: 40 }}>
                     <SummarizeIcon />
                   </ListItemIcon>
@@ -326,29 +349,23 @@ function Navbar() {
                 </ListItemButton>
                 <Collapse in={openSections['REPORTES']} timeout="auto" unmountOnExit>
                   <List component="div" disablePadding>
-                    {reportesPorRol[currentRole]?.map((reporte) => {
-                      const isActive = location.pathname === reporte.path;
-                      return (
-                        <ListItemButton
-                          key={reporte.key}
-                          component={NavLink}
-                          to={reporte.path}
-                          selected={isActive}
-                          onClick={handleNavigation(reporte.path)}
-                          sx={getMenuItemSx(isActive, { pl: 4 })}
-                        >
-                          <ListItemIcon
-                            sx={{
-                              color: isActive ? 'white' : 'inherit',
-                              minWidth: 40,
-                            }}
-                          >
-                            <SummarizeIcon />
-                          </ListItemIcon>
-                          <ListItemText primary={reporte.text} />
-                        </ListItemButton>
-                      );
-                    })}
+                    <ListItemButton
+                      component={NavLink}
+                      to="/reportes"
+                      selected={location.pathname === '/reportes'}
+                      onClick={handleNavigation('/reportes')}
+                      sx={getMenuItemSx(location.pathname === '/reportes', { pl: 4 })}
+                    >
+                      <ListItemIcon
+                        sx={{
+                          color: location.pathname === '/reportes' ? 'white' : 'inherit',
+                          minWidth: 40,
+                        }}
+                      >
+                        <SummarizeIcon />
+                      </ListItemIcon>
+                      <ListItemText primary="Ver reportes" />
+                    </ListItemButton>
                   </List>
                 </Collapse>
                 <Divider sx={{ my: 0.5 }} />

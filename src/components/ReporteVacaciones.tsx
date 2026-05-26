@@ -4,7 +4,6 @@ import {
   Alert,
   Avatar,
   Box,
-  Button,
   Chip,
   CircularProgress,
   Divider,
@@ -23,7 +22,6 @@ import {
   TableRow,
   Typography,
 } from '@mui/material';
-import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
 import BeachAccessIcon from '@mui/icons-material/BeachAccess';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import {
@@ -42,9 +40,10 @@ import {
   Area,
 } from 'recharts';
 
-import { getReporteVacaciones, descargarPdfVacaciones } from '../services/reporte_vacaciones.service';
+import { getReporteVacaciones } from '../services/reporte_vacaciones.service';
 import { obtenerDepartamentos } from '../services/departamentos.service';
 import { getApiErrorMessage } from '../api/errors';
+import ReportPdfButton from './common/ReportPdfButton';
 
 import type { VacacionesResponse, VacacionesEstado, VacacionesParams } from '../interfaces/reporteVacaciones';
 import type { Departamento } from '../interfaces/departamentos';
@@ -155,7 +154,7 @@ export default function ReporteVacaciones() {
   })();
 
   return (
-    <Box>
+    <Box data-report-pdf-root>
       {/* ── header ──────────────────────────────────────────────────────────── */}
       <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', mb: 3, flexWrap: 'wrap', gap: 2 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
@@ -169,13 +168,17 @@ export default function ReporteVacaciones() {
             </Typography>
           </Box>
         </Box>
-        <Button
-          variant="outlined"
-          startIcon={<PictureAsPdfIcon />}
-          onClick={() => descargarPdfVacaciones({ departamentoId: depId !== '' ? depId : undefined })}
-        >
-          Descargar PDF
-        </Button>
+        <ReportPdfButton
+          filename="reporte-vacaciones.pdf"
+          title="Reporte de vacaciones"
+          endpoint="/api/reportes/vacaciones/pdf"
+          params={{
+            ...(depId !== '' ? { departamentoId: depId } : {}),
+            ...(estado !== '' ? { estado } : {}),
+            ...(antiguedadMin > 0 ? { antiguedadMin } : {}),
+          }}
+          disabled={!data}
+        />
       </Box>
 
       {/* ── alerta empleados críticos ───────────────────────────────────────── */}

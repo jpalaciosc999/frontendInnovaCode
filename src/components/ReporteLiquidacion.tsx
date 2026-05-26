@@ -4,7 +4,6 @@ import {
   Alert,
   Avatar,
   Box,
-  Button,
   Chip,
   CircularProgress,
   Divider,
@@ -22,7 +21,6 @@ import {
   TableRow,
   Typography,
 } from '@mui/material';
-import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
 import GavelIcon from '@mui/icons-material/Gavel';
 import {
   BarChart,
@@ -49,6 +47,7 @@ import type {
   LiquidacionParams,
 } from '../interfaces/reporteLiquidacion';
 import type { Departamento } from '../interfaces/departamentos';
+import ReportPdfButton from './common/ReportPdfButton';
 
 // ── constants ─────────────────────────────────────────────────────────────────
 
@@ -215,7 +214,7 @@ export default function ReporteLiquidacion() {
     }));
 
   return (
-    <Box>
+    <Box data-report-pdf-root>
       {/* ── header ──────────────────────────────────────────────────────────── */}
       <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', mb: 3, flexWrap: 'wrap', gap: 2 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
@@ -229,14 +228,17 @@ export default function ReporteLiquidacion() {
             </Typography>
           </Box>
         </Box>
-        <Button
-          variant="outlined"
-          color="error"
-          startIcon={<PictureAsPdfIcon />}
-          disabled
-        >
-          Descargar PDF
-        </Button>
+        <ReportPdfButton
+          filename={`reporte-liquidaciones-${anio || 'todos'}.pdf`}
+          title="Reporte de Liquidaciones"
+          endpoint="/api/reportes/liquidacion/pdf"
+          params={{
+            anio: anio !== '' ? anio : undefined,
+            departamentoId: depId !== '' ? depId : undefined,
+            motivoSalida: motivoFiltro || undefined,
+          }}
+          disabled={!data}
+        />
       </Box>
 
       {/* ── filters ─────────────────────────────────────────────────────────── */}

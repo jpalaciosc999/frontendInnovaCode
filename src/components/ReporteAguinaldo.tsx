@@ -4,7 +4,6 @@ import {
   Alert,
   Avatar,
   Box,
-  Button,
   Chip,
   CircularProgress,
   Divider,
@@ -25,7 +24,6 @@ import {
   Tabs,
   Typography,
 } from '@mui/material';
-import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
 import SummarizeIcon from '@mui/icons-material/Summarize';
 import {
   ComposedChart,
@@ -43,9 +41,10 @@ import {
   RadialBar,
 } from 'recharts';
 
-import { getReporteAguinaldo, descargarPdfAguinaldo } from '../services/reporte_aguinaldo.service';
+import { getReporteAguinaldo } from '../services/reporte_aguinaldo.service';
 import { obtenerDepartamentos } from '../services/departamentos.service';
 import { getApiErrorMessage } from '../api/errors';
+import ReportPdfButton from './common/ReportPdfButton';
 
 import type { AguinaldoResponse } from '../interfaces/reporteAguinaldo';
 import type { Departamento } from '../interfaces/departamentos';
@@ -160,7 +159,7 @@ export default function ReporteAguinaldo() {
   const periodoStr = resumen ? `${resumen.periodoInicio} - ${resumen.periodoFin}` : '';
 
   return (
-    <Box>
+    <Box data-report-pdf-root>
       {/* ── Header ─────────────────────────────────────────────────────────── */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 3 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
@@ -172,21 +171,18 @@ export default function ReporteAguinaldo() {
             </Typography>
           </Box>
         </Box>
-        <Button
-          variant="outlined"
-          startIcon={<PictureAsPdfIcon />}
-          size="small"
-          onClick={() =>
-            descargarPdfAguinaldo({
-              tipo: tabActual === 0 ? 'aguinaldo' : 'bono14',
-              anio,
-              ...(departamentoId ? { departamentoId: Number(departamentoId) } : {}),
-              ...(estadoFiltro   ? { estado: estadoFiltro } : {}),
-            })
-          }
-        >
-          Descargar PDF
-        </Button>
+        <ReportPdfButton
+          filename={`reporte-aguinaldo-bono14-${anio}.pdf`}
+          title="Reporte Aguinaldo/Bono 14"
+          endpoint="/api/reportes/aguinaldo/pdf"
+          params={{
+            tipo: tabActual === 0 ? 'aguinaldo' : 'bono14',
+            anio,
+            ...(departamentoId ? { departamentoId: Number(departamentoId) } : {}),
+            ...(estadoFiltro ? { estado: estadoFiltro } : {}),
+          }}
+          disabled={!reporteAg && !reporteB14}
+        />
       </Box>
 
       {/* ── Tabs ────────────────────────────────────────────────────────────── */}
