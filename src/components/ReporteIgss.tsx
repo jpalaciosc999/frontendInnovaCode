@@ -23,6 +23,7 @@ import {
   Typography,
 } from '@mui/material';
 import SummarizeIcon from '@mui/icons-material/Summarize';
+import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
 import {
   BarChart,
   Bar,
@@ -38,7 +39,6 @@ import {
 
 import {
   getReporteIgss,
-  descargarCsvIgss,
   subirReciboIgss,
   registrarNumeroRecibo,
 } from '../services/reporte_igss.service';
@@ -188,15 +188,9 @@ export default function ReporteIgss() {
             endpoint="/api/reportes/igss/pdf"
             params={pdfParams}
             disabled={!reporte}
+            label="Descargar factura"
+            startIcon={<ReceiptLongIcon />}
           />
-
-          <Button
-            variant="outlined"
-            size="small"
-            onClick={() => descargarCsvIgss(exportParams)}
-          >
-            Descargar CSV
-          </Button>
 
           <Button
             variant="contained"

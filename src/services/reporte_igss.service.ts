@@ -159,21 +159,6 @@ export const descargarPdfIgss = async (
   URL.revokeObjectURL(url);
 };
 
-export const descargarCsvIgss = async (
-  params: ReporteIgssParams
-): Promise<void> => {
-  const response = await api.get(`/api/reportes/igss/csv`, {
-    params,
-    responseType: 'blob',
-  });
-  const url = URL.createObjectURL(new Blob([response.data], { type: 'text/csv' }));
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = `reporte-igss-${params.periodoId ?? 'todos'}.csv`;
-  link.click();
-  URL.revokeObjectURL(url);
-};
-
 export const subirReciboIgss = async (periodoId: number, file: File) => {
   const fd = new FormData();
   fd.append('file', file);

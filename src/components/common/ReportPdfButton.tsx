@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import Button from '@mui/material/Button';
 import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
 
@@ -11,6 +12,7 @@ type ReportPdfButtonProps = {
   params?: Record<string, unknown>;
   disabled?: boolean;
   label?: string;
+  startIcon?: ReactNode;
 };
 
 const getFilenameFromDisposition = (disposition: unknown) => {
@@ -38,6 +40,7 @@ export default function ReportPdfButton({
   params,
   disabled = false,
   label = 'Descargar PDF',
+  startIcon,
 }: ReportPdfButtonProps) {
   const handleDownload = async () => {
     if (!endpoint) {
@@ -62,7 +65,7 @@ export default function ReportPdfButton({
       variant="contained"
       color="error"
       size="small"
-      startIcon={<PictureAsPdfIcon />}
+      startIcon={startIcon ?? <PictureAsPdfIcon />}
       disabled={disabled}
       onClick={handleDownload}
       sx={{
