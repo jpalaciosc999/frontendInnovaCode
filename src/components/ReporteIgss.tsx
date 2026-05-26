@@ -22,7 +22,6 @@ import {
   TableRow,
   Typography,
 } from '@mui/material';
-import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
 import SummarizeIcon from '@mui/icons-material/Summarize';
 import {
   BarChart,
@@ -39,7 +38,6 @@ import {
 
 import {
   getReporteIgss,
-  descargarPdfIgss,
   descargarCsvIgss,
   subirReciboIgss,
   registrarNumeroRecibo,
@@ -51,6 +49,7 @@ import { getApiErrorMessage } from '../api/errors';
 import type { ReporteIgssResponse } from '../interfaces/reporteIgss';
 import type { Periodo } from '../interfaces/periodo';
 import type { Departamento } from '../interfaces/departamentos';
+import ReportPdfButton from './common/ReportPdfButton';
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -143,7 +142,7 @@ export default function ReporteIgss() {
     ? `Cuotas patronal ${(TASA_PATRONAL * 100).toFixed(2)}% y laboral ${(TASA_LABORAL * 100).toFixed(2)}% · ${periodoLabel(periodoSeleccionado)}`
     : `Cuotas patronal ${(TASA_PATRONAL * 100).toFixed(2)}% y laboral ${(TASA_LABORAL * 100).toFixed(2)}%`;
 
-  const pdfParams = {
+  const exportParams = {
     ...(periodoId ? { periodoId: Number(periodoId) } : {}),
     ...(departamentoId ? { departamentoId: Number(departamentoId) } : {}),
     ...(estado ? { estado } : {}),
@@ -156,7 +155,7 @@ export default function ReporteIgss() {
   const [guardandoNumero, setGuardandoNumero] = useState(false);
 
   return (
-    <Box>
+    <Box data-report-pdf-root>
       {/* ── Header ── */}
       <Box
         sx={{
@@ -179,19 +178,18 @@ export default function ReporteIgss() {
         </Box>
 
         <Box sx={{ display: 'flex', gap: 1 }}>
-          <Button
-            variant="outlined"
-            startIcon={<PictureAsPdfIcon />}
-            size="small"
-            onClick={() => descargarPdfIgss(pdfParams)}
-          >
-            Descargar PDF
-          </Button>
+          <ReportPdfButton
+            filename={`reporte-igss-${periodoId || 'todos'}.pdf`}
+            title="Reporte IGSS"
+            endpoint="/api/reportes/igss/pdf"
+            params={exportParams}
+            disabled={!reporte}
+          />
 
           <Button
             variant="outlined"
             size="small"
-            onClick={() => descargarCsvIgss(pdfParams)}
+            onClick={() => descargarCsvIgss(exportParams)}
           >
             Descargar CSV
           </Button>

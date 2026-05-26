@@ -221,8 +221,28 @@ export function getVistaForPath(path: string) {
   return pathToVista[path];
 }
 
-export function canAccessPath(usuario: AuthUserWithPermissions | null | undefined, path: string) {
+function hasReportesRole(usuario: AuthUserWithPermissions | null | undefined) {
+  const role = getNormalizedRole(usuario);
+  return [
+    'rrhh',
+    'admin',
+    'administrador',
+    'contabilidad',
+    'gerente',
+    'auditoria',
+    'analista nomina',
+    'supervisor asistencia',
+    'supremo',
+    'superadmin',
+    'root',
+  ].includes(role);
+}
+
+export function canAccessPath(usuario: AuthUserWithPermissions | null | undefined, path: string): boolean {
   if (path === '/') return true;
+  if (path === '/reportes') {
+    return hasReportesRole(usuario) || Array.from(reportPaths).some((reportPath) => canAccessPath(usuario, reportPath));
+  }
   if (isAdminUser(usuario) && reportPaths.has(path)) return true;
   // Role-specific shortcuts
   if (isRole(usuario, 'auditoria')) {

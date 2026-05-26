@@ -4,7 +4,6 @@ import {
   Alert,
   Avatar,
   Box,
-  Button,
   Chip,
   CircularProgress,
   FormControl,
@@ -26,8 +25,7 @@ import GroupIcon from '@mui/icons-material/Group';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import CancelIcon from '@mui/icons-material/Cancel';
-import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
-import { descargarPdfMarcajes } from '../services/reportes.service';
+import ReportPdfButton from './common/ReportPdfButton';
 import {
   BarChart,
   Bar,
@@ -145,7 +143,7 @@ export default function ReporteMarcajes() {
   const distribucion = reporte?.distribucion ?? [];
 
   return (
-    <Box>
+    <Box data-report-pdf-root>
       {/* ── Header ── */}
       <Box
         sx={{
@@ -165,21 +163,18 @@ export default function ReporteMarcajes() {
         </Box>
 
         <Box sx={{ display: 'flex', gap: 1 }}>
-          <Button
-            variant="outlined"
-            startIcon={<PictureAsPdfIcon />}
-            size="small"
-            onClick={() =>
-              descargarPdfMarcajes({
-                fechaInicio,
-                fechaFin,
-                ...(empleadoId ? { empleadoId: Number(empleadoId) } : {}),
-                ...(departamentoId ? { departamentoId: Number(departamentoId) } : {}),
-              })
-            }
-          >
-            PDF
-          </Button>
+          <ReportPdfButton
+            filename={`reporte-marcajes-${fechaInicio}_${fechaFin}.pdf`}
+            title="Reporte de marcajes"
+            endpoint="/api/reportes/marcajes/pdf"
+            params={{
+              fechaInicio,
+              fechaFin,
+              ...(empleadoId ? { empleadoId: Number(empleadoId) } : {}),
+              ...(departamentoId ? { departamentoId: Number(departamentoId) } : {}),
+            }}
+            disabled={!reporte}
+          />
         </Box>
       </Box>
 

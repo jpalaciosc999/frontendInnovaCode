@@ -4,7 +4,6 @@ import {
   Alert,
   Avatar,
   Box,
-  Button,
   Chip,
   CircularProgress,
   FormControl,
@@ -26,7 +25,6 @@ import MoreTimeIcon from '@mui/icons-material/MoreTime';
 import AttachMoneyIcon from '@mui/icons-material/AttachMoney';
 import PersonIcon from '@mui/icons-material/Person';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
-import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
 import {
   BarChart,
   Bar,
@@ -42,10 +40,7 @@ import {
   ReferenceLine,
 } from 'recharts';
 
-import {
-  getReporteHorasExtra,
-  descargarPdfHorasExtra,
-} from '../services/reporte_horas_extra.service';
+import { getReporteHorasExtra } from '../services/reporte_horas_extra.service';
 import { obtenerDepartamentos } from '../services/departamentos.service';
 import { getApiErrorMessage } from '../api/errors';
 
@@ -54,6 +49,7 @@ import type {
   HorasExtraParams,
 } from '../interfaces/reporteHorasExtra';
 import type { Departamento } from '../interfaces/departamentos';
+import ReportPdfButton from './common/ReportPdfButton';
 
 // ── date helpers ──────────────────────────────────────────────────────────────
 
@@ -131,7 +127,6 @@ export default function ReporteHorasExtra() {
   const [data, setData] = useState<HorasExtraResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [pdfLoading, setPdfLoading] = useState(false);
 
   useEffect(() => {
     obtenerDepartamentos()
@@ -161,21 +156,8 @@ export default function ReporteHorasExtra() {
     cargar();
   }, [cargar]);
 
-  const handlePdf = async () => {
-    setPdfLoading(true);
-    try {
-      await descargarPdfHorasExtra({
-        fechaInicio,
-        fechaFin,
-        ...(departamentoId ? { departamentoId: Number(departamentoId) } : {}),
-      });
-    } finally {
-      setPdfLoading(false);
-    }
-  };
-
   return (
-    <Box sx={{ p: 3 }}>
+    <Box sx={{ p: 3 }} data-report-pdf-root>
       {/* ── Header ────────────────────────────────────────────────────────── */}
       <Box
         sx={{
@@ -202,15 +184,17 @@ export default function ReporteHorasExtra() {
             Control de horas adicionales para nómina
           </Typography>
         </Box>
-        <Button
-          variant="outlined"
-          color="error"
-          startIcon={<PictureAsPdfIcon />}
-          onClick={handlePdf}
-          disabled={pdfLoading || !data}
-        >
-          Descargar PDF
-        </Button>
+        <ReportPdfButton
+          filename={`reporte-horas-extra-${fechaInicio}_${fechaFin}.pdf`}
+          title="Reporte de Horas Extra"
+          endpoint="/api/reportes/horas-extra/pdf"
+          params={{
+            fechaInicio,
+            fechaFin,
+            ...(departamentoId ? { departamentoId: Number(departamentoId) } : {}),
+          }}
+          disabled={!data}
+        />
       </Box>
 
       {/* ── Filters ───────────────────────────────────────────────────────── */}

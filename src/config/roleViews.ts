@@ -45,6 +45,7 @@ export const AUTH_USER_CHANGED_EVENT = 'auth-user-changed';
 
 export const appViews: AppView[] = [
   { key: 'marcaje', text: 'Marcaje', path: '/marcajes', roles: ['EMPLEADO'] },
+  { key: 'reportes', text: 'Reportes', path: '/reportes', roles: ['RRHH', 'ADMIN', 'CONTABILIDAD', 'GERENTE', 'AUDITORIA', 'ANALISTA_NOMINA', 'SUPERVISOR_ASISTENCIA', 'SUPREMO'] },
 
   { key: 'resumen-marcaje', text: 'Resumen de Marcaje', path: '/resumen-marcaje', roles: ['RRHH', 'SUPERVISOR_ASISTENCIA'] },
   { key: 'reporte-marcajes', text: 'Reporte de Marcajes', path: '/reporte-marcajes', roles: ['RRHH', 'ADMIN', 'AUDITORIA', 'SUPERVISOR_ASISTENCIA'] },

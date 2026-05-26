@@ -4,7 +4,6 @@ import {
   Alert,
   Avatar,
   Box,
-  Button,
   Chip,
   CircularProgress,
   Divider,
@@ -23,7 +22,6 @@ import {
   TableRow,
   Typography,
 } from '@mui/material';
-import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
 import ContentCutIcon from '@mui/icons-material/ContentCut';
 import {
   BarChart,
@@ -41,9 +39,10 @@ import {
   Line,
 } from 'recharts';
 
-import { getReporteDescuentos, descargarPdfDescuentos } from '../services/reporte_descuentos.service';
+import { getReporteDescuentos } from '../services/reporte_descuentos.service';
 import { obtenerDepartamentos } from '../services/departamentos.service';
 import { getApiErrorMessage } from '../api/errors';
+import ReportPdfButton from './common/ReportPdfButton';
 
 import type { DescuentoResponse, DescuentoEstado, DescuentoParams } from '../interfaces/reporteDescuentos';
 import type { Departamento } from '../interfaces/departamentos';
@@ -169,7 +168,7 @@ export default function ReporteDescuentos() {
   })();
 
   return (
-    <Box>
+    <Box data-report-pdf-root>
       {/* ── header ──────────────────────────────────────────────────────────── */}
       <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', mb: 3, flexWrap: 'wrap', gap: 2 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
@@ -183,14 +182,16 @@ export default function ReporteDescuentos() {
             </Typography>
           </Box>
         </Box>
-        <Button
-          variant="outlined"
-          color="error"
-          startIcon={<PictureAsPdfIcon />}
-          onClick={() => descargarPdfDescuentos({ departamentoId: depId !== '' ? depId : undefined })}
-        >
-          Descargar PDF
-        </Button>
+        <ReportPdfButton
+          filename="reporte-descuentos.pdf"
+          title="Reporte de descuentos"
+          endpoint="/api/reportes/descuentos/pdf"
+          params={{
+            ...(depId !== '' ? { departamentoId: depId } : {}),
+            ...(estado !== '' ? { estado } : {}),
+          }}
+          disabled={!data}
+        />
       </Box>
 
       {/* ── filters ─────────────────────────────────────────────────────────── */}

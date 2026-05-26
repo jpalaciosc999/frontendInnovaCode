@@ -4,7 +4,6 @@ import {
   Alert,
   Avatar,
   Box,
-  Button,
   Chip,
   CircularProgress,
   Divider,
@@ -24,7 +23,6 @@ import {
   Typography,
 } from '@mui/material';
 import AssessmentIcon      from '@mui/icons-material/Assessment';
-import PictureAsPdfIcon    from '@mui/icons-material/PictureAsPdf';
 import EmojiEventsIcon     from '@mui/icons-material/EmojiEvents';
 import TrendingUpIcon      from '@mui/icons-material/TrendingUp';
 import TrendingDownIcon    from '@mui/icons-material/TrendingDown';
@@ -47,7 +45,7 @@ import {
   ReferenceLine,
 } from 'recharts';
 
-import { getReporteKpi, descargarPdfKpi } from '../services/reporte_kpi.service';
+import { getReporteKpi } from '../services/reporte_kpi.service';
 import { obtenerKPIs }         from '../services/kpi.service';
 import { obtenerEmpleados }    from '../services/empleados.service';
 import { obtenerDepartamentos } from '../services/departamentos.service';
@@ -57,6 +55,7 @@ import type { KpiResponse, KpiEstado, KpiParams } from '../interfaces/reporteKpi
 import type { KPI }         from '../interfaces/kpi';
 import type { Empleado }    from '../interfaces/empleados';
 import type { Departamento } from '../interfaces/departamentos';
+import ReportPdfButton from './common/ReportPdfButton';
 
 // ── paleta ────────────────────────────────────────────────────────────────────
 
@@ -219,7 +218,7 @@ export default function ReporteKpi() {
     : 'Cumplimiento por departamento';
 
   return (
-    <Box>
+    <Box data-report-pdf-root>
       {/* ── Header ─────────────────────────────────────────────────────────── */}
       <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', mb: 3, flexWrap: 'wrap', gap: 2 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
@@ -231,13 +230,18 @@ export default function ReporteKpi() {
             </Typography>
           </Box>
         </Box>
-        <Button
-          variant="outlined"
-          startIcon={<PictureAsPdfIcon />}
-          onClick={() => descargarPdfKpi({ periodo: periodo || undefined })}
-        >
-          PDF
-        </Button>
+        <ReportPdfButton
+          filename={`reporte-kpi-${periodo || 'todos'}.pdf`}
+          title="Reporte KPIs"
+          endpoint="/api/reportes/kpi/pdf"
+          params={{
+            periodo: periodo || undefined,
+            departamentoId: depId !== '' ? depId : undefined,
+            kpiId: kpiId !== '' ? kpiId : undefined,
+            empleadoId: empId !== '' ? empId : undefined,
+          }}
+          disabled={!data}
+        />
       </Box>
 
       {/* ── Filters ────────────────────────────────────────────────────────── */}
