@@ -181,15 +181,27 @@ export default function ReporteIgss() {
           </Box>
         </Box>
 
-        <Box sx={{ display: 'flex', gap: 1 }}>
+        <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
           <ReportPdfButton
             filename={`reporte-igss-${periodoId || 'todos'}.pdf`}
             title="Reporte IGSS"
+            label="Descargar reporte"
             endpoint="/api/reportes/igss/pdf"
+            params={exportParams}
+            disabled={!reporte}
+          />
+
+          <ReportPdfButton
+            filename={`factura-igss-${periodoId || 'todos'}.pdf`}
+            title="Factura IGSS"
+            endpoint="/api/reportes/igss/factura/pdf"
             params={pdfParams}
             disabled={!reporte}
             label="Descargar factura"
             startIcon={<ReceiptLongIcon />}
+            fallbackToElement={false}
+            variant="outlined"
+            color="inherit"
           />
 
           <Button

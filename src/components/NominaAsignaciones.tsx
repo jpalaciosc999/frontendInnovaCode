@@ -124,7 +124,7 @@ function NominaAsignaciones() {
     [periodos]
   );
 
-  const normalizePeriodoEstado = (estado: string) => String(estado || '').trim().toUpperCase();
+  const normalizePeriodoEstado = (estado?: string) => String(estado || '').trim().toUpperCase();
   const periodoForm = periodosPorId.get(String(form.per_id));
   const periodoFormBloqueado = ['APROBADO', 'CERRADO'].includes(normalizePeriodoEstado(periodoForm?.PER_ESTADO || ''));
 

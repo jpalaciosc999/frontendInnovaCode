@@ -163,9 +163,10 @@ function Auditoria() {
         <Alert severity="info" sx={{ mb: 2 }}>
           Registros de cambios sensibles. Vista de solo lectura. Los cambios se deben generar desde el backend.
         </Alert>
+        {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
         <Grid container spacing={2}>
-          <Grid item xs={12} md={3}>
+          <Grid size={{ xs: 12, md: 3 }}>
             <FormControl fullWidth>
               <InputLabel>Tabla</InputLabel>
               <Select value={filtroTabla} label="Tabla" onChange={(e: SelectChangeEvent) => setFiltroTabla(e.target.value)}>
@@ -177,28 +178,28 @@ function Auditoria() {
             </FormControl>
           </Grid>
 
-          <Grid item xs={12} md={3}>
+          <Grid size={{ xs: 12, md: 3 }}>
             <TextField fullWidth label="Usuario (ID)" value={filtroUsuario} onChange={(e) => setFiltroUsuario(e.target.value)} />
           </Grid>
 
-          <Grid item xs={12} md={2}>
+          <Grid size={{ xs: 12, md: 2 }}>
             <TextField fullWidth label="Campo" value={campo} onChange={(e) => setCampo(e.target.value)} />
           </Grid>
 
-          <Grid item xs={12} md={2}>
+          <Grid size={{ xs: 12, md: 2 }}>
             <TextField fullWidth label="Desde" type="date" value={fechaDesde} onChange={(e) => setFechaDesde(e.target.value)} slotProps={{ inputLabel: { shrink: true } }} />
           </Grid>
 
-          <Grid item xs={12} md={2}>
+          <Grid size={{ xs: 12, md: 2 }}>
             <TextField fullWidth label="Hasta" type="date" value={fechaHasta} onChange={(e) => setFechaHasta(e.target.value)} slotProps={{ inputLabel: { shrink: true } }} />
           </Grid>
 
-          <Grid item xs={12} md={2}>
+          <Grid size={{ xs: 12, md: 2 }}>
             <Button variant="outlined" startIcon={<DownloadIcon />} onClick={() => exportCsv(datosFiltrados)} fullWidth sx={{ mb: 1 }}>Exportar CSV</Button>
             <Button variant="contained" startIcon={<DownloadIcon />} onClick={() => exportXlsx(datosFiltrados)} fullWidth>Exportar XLSX</Button>
           </Grid>
 
-          <Grid item xs={12} md={10}>
+          <Grid size={{ xs: 12, md: 10 }}>
             <TextField fullWidth label="Buscar" value={busqueda} onChange={(e) => setBusqueda(e.target.value)} />
           </Grid>
         </Grid>
