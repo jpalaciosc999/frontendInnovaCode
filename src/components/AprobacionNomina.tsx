@@ -218,11 +218,12 @@ function AprobacionNomina() {
 
   const periodosPendientes = useMemo(() => {
     const ids = new Set(pendientes.map((nomina) => String(nomina.PER_ID)));
-    return periodos.filter((periodo) => ids.has(String(periodo.PER_ID)) && esPeriodoEnRevision(periodo.PER_ESTADO));
+    return periodos.filter((periodo) => ids.has(String(periodo.PER_ID)));
   }, [pendientes, periodos]);
 
   const periodoActivoId = periodoRevisionId || String(periodosPendientes[0]?.PER_ID ?? '');
   const periodoActivo = periodos.find((periodo) => String(periodo.PER_ID) === periodoActivoId);
+  const periodoActivoEnRevision = esPeriodoEnRevision(periodoActivo?.PER_ESTADO);
 
   const nominasPendientesPeriodo = useMemo(
     () => pendientes.filter((nomina) => periodoActivoId && String(nomina.PER_ID) === periodoActivoId),
@@ -383,7 +384,7 @@ function AprobacionNomina() {
   }), [filasPlanilla]);
 
   const planillaTieneInconsistencias = filasPlanilla.some((fila) => fila.conceptos === 0 || fila.duplicados > 0 || !fila.cuadra);
-  const puedeAprobarPlanilla = filasPlanilla.length > 0 && !planillaTieneInconsistencias;
+  const puedeAprobarPlanilla = filasPlanilla.length > 0 && periodoActivoEnRevision && !planillaTieneInconsistencias;
 
   const obtenerEtiquetaPeriodo = (periodo?: Periodo) =>
     periodo
@@ -505,7 +506,7 @@ function AprobacionNomina() {
               variant="outlined"
               color="error"
               startIcon={<CancelIcon />}
-              disabled={procesando || filasPlanilla.length === 0}
+              disabled={procesando || filasPlanilla.length === 0 || !periodoActivoEnRevision}
               onClick={() => cambiarEstadoPlanilla('R')}
             >
               Rechazar planilla
@@ -516,6 +517,12 @@ function AprobacionNomina() {
         {planillaTieneInconsistencias && (
           <Alert severity="error" sx={{ mb: 2 }}>
             Hay nominas sin detalle, duplicadas o descuadradas. Contabilidad debe corregirlas antes de aprobacion.
+          </Alert>
+        )}
+
+        {filasPlanilla.length > 0 && !periodoActivoEnRevision && (
+          <Alert severity="warning" sx={{ mb: 2 }}>
+            Hay nominas pendientes en este periodo, pero el periodo no esta En revision. Contabilidad debe enviarlo nuevamente al gerente para sincronizar el estado del periodo.
           </Alert>
         )}
 

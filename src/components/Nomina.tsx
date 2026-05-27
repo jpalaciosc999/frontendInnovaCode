@@ -494,10 +494,11 @@ function NominaCRUD() {
   }), [filasPlanilla]);
 
   const planillaTieneInconsistencias = filasPlanilla.some((fila) => fila.conceptos === 0 || fila.duplicados > 0 || !fila.cuadra);
+  const filasEnviables = filasPlanilla.filter((fila) => ['B', 'R'].includes(fila.nomina.NOM_ESTADO));
   const planillaPuedeEnviar = filasPlanilla.length > 0
     && periodoPlanillaAbierto
     && !planillaTieneInconsistencias
-    && filasPlanilla.some((fila) => ['B', 'R'].includes(fila.nomina.NOM_ESTADO));
+    && filasEnviables.length > 0;
   const planillaPuedeExportar = filasPlanilla.length > 0
     && periodoPlanillaAprobado
     && !planillaTieneInconsistencias
@@ -515,6 +516,17 @@ function NominaCRUD() {
     const etiquetaEstado = estado ? periodoEstadoLabels[estado] : periodo.PER_ESTADO;
     return `${obtenerEtiquetaPeriodo(periodo)} - ${etiquetaEstado}`;
   };
+
+  const obtenerMotivoBloqueoEnvio = () => {
+    if (!planillaPeriodoId) return 'Selecciona un periodo de planilla para enviarla al gerente.';
+    if (filasPlanilla.length === 0) return 'No hay nominas generadas para este periodo.';
+    if (!periodoPlanillaAbierto) return 'Solo se pueden enviar a gerencia las planillas de periodos abiertos.';
+    if (planillaTieneInconsistencias) return 'Hay nominas con detalle faltante, duplicado o descuadrado.';
+    if (filasEnviables.length === 0) return 'No hay nominas en Borrador o Rechazadas para enviar. Las nominas aprobadas ya no se envian al gerente.';
+    return '';
+  };
+
+  const motivoBloqueoEnvio = planillaPuedeEnviar ? '' : obtenerMotivoBloqueoEnvio();
 
   const crearPayloadNomina = (
     datosForm: NominaForm,
@@ -1077,6 +1089,12 @@ function NominaCRUD() {
 
         {planillaPeriodoId && filasPlanilla.length === 0 && (
           <Alert severity="warning">No hay nominas generadas para este periodo.</Alert>
+        )}
+
+        {motivoBloqueoEnvio && filasPlanilla.length > 0 && (
+          <Alert severity="info" sx={{ mb: 2 }}>
+            Enviar al gerente esta deshabilitado: {motivoBloqueoEnvio}
+          </Alert>
         )}
 
         {planillaTieneInconsistencias && (
