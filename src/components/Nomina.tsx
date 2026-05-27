@@ -27,6 +27,7 @@ import CalculateIcon from '@mui/icons-material/Calculate';
 import DownloadIcon from '@mui/icons-material/Download';
 import SummarizeIcon from '@mui/icons-material/Summarize';
 import DeleteIcon from '@mui/icons-material/Delete';
+import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
 
 import type { Nomina, NominaForm } from '../interfaces/nomina';
 import type { NominaDetalle } from '../interfaces/nomina-detalle';
@@ -57,6 +58,7 @@ import {
   normalizePeriodoEstado,
   periodoEstadoLabels,
 } from '../utils/payroll';
+import { downloadPayStubPdf } from '../utils/payStubPdf';
 import PeriodoBadge from './common/PeriodoBadge';
 
 type TotalesNomina = {
@@ -170,6 +172,71 @@ const normalizarCodigo = (value?: string | null) =>
 
 const esCodigo = (codigo: string, tokens: string[]) =>
   tokens.some((token) => codigo.includes(token));
+
+const sanitizarNombreArchivo = (value: string) =>
+  value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9_-]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .toLowerCase();
+
+const obtenerTextoEstadoNomina = (estado: string) => {
+  if (estado === 'A' || estado === 'Activo') return 'Aprobada';
+  if (estado === 'R' || estado === 'Rechazada') return 'Rechazada';
+  if (estado === 'I' || estado === 'Inactivo') return 'Inactiva';
+  if (estado === 'P' || estado === 'Pendiente') return 'Pendiente';
+  if (estado === 'B' || estado === 'Borrador') return 'Borrador';
+  return estado || 'Sin estado';
+};
+
+const numeroALetrasBasico = (value: number): string => {
+  const unidades = ['', 'uno', 'dos', 'tres', 'cuatro', 'cinco', 'seis', 'siete', 'ocho', 'nueve'];
+  const especiales: Record<number, string> = {
+    10: 'diez',
+    11: 'once',
+    12: 'doce',
+    13: 'trece',
+    14: 'catorce',
+    15: 'quince',
+    20: 'veinte',
+  };
+  const decenas = ['', '', 'veinti', 'treinta', 'cuarenta', 'cincuenta', 'sesenta', 'setenta', 'ochenta', 'noventa'];
+  const centenas = ['', 'ciento', 'doscientos', 'trescientos', 'cuatrocientos', 'quinientos', 'seiscientos', 'setecientos', 'ochocientos', 'novecientos'];
+
+  const convertirMenorMil = (num: number): string => {
+    if (num === 0) return '';
+    if (num === 100) return 'cien';
+    if (num < 10) return unidades[num];
+    if (especiales[num]) return especiales[num];
+    if (num < 20) return `dieci${unidades[num - 10]}`;
+    if (num < 30) return num === 20 ? especiales[20] : `${decenas[2]}${unidades[num - 20]}`;
+    if (num < 100) {
+      const decena = Math.floor(num / 10);
+      const unidad = num % 10;
+      return unidad ? `${decenas[decena]} y ${unidades[unidad]}` : decenas[decena];
+    }
+
+    const centena = Math.floor(num / 100);
+    const resto = num % 100;
+    return `${centenas[centena]} ${convertirMenorMil(resto)}`.trim();
+  };
+
+  const entero = Math.floor(Math.abs(value));
+  if (entero === 0) return 'cero';
+  if (entero < 1000) return convertirMenorMil(entero);
+
+  const miles = Math.floor(entero / 1000);
+  const resto = entero % 1000;
+  const textoMiles = miles === 1 ? 'mil' : `${convertirMenorMil(miles)} mil`;
+  return `${textoMiles} ${convertirMenorMil(resto)}`.trim();
+};
+
+const montoEnLetras = (value: number) => {
+  const centavos = Math.round((Math.abs(value) % 1) * 100);
+  const letras = numeroALetrasBasico(value).toUpperCase();
+  return `${letras} QUETZALES CON ${String(centavos).padStart(2, '0')}/100`;
+};
 
 function NominaCRUD() {
   const [datos, setDatos] = useState<Nomina[]>([]);
@@ -319,6 +386,7 @@ function NominaCRUD() {
     const puesto = empleado?.PUE_ID ? puestosPorId.get(String(empleado.PUE_ID)) : undefined;
     const departamentoId = empleado?.DEP_ID ?? puesto?.DEP_ID;
     const departamento = departamentoId ? departamentosPorId.get(String(departamentoId)) : undefined;
+    const periodo = periodosPorId.get(String(nomina.PER_ID));
     const detallesNomina = detalles.filter((detalle) => String(detalle.NOM_ID) === String(nomina.NOM_ID));
     const ingresosDetalle = detallesNomina.filter((detalle) => !detalle.TDS_ID);
     const descuentosDetalle = detallesNomina.filter((detalle) => detalle.TDS_ID);
@@ -368,7 +436,7 @@ function NominaCRUD() {
       puesto: puesto?.PUE_NOMBRE || 'Sin puesto',
       salarioBase: Number(empleado?.EMP_SUELDO || puesto?.PUE_SALARIO_BASE || 0),
       bonificacion,
-      diasLaborados: 0,
+      diasLaborados: Number(periodo?.DIAS_PERIODO || 0),
       salarioOrdinario,
       horasExtra,
       sueldoExtraordinario,
@@ -393,7 +461,7 @@ function NominaCRUD() {
     () => datos
       .filter((nomina) => planillaPeriodoId && String(nomina.PER_ID) === String(planillaPeriodoId))
       .map(construirFilaPlanilla),
-    [datos, detalles, empleadosPorId, puestosPorId, departamentosPorId, ingresosPorId, descuentosPorId, planillaPeriodoId, duplicadosPorNomina]
+    [datos, detalles, empleadosPorId, puestosPorId, departamentosPorId, periodosPorId, ingresosPorId, descuentosPorId, planillaPeriodoId, duplicadosPorNomina]
   );
 
   const planillaPorDepartamento = useMemo(() => {
@@ -692,6 +760,112 @@ function NominaCRUD() {
     URL.revokeObjectURL(url);
   };
 
+  const obtenerConceptosBoleta = (nominaId: number) =>
+    detalles
+      .filter((detalle) => String(detalle.NOM_ID) === String(nominaId))
+      .map((detalle) => {
+        const ingreso = detalle.TIS_ID ? ingresosPorId.get(String(detalle.TIS_ID)) : undefined;
+        const descuento = detalle.TDS_ID ? descuentosPorId.get(String(detalle.TDS_ID)) : undefined;
+        const tipo = descuento ? 'Deduccion' : 'Ingreso';
+        const codigo = ingreso?.TIS_CODIGO || descuento?.TDS_CODIGO || (detalle.KRE_ID ? `KPI-${detalle.KRE_ID}` : 'N/A');
+        const nombre = ingreso?.TIS_NOMBRE || descuento?.TDS_NOMBRE || (detalle.KRE_ID ? 'Resultado KPI' : 'Concepto sin clasificar');
+
+        return {
+          tipo,
+          codigo,
+          nombre,
+          referencia: detalle.DET_REFERENCIA,
+          monto: Number(detalle.DET_MONTO || 0),
+        };
+      })
+      .sort((a, b) => a.tipo.localeCompare(b.tipo) || a.nombre.localeCompare(b.nombre));
+
+  const descargarBoletaPago = (fila: FilaPlanilla) => {
+    const periodo = periodosPorId.get(String(fila.nomina.PER_ID));
+    const empleado = empleadosPorId.get(String(fila.nomina.EMP_ID));
+    const conceptos = obtenerConceptosBoleta(fila.nomina.NOM_ID);
+    const periodoTexto = periodo
+      ? `${formatearFecha(periodo.PER_FECHA_INICIO)} al ${formatearFecha(periodo.PER_FECHA_FIN)}`
+      : `Periodo #${fila.nomina.PER_ID}`;
+    const filename = `boleta_pago_${fila.empleadoId}_${sanitizarNombreArchivo(fila.colaborador || 'empleado')}.pdf`;
+    const camposEmpleado = [
+      { label: 'Nombre Completo:', value: fila.colaborador },
+      { label: 'No. Empleado:', value: String(fila.empleadoId) },
+      { label: 'DPI / NIT:', value: [empleado?.EMP_DPI, empleado?.EMP_NIT].filter(Boolean).join(' / ') },
+      { label: 'Cargo / Puesto:', value: fila.puesto },
+      { label: 'Departamento:', value: fila.departamento },
+      { label: 'Fecha de Ingreso:', value: formatearFecha(empleado?.EMP_FECHA_CONTRATACION) },
+    ].filter(({ value }) => value && value !== 'Sin puesto' && value !== 'Sin departamento');
+    const esConceptoPlantillaCubierto = (concepto: ReturnType<typeof obtenerConceptosBoleta>[number]) => {
+      const codigo = normalizarCodigo(`${concepto.codigo} ${concepto.nombre}`);
+      return esCodigo(codigo, [
+        'SALARIO',
+        'SUELDO',
+        'EXTRA',
+        'COMISION',
+        'KPI',
+        'BONIF',
+        'BONIFICACION',
+        'INCENTIVO',
+        'IGSS',
+        'ISR',
+        'PRESTAMO',
+        'ANTICIPO',
+        'JUD',
+        'EMBARGO',
+        'PENSION',
+      ]);
+    };
+    const conceptosAdicionales = conceptos
+      .filter((concepto) => !esConceptoPlantillaCubierto(concepto))
+      .map((concepto) => [`${concepto.codigo} - ${concepto.nombre}`, concepto.monto, concepto.tipo] as const);
+    const ingresosPlantilla = [
+      ['Salario base', fila.salarioOrdinario || fila.salarioBase],
+      ['Horas extra', fila.sueldoExtraordinario],
+      ['Comisiones', fila.comisiones],
+      ['Bono incentivo', fila.bonificacion],
+      ...conceptosAdicionales
+        .filter(([, , tipo]) => tipo === 'Ingreso')
+        .map(([label, monto]) => [label, monto] as [string, number]),
+    ].filter(([, value]) => Number(value) > 0) as Array<[string, number]>;
+    const deduccionesPlantilla = [
+      ['IGSS', fila.igss],
+      ['ISR', fila.isr],
+      ['Prestamo empresa', fila.prestamo],
+      ['Anticipo de salario', fila.anticipo],
+      ['Descuentos judiciales', fila.descuentosJudiciales],
+      ...conceptosAdicionales
+        .filter(([, , tipo]) => tipo === 'Deduccion')
+        .map(([label, monto]) => [label, monto] as [string, number]),
+    ].filter(([, value]) => Number(value) > 0) as Array<[string, number]>;
+    const camposNomina = [
+      { label: 'Fecha Generacion:', value: formatearFecha(fila.nomina.NOM_FECHA_GENERACION) },
+      { label: 'Dias Trabajados:', value: String(fila.diasLaborados || 'N/A') },
+      { label: 'Estado:', value: obtenerTextoEstadoNomina(fila.nomina.NOM_ESTADO) },
+      { label: 'Salario Base:', value: formatearMoneda(fila.salarioBase) },
+    ];
+
+    downloadPayStubPdf({
+      filename,
+      companyName: 'EMPRESA "Innova", S.A.',
+      companyNit: '123456-6',
+      title: 'BOLETA DE PAGO',
+      correlativo: String(fila.nomina.NOM_ID),
+      periodo: periodoTexto,
+      fechaPago: formatearFecha(periodo?.PER_FECHA_PAGO) || 'N/A',
+      employeeFields: camposEmpleado,
+      payrollFields: camposNomina,
+      incomeItems: ingresosPlantilla.map(([label, amount]) => ({ label, amount: formatearMoneda(amount) })),
+      deductionItems: deduccionesPlantilla.map(([label, amount]) => ({ label, amount: formatearMoneda(amount) })),
+      totalIncome: formatearMoneda(fila.totalIngresos),
+      totalDeductions: formatearMoneda(fila.totalEgresos),
+      netPay: formatearMoneda(fila.liquido),
+      amountInWords: montoEnLetras(fila.liquido),
+      employeeName: fila.colaborador,
+      employeeDpi: String(empleado?.EMP_DPI ?? ''),
+    });
+  };
+
   const obtenerChipEstado = (estado: string) => {
     if (estado === 'A' || estado === 'Activo')
       return <Chip label="Aprobada" color="success" size="small" />;
@@ -937,6 +1111,7 @@ function NominaCRUD() {
                   <TableCell align="right"><strong>Liquido</strong></TableCell>
                   <TableCell><strong>Estado</strong></TableCell>
                   <TableCell><strong>Revision</strong></TableCell>
+                  <TableCell><strong>Acciones</strong></TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -963,7 +1138,7 @@ function NominaCRUD() {
                   return (
                     <Fragment key={departamento}>
                       <TableRow key={`${departamento}-header`}>
-                        <TableCell colSpan={20} sx={{ fontWeight: 'bold', backgroundColor: '#f5f5f5' }}>
+                        <TableCell colSpan={22} sx={{ fontWeight: 'bold', backgroundColor: '#f5f5f5' }}>
                           {departamento.toUpperCase()}
                         </TableCell>
                       </TableRow>
@@ -994,6 +1169,18 @@ function NominaCRUD() {
                               ? <Chip label="Revisar" color="error" size="small" />
                               : <Chip label="OK" color="success" size="small" />}
                           </TableCell>
+                          <TableCell>
+                            <Button
+                              size="small"
+                              variant="outlined"
+                              startIcon={<PictureAsPdfIcon />}
+                              onClick={() => descargarBoletaPago(fila)}
+                              disabled={fila.conceptos === 0}
+                              sx={{ whiteSpace: 'nowrap' }}
+                            >
+                              Boleta PDF
+                            </Button>
+                          </TableCell>
                         </TableRow>
                       ))}
                       <TableRow key={`${departamento}-subtotal`} sx={{ backgroundColor: '#fafafa' }}>
@@ -1014,7 +1201,7 @@ function NominaCRUD() {
                         <TableCell align="right"><strong>{formatearMoneda(subtotal.otrosEgresos)}</strong></TableCell>
                         <TableCell align="right"><strong>{formatearMoneda(subtotal.totalEgresos)}</strong></TableCell>
                         <TableCell align="right"><strong>{formatearMoneda(subtotal.liquido)}</strong></TableCell>
-                        <TableCell colSpan={2} />
+                        <TableCell colSpan={3} />
                       </TableRow>
                     </Fragment>
                   );
@@ -1039,7 +1226,7 @@ function NominaCRUD() {
                   <TableCell align="right"><strong>{formatearMoneda(totalesPlanilla.otrosEgresos)}</strong></TableCell>
                   <TableCell align="right"><strong>{formatearMoneda(totalesPlanilla.totalEgresos)}</strong></TableCell>
                   <TableCell align="right"><strong>{formatearMoneda(totalesPlanilla.liquido)}</strong></TableCell>
-                  <TableCell colSpan={2} />
+                  <TableCell colSpan={3} />
                 </TableRow>
               </TableFooter>
             </Table>
