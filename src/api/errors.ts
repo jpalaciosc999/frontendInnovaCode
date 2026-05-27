@@ -12,5 +12,9 @@ export const getApiErrorMessage = (err: unknown, fallback: string) => {
     return 'Oracle no encontro la secuencia usada para generar el ID. Revisa en backend el NEXTVAL usado en este endpoint y crea esa secuencia en la base de datos.';
   }
 
+  if (message.includes('ORA-02291')) {
+    return 'No se pudo guardar porque una referencia no existe en la base de datos. En liquidaciones, verifica que el empleado seleccionado exista y que el backend reciba el EMP_ID correcto.';
+  }
+
   return message;
 };

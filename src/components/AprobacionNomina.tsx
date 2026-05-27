@@ -224,6 +224,7 @@ function AprobacionNomina() {
   const periodoActivoId = periodoRevisionId || String(periodosPendientes[0]?.PER_ID ?? '');
   const periodoActivo = periodos.find((periodo) => String(periodo.PER_ID) === periodoActivoId);
   const periodoActivoEnRevision = esPeriodoEnRevision(periodoActivo?.PER_ESTADO);
+  const periodoActivoProcesable = ['ABIERTO', 'EN_REVISION'].includes(normalizePeriodoEstado(periodoActivo?.PER_ESTADO || ''));
 
   const nominasPendientesPeriodo = useMemo(
     () => pendientes.filter((nomina) => periodoActivoId && String(nomina.PER_ID) === periodoActivoId),
@@ -384,7 +385,7 @@ function AprobacionNomina() {
   }), [filasPlanilla]);
 
   const planillaTieneInconsistencias = filasPlanilla.some((fila) => fila.conceptos === 0 || fila.duplicados > 0 || !fila.cuadra);
-  const puedeAprobarPlanilla = filasPlanilla.length > 0 && periodoActivoEnRevision && !planillaTieneInconsistencias;
+  const puedeAprobarPlanilla = filasPlanilla.length > 0 && periodoActivoProcesable && !planillaTieneInconsistencias;
 
   const obtenerEtiquetaPeriodo = (periodo?: Periodo) =>
     periodo
@@ -417,8 +418,8 @@ function AprobacionNomina() {
         setError('No hay nominas pendientes para este periodo.');
         return;
       }
-      if (!periodoActivo || !esPeriodoEnRevision(periodoActivo.PER_ESTADO)) {
-        setError('Solo puedes aprobar o rechazar planillas de periodos en revision.');
+      if (!periodoActivo || !periodoActivoProcesable) {
+        setError('Solo puedes aprobar o rechazar planillas de periodos abiertos o en revision.');
         return;
       }
 
@@ -506,7 +507,7 @@ function AprobacionNomina() {
               variant="outlined"
               color="error"
               startIcon={<CancelIcon />}
-              disabled={procesando || filasPlanilla.length === 0 || !periodoActivoEnRevision}
+              disabled={procesando || filasPlanilla.length === 0 || !periodoActivoProcesable}
               onClick={() => cambiarEstadoPlanilla('R')}
             >
               Rechazar planilla
@@ -522,7 +523,7 @@ function AprobacionNomina() {
 
         {filasPlanilla.length > 0 && !periodoActivoEnRevision && (
           <Alert severity="warning" sx={{ mb: 2 }}>
-            Hay nominas pendientes en este periodo, pero el periodo no esta En revision. Contabilidad debe enviarlo nuevamente al gerente para sincronizar el estado del periodo.
+            Hay nominas pendientes en este periodo, pero el periodo aun esta Abierto. Al aprobar o rechazar se sincronizara el estado del periodo.
           </Alert>
         )}
 

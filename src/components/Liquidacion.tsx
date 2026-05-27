@@ -93,6 +93,20 @@ function LiquidacionCRUD() {
     () => new Map(empleados.map((empleado) => [String(empleado.EMP_ID), empleado])),
     [empleados]
   );
+  const empleadoSeleccionado = empleadosPorId.get(String(form.emp_id));
+  const empleadosLiquidadosIds = useMemo(
+    () => new Set(datos.map((liquidacion) => String(liquidacion.EMP_ID))),
+    [datos]
+  );
+  const empleadosDisponibles = useMemo(
+    () => empleados.filter((empleado) => {
+      const esLiquidado = empleadosLiquidadosIds.has(String(empleado.EMP_ID))
+        || Boolean(empleado.EMP_FECHA_LIQUIDACION)
+        || String(empleado.EMP_ESTADO || 'A').toUpperCase() === 'L';
+      return !esLiquidado || (modoEdicion && String(empleado.EMP_ID) === String(form.emp_id));
+    }),
+    [empleados, empleadosLiquidadosIds, modoEdicion, form.emp_id]
+  );
 
   useEffect(() => {
     const debeCalcular = form.emp_id && form.liq_fecha_salida && form.liq_tipo_retiro;
@@ -155,6 +169,11 @@ function LiquidacionCRUD() {
       return false;
     }
 
+    if (!empleadosPorId.has(String(form.emp_id))) {
+      setError('El empleado seleccionado no existe o ya no esta disponible. Recarga la pantalla y selecciona nuevamente.');
+      return false;
+    }
+
     if (Number(form.liq_liquidacion || 0) <= 0) {
       setError('Primero espera a que el sistema calcule la liquidacion');
       return false;
@@ -181,7 +200,7 @@ function LiquidacionCRUD() {
       await cargarDatos();
       return true;
     } catch (err: unknown) {
-      setError(getApiErrorMessage(err, 'Error guardando liquidacion'));
+      setError(`${getApiErrorMessage(err, 'Error guardando liquidacion')} ID empleado enviado: ${form.emp_id}.`);
       return false;
     }
   };
@@ -263,7 +282,7 @@ function LiquidacionCRUD() {
               <InputLabel>Empleado</InputLabel>
               <Select name="emp_id" value={String(form.emp_id)} label="Empleado" onChange={handleChange}>
                 <MenuItem value="">Seleccione empleado</MenuItem>
-                {empleados.map((empleado) => (
+                {empleadosDisponibles.map((empleado) => (
                   <MenuItem key={empleado.EMP_ID} value={String(empleado.EMP_ID)}>
                     {obtenerNombreEmpleado(empleado)}
                   </MenuItem>
@@ -299,6 +318,14 @@ function LiquidacionCRUD() {
           {resumenCalculo && (
             <Grid size={{ xs: 12 }}>
               <Alert severity="success">{calculando ? 'Calculando liquidacion...' : resumenCalculo}</Alert>
+            </Grid>
+          )}
+
+          {empleadoSeleccionado && (
+            <Grid size={{ xs: 12 }}>
+              <Alert severity="info">
+                Empleado seleccionado: #{empleadoSeleccionado.EMP_ID} - {obtenerNombreEmpleado(empleadoSeleccionado)}
+              </Alert>
             </Grid>
           )}
 

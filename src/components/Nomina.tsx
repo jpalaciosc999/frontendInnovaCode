@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import type { SelectChangeEvent } from '@mui/material/Select';
 import {
   Alert,
@@ -44,6 +44,7 @@ import type { Puesto } from '../interfaces/puestos';
 import type { Departamento } from '../interfaces/departamentos';
 import type { Ingreso } from '../interfaces/tipoIngresos';
 import type { Descuento } from '../interfaces/descuentos';
+import type { Liquidacion } from '../interfaces/liquidacion';
 import {
   obtenerNominas,
   actualizarNomina,
@@ -57,6 +58,7 @@ import { obtenerPuestos } from '../services/puestos.service';
 import { obtenerDepartamentos } from '../services/departamentos.service';
 import { obtenerIngresos } from '../services/tipoIngresos.service';
 import { obtenerDescuentos } from '../services/descuentos.service';
+import { obtenerLiquidaciones } from '../services/liquidacion.service';
 import { getApiErrorMessage } from '../api/errors';
 import { formatearFecha, formatearMoneda, obtenerNombreEmpleado } from '../utils/relations';
 import {
@@ -133,15 +135,6 @@ const obtenerFechaLocalInput = () => {
   const ahora = new Date();
   const local = new Date(ahora.getTime() - ahora.getTimezoneOffset() * 60_000);
   return local.toISOString().slice(0, 10);
-};
-
-const fechaEnPeriodo = (fecha: string | undefined, periodo?: Periodo) => {
-  if (!fecha || !periodo?.PER_FECHA_INICIO || !periodo?.PER_FECHA_FIN) return false;
-
-  const salida = toInputDate(fecha);
-  const inicio = toInputDate(periodo.PER_FECHA_INICIO);
-  const fin = toInputDate(periodo.PER_FECHA_FIN);
-  return salida >= inicio && salida <= fin;
 };
 
 const initialGeneracionForm: GeneracionNominaForm = {
@@ -259,6 +252,7 @@ function NominaCRUD() {
   const [departamentos, setDepartamentos] = useState<Departamento[]>([]);
   const [ingresos, setIngresos] = useState<Ingreso[]>([]);
   const [descuentos, setDescuentos] = useState<Descuento[]>([]);
+  const [liquidaciones, setLiquidaciones] = useState<Liquidacion[]>([]);
   const [planillaPeriodoId, setPlanillaPeriodoId] = useState('');
 
   const cargarDatos = async () => {
@@ -274,6 +268,7 @@ function NominaCRUD() {
         departamentosData,
         ingresosData,
         descuentosData,
+        liquidacionesData,
       ] = await Promise.all([
         obtenerNominas(),
         obtenerDetallesNomina(),
@@ -283,6 +278,7 @@ function NominaCRUD() {
         obtenerDepartamentos(),
         obtenerIngresos(),
         obtenerDescuentos(),
+        obtenerLiquidaciones(),
       ]);
       setDatos(nominasData);
       setDetalles(detallesData);
@@ -292,6 +288,7 @@ function NominaCRUD() {
       setDepartamentos(departamentosData);
       setIngresos(ingresosData);
       setDescuentos(descuentosData);
+      setLiquidaciones(liquidacionesData);
     } catch (err: unknown) {
       setError(getApiErrorMessage(err, 'Error cargando datos de nomina'));
     } finally {
@@ -336,15 +333,25 @@ function NominaCRUD() {
   const periodoPlanillaLectura = ['APROBADO', 'CERRADO'].includes(normalizePeriodoEstado(periodoPlanilla?.PER_ESTADO || ''));
   const periodoActivo = periodoPlanilla || periodoGeneracion;
 
+  const empleadosLiquidadosIds = useMemo(
+    () => new Set(liquidaciones.map((liquidacion) => String(liquidacion.EMP_ID))),
+    [liquidaciones]
+  );
+
+  const empleadoEstaLiquidado = useCallback((empleado?: Empleado) => {
+    if (!empleado) return false;
+    const estado = String(empleado.EMP_ESTADO || 'A').toUpperCase();
+    return Boolean(empleado.EMP_FECHA_LIQUIDACION)
+      || estado === 'L'
+      || empleadosLiquidadosIds.has(String(empleado.EMP_ID));
+  }, [empleadosLiquidadosIds]);
+
   const empleadosGenerables = useMemo(() => {
-    const periodo = periodosPorId.get(String(generacionForm.per_id));
     return empleados.filter((empleado) => {
       const estado = String(empleado.EMP_ESTADO || 'A').toUpperCase();
-      const estaLiquidado = Boolean(empleado.EMP_FECHA_LIQUIDACION) || estado === 'L';
-      if (!estaLiquidado && estado === 'A') return true;
-      return fechaEnPeriodo(empleado.EMP_FECHA_LIQUIDACION, periodo);
+      return estado === 'A' && !empleadoEstaLiquidado(empleado);
     });
-  }, [empleados, periodosPorId, generacionForm.per_id]);
+  }, [empleados, empleadoEstaLiquidado]);
 
   useEffect(() => {
     if (!generacionForm.empleado_id) return;
@@ -467,8 +474,9 @@ function NominaCRUD() {
   const filasPlanilla = useMemo(
     () => datos
       .filter((nomina) => planillaPeriodoId && String(nomina.PER_ID) === String(planillaPeriodoId))
+      .filter((nomina) => !empleadoEstaLiquidado(empleadosPorId.get(String(nomina.EMP_ID))))
       .map(construirFilaPlanilla),
-    [datos, detalles, empleadosPorId, puestosPorId, departamentosPorId, periodosPorId, ingresosPorId, descuentosPorId, planillaPeriodoId, duplicadosPorNomina]
+    [datos, detalles, empleadosPorId, puestosPorId, departamentosPorId, periodosPorId, ingresosPorId, descuentosPorId, planillaPeriodoId, duplicadosPorNomina, empleadoEstaLiquidado]
   );
 
   const planillaPorDepartamento = useMemo(() => {
@@ -573,12 +581,20 @@ function NominaCRUD() {
       setGenerando(true);
       setError('');
       setMensaje('');
+      const empleadosObjetivo = generacionForm.empleado_id
+        ? [Number(generacionForm.empleado_id)]
+        : empleadosGenerables.map((empleado) => Number(empleado.EMP_ID));
+
+      if (empleadosObjetivo.length === 0) {
+        setError('No hay empleados activos sin liquidacion para generar nomina en este periodo.');
+        return;
+      }
 
       const respuesta = await generarNominas({
         per_id: Number(generacionForm.per_id),
         fecha_generacion: generacionForm.fecha_generacion,
         estado: 'B',
-        emp_ids: generacionForm.empleado_id ? [Number(generacionForm.empleado_id)] : undefined,
+        emp_ids: empleadosObjetivo,
         recalcular,
       });
 
@@ -1044,7 +1060,6 @@ function NominaCRUD() {
                 {empleadosGenerables.map((empleado) => (
                   <MenuItem key={empleado.EMP_ID} value={String(empleado.EMP_ID)}>
                     {obtenerNombreEmpleado(empleado)}
-                    {empleado.EMP_FECHA_LIQUIDACION || String(empleado.EMP_ESTADO || 'A').toUpperCase() === 'L' ? ' - liquidado en este periodo' : ''}
                   </MenuItem>
                 ))}
               </Select>
