@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import type { MouseEvent, ReactNode } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import {
@@ -14,7 +14,6 @@ import {
   Box,
   Divider,
   Collapse,
-  Chip,
 } from '@mui/material';
 
 import MenuIcon from '@mui/icons-material/Menu';
@@ -50,13 +49,8 @@ import SummarizeIcon from '@mui/icons-material/Summarize';
 import ApprovalIcon from '@mui/icons-material/Approval';
 import HealthAndSafetyIcon from '@mui/icons-material/HealthAndSafety';
 import GavelIcon from '@mui/icons-material/Gavel';
-import {
-  AUTH_USER_CHANGED_EVENT,
-  appViews,
-  getCurrentUserRole,
-  roleLabels,
-  roleOrder,
-} from '../config/roleViews';
+import PlaylistAddCheckIcon from '@mui/icons-material/PlaylistAddCheck';
+import { appViews } from '../config/roleViews';
 import { useAuth } from '../context/AuthContext';
 import { useUnsavedChanges } from '../context/UnsavedChangesContext';
 
@@ -149,14 +143,75 @@ const reportViewKeys = new Set([
   'dashboard-ejecutivo',
 ]);
 
+const processSections: Array<{ key: string; text: string; icon: ReactNode; viewKeys: string[] }> = [
+  {
+    key: 'guia',
+    text: 'Flujo de nomina',
+    icon: <PlaylistAddCheckIcon />,
+    viewKeys: [
+      'registro-empleados',
+      'empleado-contrato',
+      'cuenta-bancaria',
+      'control-laboral',
+      'periodos',
+      'tipo-ingresos',
+      'descuentos',
+      'prestamos',
+      'nomina',
+      'aprobacion-nomina',
+    ],
+  },
+  {
+    key: 'personas',
+    text: 'Personas y estructura',
+    icon: <PeopleIcon />,
+    viewKeys: [
+      'departamentos',
+      'puestos',
+      'sucursales',
+      'horarios',
+      'tipo-contrato',
+      'kpis',
+      'kpi-resultado',
+      'suspensiones-igss',
+    ],
+  },
+  {
+    key: 'nomina',
+    text: 'Operaciones de pago',
+    icon: <PaymentsIcon />,
+    viewKeys: ['nomina-asignaciones', 'nomina-detalle', 'liquidacion', 'calculadora-igss', 'calculadora-isr'],
+  },
+  {
+    key: 'administracion',
+    text: 'Administracion',
+    icon: <AdminPanelSettingsIcon />,
+    viewKeys: ['registro-usuarios', 'asignacion-roles', 'asignacion-permisos', 'roles-permisos'],
+  },
+  {
+    key: 'auditoria',
+    text: 'Auditoria y trazabilidad',
+    icon: <HistoryIcon />,
+    viewKeys: ['bitacora', 'usuario-bitacora'],
+  },
+  {
+    key: 'asistencia',
+    text: 'Asistencia',
+    icon: <FactCheckIcon />,
+    viewKeys: ['marcaje', 'resumen-marcaje'],
+  },
+];
+
 const buildMenuSections = (): MenuSectionType[] =>
-  roleOrder
-    .map((role) => ({
-      key: role,
-      text: `Rol ${roleLabels[role]}`,
-      icon: <FolderIcon />,
-      items: appViews
-        .filter((view) => view.roles.includes(role) && !reportViewKeys.has(view.key))
+  processSections
+    .map((section) => ({
+      key: section.key,
+      text: section.text,
+      icon: section.icon,
+      items: section.viewKeys
+        .map((key) => appViews.find((view) => view.key === key))
+        .filter((view): view is (typeof appViews)[number] => view !== undefined)
+        .filter((view) => !reportViewKeys.has(view.key))
         .map((view) => ({
           text: view.text,
           path: view.path,
@@ -167,16 +222,13 @@ const buildMenuSections = (): MenuSectionType[] =>
 
 function Navbar() {
   const [open, setOpen] = useState(false);
-  const [currentRole, setCurrentRole] = useState(getCurrentUserRole());
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
-    EMPLEADO: true,
-    RRHH: true,
-    ADMIN: true,
-    CONTABILIDAD: true,
-    GERENTE: true,
-    AUDITORIA: true,
-    ANALISTA_NOMINA: true,
-    SUPERVISOR_ASISTENCIA: true,
+    guia: true,
+    personas: false,
+    nomina: false,
+    administracion: false,
+    auditoria: false,
+    asistencia: false,
     REPORTES: true,
   });
 
@@ -184,17 +236,6 @@ function Navbar() {
   const menuSections = useMemo(() => buildMenuSections(), []);
   const { requestNavigation } = useUnsavedChanges();
 
-  useEffect(() => {
-    const syncCurrentRole = () => setCurrentRole(getCurrentUserRole());
-
-    window.addEventListener(AUTH_USER_CHANGED_EVENT, syncCurrentRole);
-    window.addEventListener('storage', syncCurrentRole);
-
-    return () => {
-      window.removeEventListener(AUTH_USER_CHANGED_EVENT, syncCurrentRole);
-      window.removeEventListener('storage', syncCurrentRole);
-    };
-  }, []);
   const { canAccessPath, logout, user } = useAuth();
   const canSeeReportes = canAccessPath('/reportes') || reportPaths.some((path) => canAccessPath(path));
   const visibleSections = menuSections
@@ -306,13 +347,9 @@ function Navbar() {
             <Typography variant="h6" sx={{ fontWeight: 700 }}>
               Menu principal
             </Typography>
-            {currentRole ? (
-              <Chip size="small" label={`Rol: ${roleLabels[currentRole]}`} sx={{ mt: 1 }} />
-            ) : (
-              <Typography variant="body2" color="text.secondary">
-                Navegacion del sistema
-              </Typography>
-            )}
+            <Typography variant="body2" color="text.secondary">
+              Navegacion por proceso
+            </Typography>
           </Box>
 
           <Divider />

@@ -493,7 +493,6 @@ function PruebaAxios() {
       !form.emp_dpi.trim() ||
       !form.emp_nit.trim() ||
       !form.emp_telefono.trim() ||
-      !form.emp_fecha_contratacion.trim() ||
       !form.emp_estado.trim() ||
       !form.hor_id ||
       !form.sed_id ||
@@ -550,9 +549,11 @@ function PruebaAxios() {
 
       if (!validarFormulario()) return false;
 
+      const fechaInicioContrato = form.emp_fecha_inicio_contrato;
       const payload: EmpleadoForm = {
         ...form,
-        emp_fecha_inicio_contrato: form.emp_fecha_inicio_contrato || form.emp_fecha_contratacion
+        emp_fecha_contratacion: fechaInicioContrato,
+        emp_fecha_inicio_contrato: fechaInicioContrato
       };
 
       if (modoEdicion && empleadoId !== null) {
@@ -880,19 +881,6 @@ function PruebaAxios() {
           </Grid>
 
           <Grid size={{ xs: 12, md: 6 }}>
-            <TextField
-              fullWidth
-              label="Fecha de contratación"
-              name="emp_fecha_contratacion"
-              type="date"
-              value={form.emp_fecha_contratacion}
-              onChange={handleChange}
-              slotProps={{ inputLabel: { shrink: true } }}
-              required
-            />
-          </Grid>
-
-          <Grid size={{ xs: 12, md: 6 }}>
             <FormControl fullWidth required>
               <InputLabel>Estado</InputLabel>
               <Select
@@ -1014,9 +1002,9 @@ function PruebaAxios() {
               label="Inicio de contrato"
               name="emp_fecha_inicio_contrato"
               type="date"
-              value={form.emp_fecha_inicio_contrato || form.emp_fecha_contratacion}
+              value={form.emp_fecha_inicio_contrato}
               onChange={handleChange}
-              helperText="Usa esta fecha cuando el empleado cambie a un nuevo contrato"
+              helperText="Esta fecha se usara como fecha de contratacion inicial"
               slotProps={{ inputLabel: { shrink: true } }}
               required
             />

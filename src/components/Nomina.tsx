@@ -12,6 +12,11 @@ import {
   Paper,
   Select,
   Snackbar,
+  Stack,
+  Step,
+  StepContent,
+  StepLabel,
+  Stepper,
   Table,
   TableBody,
   TableCell,
@@ -28,6 +33,8 @@ import DownloadIcon from '@mui/icons-material/Download';
 import SummarizeIcon from '@mui/icons-material/Summarize';
 import DeleteIcon from '@mui/icons-material/Delete';
 import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import ErrorOutlinedIcon from '@mui/icons-material/ErrorOutlined';
 
 import type { Nomina, NominaForm } from '../interfaces/nomina';
 import type { NominaDetalle } from '../interfaces/nomina-detalle';
@@ -584,6 +591,7 @@ function NominaCRUD() {
       ].filter(Boolean);
 
       setMensaje(respuesta.mensaje || respuesta.message || `${recalcular ? 'Recalculo' : 'Generacion'} finalizada${partes.length ? `: ${partes.join(', ')}` : ''}`);
+      setPlanillaPeriodoId(String(generacionForm.per_id));
       await cargarDatos();
     } catch (err: unknown) {
       setError(getApiErrorMessage(err, 'Error generando nomina del periodo'));
@@ -880,6 +888,48 @@ function NominaCRUD() {
     return <Chip label={estado || 'Sin estado'} size="small" />;
   };
 
+  const guiaPasos = [
+    {
+      label: 'Selecciona el periodo',
+      description: periodoGeneracion
+        ? `Periodo listo: ${obtenerEtiquetaPeriodo(periodoGeneracion)}`
+        : 'Elige un periodo abierto y confirma la fecha de generacion.',
+      completed: Boolean(generacionForm.per_id && generacionForm.fecha_generacion),
+      error: periodosAbiertos.length === 0,
+    },
+    {
+      label: 'Genera la planilla',
+      description: planillaPeriodoId
+        ? `${filasPlanilla.length} nomina(s) cargadas para revision.`
+        : 'Genera para todos los elegibles o para un empleado especifico.',
+      completed: filasPlanilla.length > 0,
+      error: Boolean(planillaPeriodoId && filasPlanilla.length === 0),
+    },
+    {
+      label: 'Revisa totales',
+      description: planillaTieneInconsistencias
+        ? 'Hay nominas sin detalle, duplicadas o descuadradas.'
+        : filasPlanilla.length > 0
+          ? `Liquido total: ${formatearMoneda(totalesPlanilla.liquido)}`
+          : 'Selecciona una planilla para ver ingresos, egresos y liquido.',
+      completed: filasPlanilla.length > 0 && !planillaTieneInconsistencias,
+      error: planillaTieneInconsistencias,
+    },
+    {
+      label: 'Enviar o descargar',
+      description: planillaPuedeExportar
+        ? 'La planilla esta aprobada y lista para descargar CSV.'
+        : planillaPuedeEnviar
+          ? 'La planilla esta lista para enviarse a aprobacion gerencial.'
+          : 'Cuando todo cuadre, envia a aprobacion. Al aprobarse, podras descargar CSV.',
+      completed: planillaPuedeExportar,
+      error: false,
+    },
+  ];
+
+  const pasoActivo = Math.max(0, guiaPasos.findIndex((paso) => !paso.completed));
+  const guiaCompletada = guiaPasos.every((paso) => paso.completed);
+
   if (cargando) {
     return (
       <Box sx={{ p: 3 }}>
@@ -890,11 +940,11 @@ function NominaCRUD() {
 
   return (
     <Box sx={{ py: 2 }}>
-      <Paper elevation={3} sx={{ p: 3, mb: 3 }}>
+      <Paper elevation={2} sx={{ p: { xs: 2, md: 3 }, mb: 3 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 3, flexWrap: 'wrap' }}>
           <CalculateIcon color="primary" />
           <Typography variant="h4" sx={{ fontWeight: 'bold' }}>
-            Generar Nomina
+            Asistente para generar nomina
           </Typography>
           {periodoActivo && (
             <Box sx={{ ml: 'auto' }}>
@@ -903,6 +953,24 @@ function NominaCRUD() {
           )}
         </Box>
 
+        <Stepper activeStep={guiaCompletada ? guiaPasos.length : pasoActivo} orientation="vertical" sx={{ mb: 3 }}>
+          {guiaPasos.map((paso) => (
+            <Step key={paso.label} completed={paso.completed}>
+              <StepLabel
+                error={paso.error}
+                icon={paso.error ? <ErrorOutlinedIcon color="error" /> : paso.completed ? <CheckCircleIcon color="success" /> : undefined}
+              >
+                {paso.label}
+              </StepLabel>
+              <StepContent>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                  {paso.description}
+                </Typography>
+              </StepContent>
+            </Step>
+          ))}
+        </Stepper>
+
         {periodoActivo && periodoPlanillaLectura && (
           <Alert severity="warning" sx={{ mb: 2 }}>
             Período cerrado o aprobado - sólo lectura. No se pueden generar ni editar registros de nómina.
@@ -910,7 +978,7 @@ function NominaCRUD() {
         )}
 
         <Alert severity="info" sx={{ mb: 2 }}>
-          Genera automaticamente las nominas del periodo en estado Borrador. Luego revisa los conceptos y usa Enviar para pasarlas a Pendiente de aprobacion gerencial.
+          Elige el periodo, genera la planilla en borrador y revisa que cada colaborador tenga conceptos y totales cuadrados.
         </Alert>
 
         <Grid container spacing={2}>
@@ -972,7 +1040,7 @@ function NominaCRUD() {
           </Grid>
 
           <Grid size={{ xs: 12 }}>
-            <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
               <Button
                 variant="contained"
                 startIcon={<CalculateIcon />}
@@ -991,21 +1059,21 @@ function NominaCRUD() {
               >
                 Recalcular planilla
               </Button>
-            </Box>
+            </Stack>
           </Grid>
         </Grid>
       </Paper>
 
-      <Paper elevation={3} sx={{ p: 3, mb: 3 }}>
+      <Paper elevation={2} sx={{ p: { xs: 2, md: 3 }, mb: 3 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 3 }}>
           <SummarizeIcon color="primary" />
           <Typography variant="h4" sx={{ fontWeight: 'bold' }}>
-            Planilla del Periodo
+            Revision de planilla
           </Typography>
         </Box>
 
         <Alert severity="info" sx={{ mb: 2 }}>
-          Esta es la vista operativa final de nomina. Desde aqui se revisa la planilla, se envia al gerente y se descarga el CSV cuando todo esta aprobado.
+          Cuando la revision marque OK, envia la planilla al gerente. Si ya esta aprobada, descarga el CSV para pago.
         </Alert>
 
         <Grid container spacing={2} sx={{ alignItems: 'center', mb: 2 }}>
