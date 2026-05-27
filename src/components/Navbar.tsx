@@ -377,14 +377,14 @@ function Navbar() {
 
             {canSeeReportes && (
               <Box>
-                <ListItemButton onClick={() => toggleSection('REPORTES')} selected={false} sx={getMenuItemSx(false)}>
+                <ListItemButton onClick={() => toggleSection('Reportes')} selected={false} sx={getMenuItemSx(false)}>
                   <ListItemIcon sx={{ color: 'inherit', minWidth: 40 }}>
                     <SummarizeIcon />
                   </ListItemIcon>
-                  <ListItemText primary="REPORTES" />
-                  {openSections['REPORTES'] ? <ExpandLess /> : <ExpandMore />}
+                  <ListItemText primary="Reportes" />
+                  {openSections['Reportes'] ? <ExpandLess /> : <ExpandMore />}
                 </ListItemButton>
-                <Collapse in={openSections['REPORTES']} timeout="auto" unmountOnExit>
+                <Collapse in={openSections['Reportes']} timeout="auto" unmountOnExit>
                   <List component="div" disablePadding>
                     <ListItemButton
                       component={NavLink}
