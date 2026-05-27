@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { ControlLaboral, ControlLaboralForm } from '../interfaces/controlLaboral';
 import type { Empleado } from '../interfaces/empleados';
+import type { Liquidacion } from '../interfaces/liquidacion';
 import {
   obtenerControles,
   crearControl,
@@ -8,6 +9,7 @@ import {
   eliminarControl
 } from '../services/controlLaboral.service';
 import { obtenerEmpleados } from '../services/empleados.service';
+import { obtenerLiquidaciones } from '../services/liquidacion.service';
 
 import {
   Alert,
@@ -107,6 +109,7 @@ const getInclusiveDays = (start?: string, end?: string) => {
 function ControlLaboralPage() {
   const [datos, setDatos] = useState<ControlLaboral[]>([]);
   const [empleados, setEmpleados] = useState<Empleado[]>([]);
+  const [liquidaciones, setLiquidaciones] = useState<Liquidacion[]>([]);
   const [cargando, setCargando] = useState(true);
   const [cargandoEmpleados, setCargandoEmpleados] = useState(false);
   const [error, setError] = useState('');
@@ -134,10 +137,15 @@ function ControlLaboralPage() {
     try {
       setCargandoEmpleados(true);
       setEmpleadosError('');
-      const data = await obtenerEmpleados();
-      setEmpleados(data);
+      const [empleadosData, liquidacionesData] = await Promise.all([
+        obtenerEmpleados(),
+        obtenerLiquidaciones(),
+      ]);
+      setEmpleados(empleadosData);
+      setLiquidaciones(liquidacionesData);
     } catch (err: any) {
       setEmpleados([]);
+      setLiquidaciones([]);
       setEmpleadosError(
         'No se pudieron cargar empleados. Puedes ingresar el ID manualmente. ' +
         (err.response?.data?.error || err.message)
@@ -201,6 +209,22 @@ function ControlLaboralPage() {
   const limpiarFiltros = () => {
     setFilters(initialFilters);
   };
+
+  const empleadosLiquidadosIds = useMemo(
+    () => new Set(liquidaciones.map((liquidacion) => String(liquidacion.EMP_ID))),
+    [liquidaciones]
+  );
+
+  const empleadosDisponibles = useMemo(
+    () => empleados.filter((empleado) => {
+      const estado = String(empleado.EMP_ESTADO || 'A').toUpperCase();
+      const estaLiquidado = empleadosLiquidadosIds.has(String(empleado.EMP_ID))
+        || Boolean(empleado.EMP_FECHA_LIQUIDACION)
+        || estado === 'L';
+      return !estaLiquidado || (modoEdicion && String(empleado.EMP_ID) === String(form.emp_id));
+    }),
+    [empleados, empleadosLiquidadosIds, modoEdicion, form.emp_id]
+  );
 
   const getSelectedEmployee = () =>
     empleados.find((item) => String(item.EMP_ID) === String(form.emp_id));
@@ -428,7 +452,7 @@ function ControlLaboralPage() {
 
         <Grid container spacing={2}>
           <Grid size={{ xs: 12, md: 6 }}>
-            {empleados.length > 0 ? (
+            {empleadosDisponibles.length > 0 ? (
               <FormControl fullWidth>
                 <InputLabel>Empleado</InputLabel>
                 <Select
@@ -438,7 +462,7 @@ function ControlLaboralPage() {
                   onChange={handleChange}
                   disabled={cargandoEmpleados}
                 >
-                  {empleados.map((empleado) => (
+                  {empleadosDisponibles.map((empleado) => (
                     <MenuItem key={empleado.EMP_ID} value={String(empleado.EMP_ID)}>
                       {obtenerNombreEmpleado(empleado)}
                     </MenuItem>
