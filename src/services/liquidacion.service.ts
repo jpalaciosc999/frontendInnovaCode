@@ -13,21 +13,41 @@ type LiquidacionPayload = {
     bono14_proporcional: string | number;
     liquidacion: string | number;
     fecha_registro: string;
-    emp_id: string | number;
+    emp_id: number;
+    empleado_id: number;
+    id_empleado: number;
+    empleadoId: number;
+    empId: number;
+    EMP_ID: number;
+    EMPLEADO_ID: number;
+    ID_EMPLEADO: number;
 };
 
-const formatLiquidacionPayload = (data: LiquidacionForm): LiquidacionPayload => ({
-    fecha_retiro: data.liq_fecha_salida,
-    tipo_retiro: data.liq_tipo_retiro,
-    dias_trabajado: data.liq_dias_trabajado,
-    indemnizacion: data.liq_indemnizacion,
-    vacaciones_pagadas: data.liq_vacaciones_pagadas,
-    aguinaldo_proporcional: data.liq_aguinaldo_proporcional,
-    bono14_proporcional: data.liq_bono14_proporcional,
-    liquidacion: data.liq_liquidacion,
-    fecha_registro: data.liq_fecha_registro || data.liq_fecha_salida,
-    emp_id: data.emp_id,
-});
+const toNumber = (value: string | number) => Number(value || 0);
+
+const formatLiquidacionPayload = (data: LiquidacionForm): LiquidacionPayload => {
+    const empleadoId = toNumber(data.emp_id);
+
+    return {
+        fecha_retiro: data.liq_fecha_salida,
+        tipo_retiro: data.liq_tipo_retiro,
+        dias_trabajado: toNumber(data.liq_dias_trabajado),
+        indemnizacion: toNumber(data.liq_indemnizacion),
+        vacaciones_pagadas: toNumber(data.liq_vacaciones_pagadas),
+        aguinaldo_proporcional: toNumber(data.liq_aguinaldo_proporcional),
+        bono14_proporcional: toNumber(data.liq_bono14_proporcional),
+        liquidacion: toNumber(data.liq_liquidacion),
+        fecha_registro: data.liq_fecha_registro || data.liq_fecha_salida,
+        emp_id: empleadoId,
+        empleado_id: empleadoId,
+        id_empleado: empleadoId,
+        empleadoId,
+        empId: empleadoId,
+        EMP_ID: empleadoId,
+        EMPLEADO_ID: empleadoId,
+        ID_EMPLEADO: empleadoId,
+    };
+};
 
 export const obtenerLiquidaciones = async (): Promise<Liquidacion[]> => {
     const response = await api.get<Liquidacion[]>(`${ENDPOINT}/`);
