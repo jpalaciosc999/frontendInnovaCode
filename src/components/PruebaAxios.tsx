@@ -292,14 +292,6 @@ function PruebaAxios() {
     }
   };
 
-  const abrirModalDepartamentos = async () => {
-    setModalDepartamentos(true);
-    setFiltroDep('');
-    if (departamentos.length === 0) {
-      await cargarDepartamentos();
-    }
-  };
-
   const seleccionarHorario = (hor: Horario) => {
     setForm((prev) => ({ ...prev, hor_id: String(hor.HOR_ID) }));
     setHorNombre(hor.HOR_DESCRIPCION);
@@ -347,12 +339,6 @@ function PruebaAxios() {
     if (!puesto?.DEP_ID) return 'Sin departamento asignado';
     const departamento = departamentosMap.get(String(puesto.DEP_ID));
     return departamento ? departamento.DEP_NOMBRE : `Departamento #${puesto.DEP_ID}`;
-  };
-
-  const obtenerDepartamentoSeleccionado = (depId: number | string | undefined) => {
-    if (!depId) return '';
-    const departamento = departamentosMap.get(String(depId));
-    return departamento ? departamento.DEP_NOMBRE : `Departamento #${depId}`;
   };
 
   const formatearMoneda = (valor: number | string | undefined) => {
@@ -844,10 +830,12 @@ function PruebaAxios() {
               value={form.emp_dpi}
               onChange={handleChange}
               required
-              inputProps={{
-                inputMode: 'numeric',
-                pattern: '[0-9]*',
-                maxLength: 13
+              slotProps={{
+                htmlInput: {
+                  inputMode: 'numeric',
+                  pattern: '[0-9]*',
+                  maxLength: 13
+                }
               }}
               helperText="Solo números. Máximo 13 dígitos para DPI."
             />
@@ -861,10 +849,12 @@ function PruebaAxios() {
               value={form.emp_nit}
               onChange={handleChange}
               required
-              inputProps={{
-                inputMode: 'numeric',
-                pattern: '[0-9]*',
-                maxLength: 9
+              slotProps={{
+                htmlInput: {
+                  inputMode: 'numeric',
+                  pattern: '[0-9]*',
+                  maxLength: 9
+                }
               }}
               helperText="Solo números. Máximo 9 dígitos para NIT."
             />
@@ -878,10 +868,12 @@ function PruebaAxios() {
               value={form.emp_telefono}
               onChange={handleChange}
               required
-              inputProps={{
-                inputMode: 'numeric',
-                pattern: '[0-9]*',
-                maxLength: 8
+              slotProps={{
+                htmlInput: {
+                  inputMode: 'numeric',
+                  pattern: '[0-9]*',
+                  maxLength: 8
+                }
               }}
               helperText="Solo números. Máximo 8 dígitos para teléfono guatemalteco."
             />

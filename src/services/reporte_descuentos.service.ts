@@ -88,7 +88,6 @@ export const getReporteDescuentos = async (
 
   // ── build lookup maps ────────────────────────────────────────────────────
   const depMap    = new Map(departamentos.map((d) => [d.DEP_ID, d]));
-  const empMap    = new Map(empleados.map((e) => [e.EMP_ID, e]));
   const puestoMap = new Map(puestos.map((p) => [p.PUE_ID, p]));
   const tipoMap   = new Map(tipos.map((t) => [t.TDS_ID, t]));
 

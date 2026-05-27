@@ -203,12 +203,37 @@ export const getReporteIsr = async (
 export const getReporteIsrProyeccion = async (
   params: ReporteIsrProyeccionParams
 ): Promise<ReporteIsrProyeccionResponse> => {
-  const response = await api.get<ReporteIsrProyeccionResponse>('/reportes/isr/proyeccion', {
+  const response = await api.get('/reportes/isr/proyeccion', {
     params: {
       per_id: params.periodoId,
     },
   });
-  return response.data;
+
+  const data = response.data ?? {};
+  const empleadosBackend = Array.isArray(data.empleados) ? data.empleados : [];
+  const resumenBackend = data.resumen ?? {};
+
+  return {
+    empleados: empleadosBackend.map((row: Record<string, unknown>) => ({
+      EMP_ID: Number(row.EMP_ID ?? row.empId ?? 0),
+      EMPLEADO: String(row.EMPLEADO ?? row.empleado ?? ''),
+      DEPARTAMENTO: String(row.DEPARTAMENTO ?? row.departamento ?? ''),
+      PUESTO: String(row.PUESTO ?? row.puesto ?? ''),
+      RENTA_ACUMULADA: Number(row.RENTA_ACUMULADA ?? row.rentaAcumulada ?? 0),
+      RENTA_PROYECTADA_ANUAL: Number(row.RENTA_PROYECTADA_ANUAL ?? row.rentaProyectada ?? 0),
+      ISR_PROYECTADO_ANIO: Number(row.ISR_PROYECTADO_ANIO ?? row.isrProyectado ?? 0),
+      ISR_RETENIDO_A_LA_FECHA: Number(row.ISR_RETENIDO_A_LA_FECHA ?? row.isrRetenido ?? 0),
+      ISR_PENDIENTE: Number(row.ISR_PENDIENTE ?? row.isrPendiente ?? 0),
+    })),
+    resumen: {
+      totalEmpleados: Number(resumenBackend.totalEmpleados ?? 0),
+      totalRentaAcumulada: Number(resumenBackend.totalRentaAcumulada ?? 0),
+      totalRentaProyectada: Number(resumenBackend.totalRentaProyectada ?? 0),
+      totalIsrProyectado: Number(resumenBackend.totalIsrProyectado ?? 0),
+      totalIsrRetenido: Number(resumenBackend.totalIsrRetenido ?? 0),
+      totalIsrPendiente: Number(resumenBackend.totalIsrPendiente ?? 0),
+    },
+  };
 };
 
 export const descargarPdfIsr = async (params: ReporteIsrParams): Promise<void> => {

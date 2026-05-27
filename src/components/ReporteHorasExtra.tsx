@@ -208,7 +208,7 @@ export default function ReporteHorasExtra() {
           size="small"
           value={fechaInicio}
           onChange={(e) => setFechaInicio(e.target.value)}
-          InputLabelProps={{ shrink: true }}
+          slotProps={{ inputLabel: { shrink: true } }}
         />
         <TextField
           label="Fecha Fin"
@@ -216,7 +216,7 @@ export default function ReporteHorasExtra() {
           size="small"
           value={fechaFin}
           onChange={(e) => setFechaFin(e.target.value)}
-          InputLabelProps={{ shrink: true }}
+          slotProps={{ inputLabel: { shrink: true } }}
         />
         <FormControl size="small" sx={{ minWidth: 200 }}>
           <InputLabel>Departamento</InputLabel>

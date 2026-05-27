@@ -24,6 +24,7 @@ import {
 } from '@mui/material';
 import SummarizeIcon from '@mui/icons-material/Summarize';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
+import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
 import {
   ComposedChart,
   Bar,
@@ -74,8 +75,9 @@ function fmtQ(v: number) {
   return `Q ${v.toLocaleString('es-GT', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
 }
 
-function fmtQDec(v: number) {
-  return `Q ${v.toLocaleString('es-GT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+function fmtQDec(v: number | null | undefined) {
+  const value = Number(v ?? 0);
+  return `Q ${value.toLocaleString('es-GT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 function estadoColor(estado: string): 'success' | 'warning' | 'default' {
@@ -166,18 +168,37 @@ export default function ReporteIsr() {
             </Typography>
           </Box>
         </Box>
-        <ReportPdfButton
-          filename={`reporte-isr-${anioFiscal}.pdf`}
-          title="Reporte ISR Anual"
-          endpoint="/api/reportes/isr/pdf"
-          params={{
-            anioFiscal,
-            ...(departamentoId ? { departamentoId: Number(departamentoId) } : {}),
-            tipoRenta,
-            ...(estado ? { estado } : {}),
-          }}
-          disabled={!reporte}
-        />
+        <Box sx={{ display: 'flex', gap: 1 }}>
+          <ReportPdfButton
+            filename={`reporte-isr-${anioFiscal}.pdf`}
+            title="Reporte ISR Anual"
+            label="Descargar reporte"
+            endpoint="/api/reportes/isr/pdf"
+            params={{
+              anioFiscal,
+              ...(departamentoId ? { departamentoId: Number(departamentoId) } : {}),
+              tipoRenta,
+              ...(estado ? { estado } : {}),
+            }}
+            disabled={!reporte}
+          />
+
+          <ReportPdfButton
+            filename={`factura-isr-sat-1901-${anioFiscal}.pdf`}
+            title="Factura ISR SAT-1901"
+            label="Factura SAT-1901"
+            endpoint="/api/reportes/isr/factura/pdf"
+            params={{
+              anioFiscal,
+              ...(departamentoId ? { departamentoId: Number(departamentoId) } : {}),
+            }}
+            startIcon={<ReceiptLongIcon />}
+            disabled={!reporte}
+            fallbackToElement={false}
+            variant="outlined"
+            color="inherit"
+          />
+        </Box>
       </Box>
 
       {/* â”€â”€ Filtros â”€â”€ */}

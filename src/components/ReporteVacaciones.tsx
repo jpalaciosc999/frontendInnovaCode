@@ -95,7 +95,7 @@ function KpiCard({
       <Typography variant="body2" color="text.secondary" gutterBottom>
         {label}
       </Typography>
-      <Typography variant="h4" fontWeight={700} color={color}>
+      <Typography variant="h4" color={color} sx={{ fontWeight: 700 }}>
         {value}
       </Typography>
     </Paper>
@@ -134,7 +134,7 @@ export default function ReporteVacaciones() {
       const result = await getReporteVacaciones(params);
       setData(result);
     } catch (err) {
-      setError(getApiErrorMessage(err));
+      setError(getApiErrorMessage(err, 'Error al cargar el reporte de vacaciones'));
     } finally {
       setLoading(false);
     }
@@ -160,7 +160,7 @@ export default function ReporteVacaciones() {
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
           <BeachAccessIcon sx={{ fontSize: 32, color: 'primary.main' }} />
           <Box>
-            <Typography variant="h5" fontWeight={700}>
+            <Typography variant="h5" sx={{ fontWeight: 700 }}>
               Reporte de vacaciones
             </Typography>
             <Typography variant="body2" color="text.secondary">
@@ -288,7 +288,7 @@ export default function ReporteVacaciones() {
             {/* Bar chart: pendientes por departamento */}
             <Grid size={{ xs: 12, md: 7 }}>
               <Paper variant="outlined" sx={{ p: 2, height: 320 }}>
-                <Typography variant="subtitle2" fontWeight={700} gutterBottom>
+                <Typography variant="subtitle2" sx={{ fontWeight: 700 }} gutterBottom>
                   Vacaciones pendientes por departamento
                 </Typography>
                 <Typography variant="caption" color="text.secondary">
@@ -314,7 +314,7 @@ export default function ReporteVacaciones() {
             {/* Marco legal */}
             <Grid size={{ xs: 12, md: 5 }}>
               <Paper variant="outlined" sx={{ p: 2, height: 320 }}>
-                <Typography variant="subtitle2" fontWeight={700} gutterBottom>
+                <Typography variant="subtitle2" sx={{ fontWeight: 700 }} gutterBottom>
                   Marco legal aplicable
                 </Typography>
                 <Typography variant="caption" color="text.secondary">
@@ -332,7 +332,7 @@ export default function ReporteVacaciones() {
                   <Box key={i} sx={{ display: 'flex', justifyContent: 'space-between', py: 0.75 }}>
                     <Typography variant="body2" color="text.secondary">{label}</Typography>
                     {typeof value === 'string'
-                      ? <Typography variant="body2" fontWeight={600}>{value}</Typography>
+                      ? <Typography variant="body2" sx={{ fontWeight: 600 }}>{value}</Typography>
                       : value}
                   </Box>
                 ))}
@@ -345,7 +345,7 @@ export default function ReporteVacaciones() {
             {/* Pie chart: distribución por estado */}
             <Grid size={{ xs: 12, md: 5 }}>
               <Paper variant="outlined" sx={{ p: 2, height: 300 }}>
-                <Typography variant="subtitle2" fontWeight={700} gutterBottom>
+                <Typography variant="subtitle2" sx={{ fontWeight: 700 }} gutterBottom>
                   Distribucion por estado
                 </Typography>
                 <Typography variant="caption" color="text.secondary">
@@ -373,8 +373,8 @@ export default function ReporteVacaciones() {
                         ))}
                       </Pie>
                       <RechartsTooltip
-                        formatter={(value: number, name: string) => [
-                          `${value} empleados`, name,
+                        formatter={(value, name) => [
+                          `${Number(value ?? 0)} empleados`, String(name),
                         ]}
                       />
                       <Legend />
@@ -391,7 +391,7 @@ export default function ReporteVacaciones() {
             {/* Area chart: dias pendientes por departamento */}
             <Grid size={{ xs: 12, md: 7 }}>
               <Paper variant="outlined" sx={{ p: 2, height: 300 }}>
-                <Typography variant="subtitle2" fontWeight={700} gutterBottom>
+                <Typography variant="subtitle2" sx={{ fontWeight: 700 }} gutterBottom>
                   Tendencia de dias pendientes por departamento
                 </Typography>
                 <Typography variant="caption" color="text.secondary">
@@ -482,7 +482,7 @@ export default function ReporteVacaciones() {
                         <Typography variant="body2">{emp.ANTIGUEDAD_LABEL}</Typography>
                       </TableCell>
                       <TableCell align="center">
-                        <Typography variant="body2" fontWeight={600}>{emp.DIAS_ACUMULADOS}</Typography>
+                        <Typography variant="body2" sx={{ fontWeight: 600 }}>{emp.DIAS_ACUMULADOS}</Typography>
                       </TableCell>
                       <TableCell align="center">
                         <Typography variant="body2" color="#388E3C">{emp.DIAS_DISFRUTADOS}</Typography>
