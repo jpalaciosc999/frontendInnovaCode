@@ -28,6 +28,7 @@ const NominaDetallePage = lazy(() => import('./components/NominaDetallePage'));
 const KPIPage = lazy(() => import('./components/KPIPage'));
 const KPIResultadoPage = lazy(() => import('./components/KPIResultadoPage'));
 const MarcajePage = lazy(() => import('./components/MarcajeCRUD'));
+const ResumenMarcaje = lazy(() => import('./components/ResumenMarcaje'));
 const EmpleadoContrato = lazy(() => import('./components/EmpleadoContrato'));
 const Sede = lazy(() => import('./components/Sede'));
 const Bitacora = lazy(() => import('./components/Bitacora'));
@@ -65,6 +66,8 @@ function UnsavedAwareContainer({ children }: { children: ReactNode }) {
   const markUnsavedChange = (event: FormEvent<HTMLElement>) => {
     const target = event.target;
 
+    if (target instanceof HTMLElement && target.closest('[data-skip-unsaved="true"]')) return;
+
     if (
       target instanceof HTMLInputElement ||
       target instanceof HTMLTextAreaElement ||
@@ -81,6 +84,7 @@ function UnsavedAwareContainer({ children }: { children: ReactNode }) {
     const target = event.target;
 
     if (!(target instanceof HTMLElement)) return;
+    if (target.closest('[data-skip-unsaved="true"]')) return;
 
     const interactiveControl = target.closest(
       [
@@ -110,6 +114,7 @@ function UnsavedAwareContainer({ children }: { children: ReactNode }) {
     const target = event.target;
 
     if (!(target instanceof HTMLElement)) return;
+    if (target.closest('[data-skip-unsaved="true"]')) return;
     if (!target.matches('input, textarea, select, [role="combobox"], [contenteditable="true"]')) return;
 
     const ignoredKeys = ['Tab', 'Shift', 'Control', 'Alt', 'Meta', 'Escape'];
@@ -308,7 +313,7 @@ function Layout() {
           <Route path="/tipos-descuento" element={<Navigate to="/descuentos" replace />} />
           <Route path="/prestamos-banco" element={<Navigate to="/prestamos" replace />} />
           <Route path="/prestamo-detalle" element={<Navigate to="/prestamos" replace />} />
-          <Route path="/resumen-marcaje" element={guarded('/resumen-marcaje', <MarcajePage />)} />
+          <Route path="/resumen-marcaje" element={guarded('/resumen-marcaje', <ResumenMarcaje />)} />
           <Route path="/registro-vacaciones" element={<Navigate to="/control-laboral" replace />} />
           <Route path="/isr" element={<Navigate to="/descuentos" replace />} />
           <Route path="/irtra" element={<Navigate to="/descuentos" replace />} />

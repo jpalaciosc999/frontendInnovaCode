@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, type SyntheticEvent } from 'react';
+import { useState, useEffect, useCallback, useMemo, type SyntheticEvent } from 'react';
 import {
   Table,
   TableBody,
@@ -17,6 +17,7 @@ import {
   Tooltip,
   Autocomplete,
   TextField,
+  Chip,
 } from '@mui/material';
 
 import AddIcon from '@mui/icons-material/Add';
@@ -42,6 +43,30 @@ import type { Horario } from '../interfaces/horario';
 type DiferenciaMarcaje = {
   texto: string;
   positiva: boolean;
+};
+
+const normalizarTexto = (value: unknown) =>
+  String(value ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, ' ');
+
+const getEmpleadoSesion = (user: unknown, empleados: Empleado[]) => {
+  const record = (user && typeof user === 'object' ? user : {}) as Record<string, unknown>;
+  const empId = Number(record.emp_id ?? record.EMP_ID);
+
+  if (Number.isFinite(empId) && empId > 0) {
+    return empleados.find((empleado) => Number(empleado.EMP_ID) === empId) ?? null;
+  }
+
+  const nombreUsuario = normalizarTexto(record.nombre_completo);
+  if (!nombreUsuario) return null;
+
+  return empleados.find((empleado) =>
+    normalizarTexto(`${empleado.EMP_NOMBRE} ${empleado.EMP_APELLIDO}`) === nombreUsuario
+  ) ?? null;
 };
 
 const obtenerPartesHora = (hora: string | undefined, respaldo: string) => {
@@ -111,6 +136,7 @@ const calcularDiferencia = (
 
 function MarcajeCRUD() {
   const authCtx = useAuth();
+  const esEmpleado = isRole(authCtx.user as any, 'empleado');
   const [datos, setDatos] = useState<Marcaje[]>([]);
   const [empleados, setEmpleados] = useState<Empleado[]>([]);
   const [horarios, setHorarios] = useState<Horario[]>([]);
@@ -156,6 +182,9 @@ function MarcajeCRUD() {
 
         setEmpleados(empleadosData);
         setHorarios(horariosData);
+        if (esEmpleado) {
+          setEmpleadoSeleccionado(getEmpleadoSesion(authCtx.user, empleadosData));
+        }
       } catch (err: any) {
         setError(
           'Error al obtener empleados u horarios del servidor: ' +
@@ -167,11 +196,27 @@ function MarcajeCRUD() {
     };
 
     cargarCatalogos();
-    }, []);
+    }, [authCtx.user, esEmpleado]);
 
   const horarioSeleccionado = horarios.find(
     (horario) => horario.HOR_ID === empleadoSeleccionado?.HOR_ID
   );
+
+  const empleadosDisponibles = useMemo(
+    () => esEmpleado && empleadoSeleccionado ? [empleadoSeleccionado] : empleados,
+    [empleadoSeleccionado, empleados, esEmpleado]
+  );
+
+  const marcajeHoy = useMemo(() => {
+    const hoy = fechaHoy.toDateString();
+    return datos.find((marcaje) => marcaje.MAR_FECHA && new Date(marcaje.MAR_FECHA).toDateString() === hoy);
+  }, [datos, fechaHoy]);
+
+  const textoAccionMarcaje = marcajeHoy?.MAR_ENTRADA && !marcajeHoy.MAR_SALIDA
+    ? 'Registrar salida'
+    : marcajeHoy?.MAR_ENTRADA && marcajeHoy.MAR_SALIDA
+      ? 'Jornada completada'
+      : 'Registrar entrada';
 
   const cargarDatos = useCallback(
     async (nuevoOffset: number = 0) => {
@@ -216,6 +261,7 @@ function MarcajeCRUD() {
     _event: SyntheticEvent,
     empleado: Empleado | null
   ) => {
+    if (esEmpleado) return;
     setEmpleadoSeleccionado(empleado);
     setDatos([]);
     setOffset(0);
@@ -261,7 +307,7 @@ function MarcajeCRUD() {
   };
 
   return (
-    <Box sx={{ p: 3, maxWidth: 1200, margin: 'auto' }}>
+    <Box sx={{ p: 3, maxWidth: 1200, margin: 'auto' }} data-skip-unsaved={esEmpleado ? 'true' : undefined}>
       <Typography
         variant="h4"
         gutterBottom
@@ -306,10 +352,11 @@ function MarcajeCRUD() {
             </Typography>
 
             <Autocomplete
-              options={empleados}
+              options={empleadosDisponibles}
               value={empleadoSeleccionado}
               loading={cargandoEmpleados}
               onChange={handleSeleccionarEmpleado}
+              disabled={esEmpleado}
               getOptionLabel={(empleado) =>
                 `${empleado.EMP_ID} - ${empleado.EMP_NOMBRE} ${empleado.EMP_APELLIDO}`
               }
@@ -327,6 +374,18 @@ function MarcajeCRUD() {
               )}
             />
           </Box>
+
+          {esEmpleado && horarioSeleccionado && (
+            <Box sx={{ minWidth: 220 }}>
+              <Typography variant="caption" sx={{ fontWeight: 'bold', color: 'gray' }}>
+                HORARIO ASIGNADO
+              </Typography>
+              <Typography variant="h6">
+                {horarioSeleccionado.HOR_HORA_INICIO} - {horarioSeleccionado.HOR_HORA_FIN}
+              </Typography>
+              <Chip size="small" color="primary" variant="outlined" label={horarioSeleccionado.HOR_DESCRIPCION} />
+            </Box>
+          )}
 
           <Box>
             <Typography
@@ -352,11 +411,17 @@ function MarcajeCRUD() {
               )
             }
             onClick={handleRegistrar}
-            disabled={cargandoMas || !empleadoSeleccionado}
+            disabled={cargandoMas || !empleadoSeleccionado || Boolean(marcajeHoy?.MAR_ENTRADA && marcajeHoy.MAR_SALIDA)}
           >
-            Registrar Marcaje
+            {textoAccionMarcaje}
           </Button>
         </Box>
+
+        {esEmpleado && (
+          <Alert severity="info" sx={{ mt: 2 }}>
+            Tu marcaje se valida contra tu horario: entrada dentro de la ventana permitida y salida cerca del fin de jornada.
+          </Alert>
+        )}
 
         {error && (
           <Alert severity="error" sx={{ mt: 2 }}>
@@ -429,6 +494,8 @@ function MarcajeCRUD() {
                         <Typography color="success.main">SÍ</Typography>
                       ) : reg.MAR_AUTORIZACION === 2 ? (
                         <Typography color="error.main">NO</Typography>
+                      ) : esEmpleado ? (
+                        <Typography color="text.secondary">Pendiente</Typography>
                       ) : (
                         <Box>
                           <Tooltip title="Autorizar">

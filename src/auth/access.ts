@@ -1,3 +1,5 @@
+import { normalizeRole, type AppRole } from '../config/roleViews';
+
 export const ALL_PERMISSIONS = '*';
 
 export type PermissionRequirement = {
@@ -128,6 +130,12 @@ function getNormalizedRole(usuario: AuthUserWithPermissions | null | undefined) 
   );
 }
 
+function getAppRole(usuario: AuthUserWithPermissions | null | undefined): AppRole | null {
+  return normalizeRole(
+    String(usuario?.rol_nombre ?? usuario?.ROL_NOMBRE ?? usuario?.rol ?? usuario?.role ?? '')
+  );
+}
+
 export function isRole(usuario: AuthUserWithPermissions | null | undefined, roleName: string) {
   return getNormalizedRole(usuario) === normalizePermiso(roleName);
 }
@@ -222,24 +230,130 @@ export function getVistaForPath(path: string) {
 }
 
 function hasReportesRole(usuario: AuthUserWithPermissions | null | undefined) {
-  const role = getNormalizedRole(usuario);
-  return [
-    'rrhh',
-    'admin',
-    'administrador',
-    'contabilidad',
-    'gerente',
-    'auditoria',
-    'analista nomina',
-    'supervisor asistencia',
-    'supremo',
-    'superadmin',
-    'root',
-  ].includes(role);
+  const role = getAppRole(usuario);
+  return role ? roleReportPaths[role].size > 0 : false;
 }
+
+const reportPathsByProfile = {
+  all: [
+    '/reporte-marcajes',
+    '/reporte-igss',
+    '/reporte-isr',
+    '/reporte-aguinaldo',
+    '/reporte-vacaciones',
+    '/reporte-descuentos',
+    '/reporte-liquidacion',
+    '/reporte-kpi',
+    '/reporte-horas-extra',
+    '/dashboard-ejecutivo',
+  ],
+  payroll: [
+    '/reporte-igss',
+    '/reporte-isr',
+    '/reporte-aguinaldo',
+    '/reporte-descuentos',
+    '/reporte-liquidacion',
+    '/reporte-horas-extra',
+  ],
+} as const;
+
+const roleReportPaths: Record<AppRole, Set<string>> = {
+  EMPLEADO: new Set(),
+  RRHH: new Set(reportPathsByProfile.all),
+  ADMIN: new Set(reportPathsByProfile.all),
+  CONTABILIDAD: new Set(reportPathsByProfile.payroll),
+  GERENTE: new Set(reportPathsByProfile.all),
+  AUDITORIA: new Set(reportPathsByProfile.all),
+  ANALISTA_NOMINA: new Set(reportPathsByProfile.payroll),
+  SUPERVISOR_ASISTENCIA: new Set(),
+  SUPREMO: new Set(reportPathsByProfile.all),
+};
+
+const managerPaths = [
+  '/empleados',
+  '/empleado-contrato',
+  '/cuenta-bancaria',
+  '/control-laboral',
+  '/periodo',
+  '/tipo-ingresos',
+  '/descuentos',
+  '/prestamos',
+  '/nomina',
+  '/aprobacion-nomina',
+  '/departamentos',
+  '/puestos',
+  '/sucursales',
+  '/sede',
+  '/horarios',
+  '/tipo-contrato',
+  '/kpis',
+  '/kpi-resultado',
+  '/suspensiones-igss',
+  '/nomina-asignaciones',
+  '/nomina-detalle',
+  '/liquidacion',
+  '/resumen-marcaje',
+];
+
+const analystPaths = [
+  '/empleados',
+  '/empleado-contrato',
+  '/cuenta-bancaria',
+  '/control-laboral',
+  '/periodo',
+  '/tipo-ingresos',
+  '/descuentos',
+  '/prestamos',
+  '/nomina',
+  '/departamentos',
+  '/puestos',
+  '/horarios',
+  '/tipo-contrato',
+  '/suspensiones-igss',
+  '/nomina-asignaciones',
+  '/nomina-detalle',
+  '/liquidacion',
+];
+
+const roleAllowedPaths: Record<AppRole, Set<string> | null> = {
+  EMPLEADO: new Set(['/marcajes', '/horarios', '/nomina-detalle', '/kpi-resultado']),
+  RRHH: new Set(managerPaths),
+  ADMIN: null,
+  CONTABILIDAD: new Set([
+    '/tipo-ingresos',
+    '/descuentos',
+    '/prestamos',
+    '/nomina',
+    '/nomina-asignaciones',
+    '/nomina-detalle',
+    '/liquidacion',
+  ]),
+  GERENTE: new Set(managerPaths),
+  AUDITORIA: new Set(['/bitacora', '/usuario-bitacora', '/auditoria']),
+  ANALISTA_NOMINA: new Set(analystPaths),
+  SUPERVISOR_ASISTENCIA: new Set([
+    '/control-laboral',
+    '/horarios',
+    '/suspensiones-igss',
+    '/resumen-marcaje',
+  ]),
+  SUPREMO: null,
+};
 
 export function canAccessPath(usuario: AuthUserWithPermissions | null | undefined, path: string): boolean {
   if (path === '/') return true;
+  const appRole = getAppRole(usuario);
+  if (appRole) {
+    if (path === '/marcajes') return appRole === 'EMPLEADO';
+    if (path === '/resumen-marcaje' && appRole === 'EMPLEADO') return false;
+
+    const allowedPaths = roleAllowedPaths[appRole];
+    if (allowedPaths === null) return true;
+    if (path === '/reportes') return roleReportPaths[appRole].size > 0;
+    if (roleReportPaths[appRole].has(path)) return true;
+    return allowedPaths.has(path);
+  }
+
   if (path === '/reportes') {
     return hasReportesRole(usuario) || Array.from(reportPaths).some((reportPath) => canAccessPath(usuario, reportPath));
   }
@@ -262,7 +376,7 @@ export function canAccessPath(usuario: AuthUserWithPermissions | null | undefine
   }
 
   if (isRole(usuario, 'supervisor_asistencia') || isRole(usuario, 'supervisor asistencia') || isRole(usuario, 'supervisor-asistencia')) {
-    if (['/marcajes', '/permisos'].includes(path)) return true;
+    if (['/resumen-marcaje', '/permisos'].includes(path)) return true;
   }
   const vista = getVistaForPath(path);
   if (!vista) return false;

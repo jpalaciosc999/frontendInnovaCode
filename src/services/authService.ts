@@ -16,6 +16,7 @@ export type LoginResponse = {
     nombre_completo: string;
     correo: string;
     rol_id: number;
+    rol_nombre?: string;
     emp_id: number | null;
     permisos?: unknown[];
   };
