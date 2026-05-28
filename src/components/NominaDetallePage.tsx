@@ -22,6 +22,8 @@ import { obtenerPuestos } from '../services/puestos.service';
 import { getApiErrorMessage } from '../api/errors';
 import { formatearMoneda, obtenerNombreEmpleado } from '../utils/relations';
 import { calcularISR, obtenerSueldoMensual, TASA_IGSS_LABORAL } from '../utils/payroll';
+import { useAuth } from '../context/AuthContext';
+import { isRole } from '../auth/access';
 
 import {
     Alert,
@@ -69,8 +71,29 @@ type TipoConceptoNomina = '' | 'INGRESO' | 'DESCUENTO' | 'KPI';
 
 const redondearMoneda = (value: number) => Math.round(value * 100) / 100;
 const esNominaBloqueada = (estado?: string) => estado === 'P' || estado === 'A';
+const normalizarTexto = (value: unknown) =>
+    String(value ?? '')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .trim()
+        .toLowerCase()
+        .replace(/\s+/g, ' ');
+
+const getEmpleadoSesion = (user: unknown, empleados: Empleado[]) => {
+    const record = (user && typeof user === 'object' ? user : {}) as Record<string, unknown>;
+    const empId = Number(record.emp_id ?? record.EMP_ID);
+    if (Number.isFinite(empId) && empId > 0) {
+        return empleados.find((empleado) => Number(empleado.EMP_ID) === empId) ?? null;
+    }
+    const nombreUsuario = normalizarTexto(record.nombre_completo);
+    return empleados.find((empleado) =>
+        normalizarTexto(`${empleado.EMP_NOMBRE} ${empleado.EMP_APELLIDO}`) === nombreUsuario
+    ) ?? null;
+};
 
 function NominaDetalleCRUD() {
+    const { user } = useAuth();
+    const esEmpleado = isRole(user as any, 'empleado');
     const [searchParams, setSearchParams] = useSearchParams();
     const [datos, setDatos] = useState<NominaDetalle[]>([]);
     const [cargando, setCargando] = useState(true);
@@ -102,8 +125,13 @@ function NominaDetalleCRUD() {
                 obtenerEmpleados(),
                 obtenerPuestos()
             ]);
-            setDatos(detallesData);
-            setNominas(nominasData);
+            const empleadoSesion = esEmpleado ? getEmpleadoSesion(user, empleadosData) : null;
+            const nominasFiltradas = esEmpleado
+                ? nominasData.filter((nomina) => String(nomina.EMP_ID) === String(empleadoSesion?.EMP_ID ?? ''))
+                : nominasData;
+            const nominaIds = new Set(nominasFiltradas.map((nomina) => String(nomina.NOM_ID)));
+            setDatos(esEmpleado ? detallesData.filter((detalle) => nominaIds.has(String(detalle.NOM_ID))) : detallesData);
+            setNominas(nominasFiltradas);
             setIngresos(ingresosData);
             setDescuentos(descuentosData);
             setResultadosKpi(resultadosData);
@@ -118,7 +146,7 @@ function NominaDetalleCRUD() {
 
     useEffect(() => {
         cargarDatos();
-    }, []);
+    }, [esEmpleado, user]);
 
     useEffect(() => {
         const nomId = searchParams.get('nom_id') ?? '';
@@ -412,7 +440,7 @@ function NominaDetalleCRUD() {
         }
     };
 
-    useUnsavedFormGuard(form, initialForm, guardarDetalle);
+    useUnsavedFormGuard(form, initialForm, esEmpleado ? () => false : guardarDetalle);
 
     const handleEliminar = async (id: number) => {
         const detalleAnterior = datos.find((detalle) => detalle.DET_ID === id);
@@ -476,6 +504,28 @@ function NominaDetalleCRUD() {
         [datos, filtroNominaId]
     );
 
+    const boletasEmpleado = useMemo(() =>
+        nominas
+            .filter((nomina) => !filtroNominaId || String(nomina.NOM_ID) === String(filtroNominaId))
+            .map((nomina) => {
+                const detalles = datos.filter((detalle) => String(detalle.NOM_ID) === String(nomina.NOM_ID));
+                const ingresosTotal = detalles
+                    .filter((detalle) => !detalle.TDS_ID)
+                    .reduce((total, detalle) => total + Number(detalle.DET_MONTO || 0), 0);
+                const descuentosTotal = detalles
+                    .filter((detalle) => detalle.TDS_ID)
+                    .reduce((total, detalle) => total + Number(detalle.DET_MONTO || 0), 0);
+
+                return {
+                    nomina,
+                    detalles,
+                    ingresosTotal,
+                    descuentosTotal,
+                };
+            }),
+        [datos, filtroNominaId, nominas]
+    );
+
     if (cargando) {
         return (
             <Box sx={{ p: 3 }}>
@@ -485,16 +535,22 @@ function NominaDetalleCRUD() {
     }
 
     return (
-        <Box sx={{ py: 2 }}>
+        <Box sx={{ py: 2 }} data-skip-unsaved={esEmpleado ? 'true' : undefined}>
             {/* Formulario */}
             <Paper elevation={3} sx={{ p: 3, mb: 3 }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 3 }}>
                     <ReceiptLongIcon color="primary" />
                     <Typography variant="h4" sx={{ fontWeight: 'bold' }}>
-                        Revision de Detalle de Nomina
+                        {esEmpleado ? 'Mi boleta de pago' : 'Revision de Detalle de Nomina'}
                     </Typography>
                 </Box>
 
+                {esEmpleado ? (
+                    <Alert severity="info" sx={{ mb: 2 }}>
+                        Consulta aqui el detalle de tus ingresos, descuentos y salario liquido por nomina.
+                    </Alert>
+                ) : (
+                <>
                 <Alert severity="info" sx={{ mb: 2 }}>
                     Este apartado es para revisar o corregir el detalle que ya genero la nomina. La captura previa de ingresos y egresos debe hacerse por empleado y periodo antes de generar.
                 </Alert>
@@ -502,7 +558,11 @@ function NominaDetalleCRUD() {
                 <Alert severity="warning" sx={{ mb: 2 }}>
                     No uses esta pantalla para preparar una nomina nueva: si la nomina aun no existe, aqui no deberia capturarse. Para eso hace falta el modulo de Asignaciones por Periodo.
                 </Alert>
+                </>
+                )}
 
+                {!esEmpleado && (
+                <>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 2, mb: 2, flexWrap: 'wrap' }}>
                     <Typography variant="h6">
                         {modoEdicion ? 'Editar concepto generado' : 'Correccion manual'}
@@ -657,18 +717,20 @@ function NominaDetalleCRUD() {
                     </Grid>
                 </Grid>
                 </Collapse>
+                </>
+                )}
             </Paper>
 
             {/* Tabla */}
             <Paper elevation={3} sx={{ p: 3 }}>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 2, mb: 2, flexWrap: 'wrap' }}>
                     <Typography variant="h6">
-                        Listado de detalles: {datosVisibles.length}
+                        {esEmpleado ? `Movimientos de pago: ${datosVisibles.length}` : `Listado de detalles: ${datosVisibles.length}`}
                     </Typography>
                     <FormControl sx={{ minWidth: 320 }}>
                         <InputLabel>Filtrar por nomina</InputLabel>
                         <Select value={filtroNominaId} label="Filtrar por nomina" onChange={handleFiltroNomina}>
-                            <MenuItem value="">Todas</MenuItem>
+                            <MenuItem value="">{esEmpleado ? 'Todas mis nominas' : 'Todas'}</MenuItem>
                             {nominas.map((nomina) => (
                                 <MenuItem key={nomina.NOM_ID} value={String(nomina.NOM_ID)}>
                                     {obtenerEtiquetaNomina(nomina)} {esNominaBloqueada(nomina.NOM_ESTADO) ? '- Bloqueada' : ''}
@@ -678,6 +740,100 @@ function NominaDetalleCRUD() {
                     </FormControl>
                 </Box>
 
+                {esEmpleado ? (
+                <Box sx={{ display: 'grid', gap: 2.5 }}>
+                    {boletasEmpleado.length > 0 ? (
+                        boletasEmpleado.map(({ nomina, detalles, ingresosTotal, descuentosTotal }) => (
+                            <Paper key={nomina.NOM_ID} variant="outlined" sx={{ p: 2.5, borderRadius: 2 }}>
+                                <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 2, flexWrap: 'wrap', mb: 2 }}>
+                                    <Box>
+                                        <Typography variant="overline" color="text.secondary">Boleta de pago</Typography>
+                                        <Typography variant="h5" sx={{ fontWeight: 800 }}>
+                                            Nomina #{nomina.NOM_ID}
+                                        </Typography>
+                                        <Typography variant="body2" color="text.secondary">
+                                            Generada el {toInputDate(nomina.NOM_FECHA_GENERACION) || 'sin fecha'}
+                                        </Typography>
+                                    </Box>
+                                    <Chip
+                                        label={nomina.NOM_ESTADO === 'A' ? 'Aprobada' : nomina.NOM_ESTADO === 'P' ? 'Pendiente' : 'Borrador'}
+                                        color={nomina.NOM_ESTADO === 'A' ? 'success' : nomina.NOM_ESTADO === 'P' ? 'warning' : 'default'}
+                                    />
+                                </Box>
+
+                                <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(3, 1fr)' }, gap: 2, mb: 2 }}>
+                                    <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
+                                        <Typography variant="caption" color="text.secondary">Ingresos</Typography>
+                                        <Typography variant="h5" sx={{ fontWeight: 800, color: 'success.main' }}>
+                                            {formatearMoneda(ingresosTotal || nomina.NOM_TOTAL_INGRESOS)}
+                                        </Typography>
+                                    </Paper>
+                                    <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
+                                        <Typography variant="caption" color="text.secondary">Descuentos</Typography>
+                                        <Typography variant="h5" sx={{ fontWeight: 800, color: 'error.main' }}>
+                                            {formatearMoneda(descuentosTotal || nomina.NOM_TOTAL_DESCUENTO)}
+                                        </Typography>
+                                    </Paper>
+                                    <Paper variant="outlined" sx={{ p: 2, borderRadius: 2, borderColor: 'primary.main' }}>
+                                        <Typography variant="caption" color="text.secondary">Liquido a recibir</Typography>
+                                        <Typography variant="h5" sx={{ fontWeight: 900, color: 'primary.main' }}>
+                                            {formatearMoneda(nomina.NOM_SALARIO_LIQUIDO)}
+                                        </Typography>
+                                    </Paper>
+                                </Box>
+
+                                <TableContainer>
+                                    <Table size="small">
+                                        <TableHead>
+                                            <TableRow>
+                                                <TableCell><strong>Concepto</strong></TableCell>
+                                                <TableCell><strong>Tipo</strong></TableCell>
+                                                <TableCell align="right"><strong>Monto</strong></TableCell>
+                                            </TableRow>
+                                        </TableHead>
+                                        <TableBody>
+                                            {detalles.length > 0 ? detalles.map((detalle) => {
+                                                const ingreso = ingresosPorId.get(String(detalle.TIS_ID));
+                                                const descuento = descuentosPorId.get(String(detalle.TDS_ID));
+                                                const resultado = resultadosPorId.get(String(detalle.KRE_ID));
+                                                const concepto = ingreso
+                                                    ? `${ingreso.TIS_CODIGO} - ${ingreso.TIS_NOMBRE}`
+                                                    : descuento
+                                                        ? `${descuento.TDS_CODIGO} - ${descuento.TDS_NOMBRE}`
+                                                        : resultado
+                                                            ? `Resultado KPI #${resultado.KRE_ID}`
+                                                            : `Referencia ${detalle.DET_REFERENCIA}`;
+                                                const esDescuento = Boolean(detalle.TDS_ID);
+
+                                                return (
+                                                    <TableRow key={detalle.DET_ID}>
+                                                        <TableCell>{concepto}</TableCell>
+                                                        <TableCell>
+                                                            <Chip
+                                                                size="small"
+                                                                label={esDescuento ? 'Descuento' : 'Ingreso'}
+                                                                color={esDescuento ? 'error' : 'success'}
+                                                                variant="outlined"
+                                                            />
+                                                        </TableCell>
+                                                        <TableCell align="right">{formatearMoneda(detalle.DET_MONTO)}</TableCell>
+                                                    </TableRow>
+                                                );
+                                            }) : (
+                                                <TableRow>
+                                                    <TableCell colSpan={3} align="center">No hay movimientos en esta boleta.</TableCell>
+                                                </TableRow>
+                                            )}
+                                        </TableBody>
+                                    </Table>
+                                </TableContainer>
+                            </Paper>
+                        ))
+                    ) : (
+                        <Alert severity="info">No tienes boletas de pago registradas.</Alert>
+                    )}
+                </Box>
+                ) : (
                 <TableContainer>
                     <Table>
                         <TableHead>
@@ -689,7 +845,7 @@ function NominaDetalleCRUD() {
                                 <TableCell><strong>Ingreso (TIS)</strong></TableCell>
                                 <TableCell><strong>Descuento (TDS)</strong></TableCell>
                                 <TableCell><strong>KRE</strong></TableCell>
-                                <TableCell><strong>Acciones</strong></TableCell>
+                                {!esEmpleado && <TableCell><strong>Acciones</strong></TableCell>}
                             </TableRow>
                         </TableHead>
 
@@ -716,6 +872,7 @@ function NominaDetalleCRUD() {
                                         <TableCell>{ingreso ? `${ingreso.TIS_CODIGO} - ${ingreso.TIS_NOMBRE}` : '—'}</TableCell>
                                         <TableCell>{descuento ? `${descuento.TDS_CODIGO} - ${descuento.TDS_NOMBRE}` : '—'}</TableCell>
                                         <TableCell>{resultado ? formatearMoneda(resultado.KRE_MONTO_TOTAL) : '—'}</TableCell>
+                                        {!esEmpleado && (
                                         <TableCell>
                                             <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
                                                 <Tooltip title={bloqueada ? 'No se modifica detalle de una nomina pendiente o aprobada' : ''}>
@@ -747,19 +904,21 @@ function NominaDetalleCRUD() {
                                                 </Tooltip>
                                             </Box>
                                         </TableCell>
+                                        )}
                                     </TableRow>
                                     );
                                 })
                             ) : (
                                 <TableRow>
-                                    <TableCell colSpan={8} align="center">
-                                        No hay registros de nómina
+                                    <TableCell colSpan={esEmpleado ? 7 : 8} align="center">
+                                        {esEmpleado ? 'No tienes boletas de pago registradas.' : 'No hay registros de nómina'}
                                     </TableCell>
                                 </TableRow>
                             )}
                         </TableBody>
                     </Table>
                 </TableContainer>
+                )}
             </Paper>
 
             {/* Snackbars */}

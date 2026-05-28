@@ -282,7 +282,7 @@ function UsuarioCRUD() {
     const targetLevel = getRolNivel(rolId);
     if (currentRoleLevel === undefined || targetLevel === undefined) return false;
 
-    return targetLevel < currentRoleLevel;
+    return targetLevel > currentRoleLevel;
   };
 
   const esUsuarioSesion = (usuarioId?: number | null) =>
