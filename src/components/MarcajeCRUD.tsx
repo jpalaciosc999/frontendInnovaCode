@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, type SyntheticEvent } from 'react';
+import { useState, useEffect, useCallback, useMemo, type SyntheticEvent } from 'react';
 import {
   Table,
   TableBody,
@@ -31,6 +31,7 @@ import {
 } from '../services/marcaje.service';
 
 import { obtenerEmpleados } from '../services/empleados.service';
+import { obtenerLiquidaciones } from '../services/liquidacion.service';
 import { useAuth } from '../context/AuthContext';
 import { isRole } from '../auth/access';
 import { obtenerHorarios } from '../services/horario.service';
@@ -38,6 +39,7 @@ import { obtenerHorarios } from '../services/horario.service';
 import type { Marcaje } from '../interfaces/marcaje';
 import type { Empleado } from '../interfaces/empleados';
 import type { Horario } from '../interfaces/horario';
+import type { Liquidacion } from '../interfaces/liquidacion';
 
 type DiferenciaMarcaje = {
   texto: string;
@@ -113,6 +115,7 @@ function MarcajeCRUD() {
   const authCtx = useAuth();
   const [datos, setDatos] = useState<Marcaje[]>([]);
   const [empleados, setEmpleados] = useState<Empleado[]>([]);
+  const [liquidaciones, setLiquidaciones] = useState<Liquidacion[]>([]);
   const [horarios, setHorarios] = useState<Horario[]>([]);
   const [empleadoSeleccionado, setEmpleadoSeleccionado] = useState<Empleado | null>(null);
 
@@ -136,7 +139,7 @@ function MarcajeCRUD() {
       setError('');
 
       try {
-        const [empleadosData, horariosData] = await Promise.all([
+        const [empleadosData, horariosData, liquidacionesData] = await Promise.all([
           // si es supervisor de asistencia, filtrar por SED_ID del usuario
           (async () => {
             try {
@@ -152,10 +155,12 @@ function MarcajeCRUD() {
             return await obtenerEmpleados();
           })(),
           obtenerHorarios(),
+          obtenerLiquidaciones(),
         ]);
 
         setEmpleados(empleadosData);
         setHorarios(horariosData);
+        setLiquidaciones(liquidacionesData);
       } catch (err: any) {
         setError(
           'Error al obtener empleados u horarios del servidor: ' +
@@ -168,6 +173,22 @@ function MarcajeCRUD() {
 
     cargarCatalogos();
     }, []);
+
+  const empleadosLiquidadosIds = useMemo(
+    () => new Set(liquidaciones.map((liquidacion) => String(liquidacion.EMP_ID))),
+    [liquidaciones]
+  );
+
+  const empleadosDisponibles = useMemo(
+    () => empleados.filter((empleado) => {
+      const estado = String(empleado.EMP_ESTADO || 'A').toUpperCase();
+      const estaLiquidado = empleadosLiquidadosIds.has(String(empleado.EMP_ID))
+        || Boolean(empleado.EMP_FECHA_LIQUIDACION)
+        || estado === 'L';
+      return !estaLiquidado;
+    }),
+    [empleados, empleadosLiquidadosIds]
+  );
 
   const horarioSeleccionado = horarios.find(
     (horario) => horario.HOR_ID === empleadoSeleccionado?.HOR_ID
@@ -306,7 +327,7 @@ function MarcajeCRUD() {
             </Typography>
 
             <Autocomplete
-              options={empleados}
+              options={empleadosDisponibles}
               value={empleadoSeleccionado}
               loading={cargandoEmpleados}
               onChange={handleSeleccionarEmpleado}
