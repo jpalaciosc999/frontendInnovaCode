@@ -42,6 +42,7 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import ManageAccountsIcon from '@mui/icons-material/ManageAccounts';
 import { useAuth } from '../context/AuthContext';
 import { useUnsavedFormGuard } from '../hooks/useUnsavedFormGuard';
+import { getApiErrorMessage } from '../api/errors';
 
 const initialForm: UsuarioForm = {
   username: '',
@@ -55,6 +56,8 @@ const initialForm: UsuarioForm = {
 
 const CORREO_DOMINIO = 'empresa.com';
 const PASSWORD_MIN_LENGTH = 8;
+const PHONE_LENGTH_MESSAGE =
+  'El numero telefonico supera el limite permitido. Dependiendo de la region existe un rango limite de digitos.';
 const normalizar = (valor: unknown) =>
   String(valor ?? '')
     .normalize('NFD')
@@ -237,7 +240,7 @@ function UsuarioCRUD() {
       setRoles(catalogo.roles);
       setEmpleados(empleadosData);
     } catch (err: any) {
-      setError('Error cargando usuarios, roles o empleados: ' + err.message);
+      setError('Error cargando usuarios, roles o empleados: ' + getApiErrorMessage(err, 'Error cargando usuarios'));
     } finally {
       setCargando(false);
     }
@@ -452,7 +455,17 @@ function UsuarioCRUD() {
       await cargarDatos();
       return true;
     } catch (err: any) {
-      setError('Error guardando usuario: ' + (err.response?.data?.error || err.message));
+      const apiMessage = getApiErrorMessage(err, 'Error guardando usuario');
+      const normalized = normalizar(apiMessage);
+      const isPhoneLengthError =
+        normalized.includes('telefono') ||
+        normalized.includes('phone') ||
+        normalized.includes('ora-12899') ||
+        normalized.includes('too large') ||
+        normalized.includes('value too large') ||
+        normalized.includes('demasiado');
+
+      setError('Error guardando usuario: ' + (isPhoneLengthError ? PHONE_LENGTH_MESSAGE : apiMessage));
       return false;
     }
   };
@@ -506,7 +519,7 @@ function UsuarioCRUD() {
 
       await cargarDatos();
     } catch (err: any) {
-      setError('Error eliminando usuario: ' + (err.response?.data?.error || err.message));
+      setError('Error eliminando usuario: ' + getApiErrorMessage(err, 'Error eliminando usuario'));
     }
   };
 

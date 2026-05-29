@@ -2,6 +2,8 @@ import axios from 'axios';
 
 export const AUTH_REQUIRED_EVENT = 'auth-required';
 export const ACCESS_FORBIDDEN_EVENT = 'access-forbidden';
+export const SERVER_CONNECTION_MESSAGE =
+  'No hay conexion con el servidor. Estamos trabajando para restablecer la conexion, tambien puedes contactar con el proveedor del servicio para verificar el estatus del servidor.';
 
 const statusMessages: Record<number, string> = {
   400: 'Filtros o datos invalidos',
@@ -31,6 +33,11 @@ api.interceptors.response.use(
   (error) => {
     const status = error?.response?.status;
     const message = status ? statusMessages[status] : undefined;
+
+    if (!error?.response) {
+      error.message = SERVER_CONNECTION_MESSAGE;
+      return Promise.reject(error);
+    }
 
     if (message && error.response) {
       if (!error.response.data || typeof error.response.data !== 'object') {

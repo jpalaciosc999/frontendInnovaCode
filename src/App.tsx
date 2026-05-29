@@ -201,10 +201,10 @@ function UnsavedAwareContainer({ children }: { children: ReactNode }) {
       </Container>
 
       <Dialog open={deleteDialogOpen} onClose={cancelDelete}>
-        <DialogTitle>Confirmar eliminación</DialogTitle>
+        <DialogTitle>Confirmar eliminacion</DialogTitle>
         <DialogContent>
           <DialogContentText>
-            ¿Estás segura de que quieres eliminar este dato? Esta acción no se puede deshacer.
+            Estas seguro de que quieres eliminar este dato? Esta accion no se puede deshacer.
           </DialogContentText>
         </DialogContent>
         <DialogActions>

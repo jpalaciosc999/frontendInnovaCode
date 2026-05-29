@@ -16,6 +16,19 @@ export function useUnsavedFormGuard<T>(
     setHasUnsavedChanges(formSnapshot !== initialSnapshot);
   }, [formSnapshot, initialSnapshot, setHasUnsavedChanges]);
 
+  useEffect(() => {
+    const hasChanges = formSnapshot !== initialSnapshot;
+    if (!hasChanges) return undefined;
+
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = '';
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [formSnapshot, initialSnapshot]);
+
   useEffect(() => registerSaveHandler(saveHandler), [registerSaveHandler, saveHandler]);
 
   useEffect(() => resetUnsavedChanges, [resetUnsavedChanges]);

@@ -12,6 +12,7 @@ import {
   actualizarEmpleado,
   eliminarEmpleado
 } from '../services/empleados.service';
+import { getApiErrorMessage } from '../api/errors';
 
 import { obtenerHorarios } from '../services/horario.service';
 import { obtenerPuestos } from '../services/puestos.service';
@@ -194,6 +195,11 @@ const getFlagEmoji = (countryCode: string) =>
 const getPhoneLocalMaxLength = (country: PhoneCountry) =>
   country.localLength ?? Math.max(6, 15 - country.dialCode.length);
 
+const getPhoneLengthMessage = (country: PhoneCountry) =>
+  country.localLength
+    ? `El telefono para ${country.name} debe tener ${country.localLength} digitos.`
+    : `El telefono para ${country.name} no debe exceder ${getPhoneLocalMaxLength(country)} digitos.`;
+
 const splitPhoneValue = (value: string, country: PhoneCountry) => {
   const digits = soloDigitos(value);
   if (digits.startsWith(country.dialCode) && digits.length > country.dialCode.length) {
@@ -331,7 +337,7 @@ function PruebaAxios() {
         `${a.EMP_NOMBRE} ${a.EMP_APELLIDO}`.localeCompare(`${b.EMP_NOMBRE} ${b.EMP_APELLIDO}`, 'es', { sensitivity: 'base' })
       ));
     } catch (err: any) {
-      setError('Error cargando empleados: ' + (err.response?.data?.error || err.message));
+      setError('Error cargando empleados: ' + getApiErrorMessage(err, 'Error cargando empleados'));
     } finally {
       setCargando(false);
     }
@@ -345,7 +351,7 @@ function PruebaAxios() {
         String(a.HOR_DESCRIPCION ?? '').localeCompare(String(b.HOR_DESCRIPCION ?? ''), 'es', { sensitivity: 'base' })
       ));
     } catch (err: any) {
-      setError('Error cargando horarios: ' + (err.response?.data?.error || err.message));
+      setError('Error cargando horarios: ' + getApiErrorMessage(err, 'Error cargando horarios'));
     } finally {
       setCargandoHorarios(false);
     }
@@ -359,7 +365,7 @@ function PruebaAxios() {
         String(a.PUE_NOMBRE ?? '').localeCompare(String(b.PUE_NOMBRE ?? ''), 'es', { sensitivity: 'base' })
       ));
     } catch (err: any) {
-      setError('Error cargando puestos: ' + (err.response?.data?.error || err.message));
+      setError('Error cargando puestos: ' + getApiErrorMessage(err, 'Error cargando puestos'));
     } finally {
       setCargandoPuestos(false);
     }
@@ -373,7 +379,7 @@ function PruebaAxios() {
         String(a.SED_NOMBRE ?? '').localeCompare(String(b.SED_NOMBRE ?? ''), 'es', { sensitivity: 'base' })
       ));
     } catch (err: any) {
-      setError('Error cargando sedes: ' + (err.response?.data?.error || err.message));
+      setError('Error cargando sedes: ' + getApiErrorMessage(err, 'Error cargando sedes'));
     } finally {
       setCargandoSedes(false);
     }
@@ -387,7 +393,7 @@ function PruebaAxios() {
         String(a.TIC_NOMBRE ?? '').localeCompare(String(b.TIC_NOMBRE ?? ''), 'es', { sensitivity: 'base' })
       ));
     } catch (err: any) {
-      setError('Error cargando tipos de contrato: ' + (err.response?.data?.error || err.message));
+      setError('Error cargando tipos de contrato: ' + getApiErrorMessage(err, 'Error cargando tipos de contrato'));
     } finally {
       setCargandoTiposContrato(false);
     }
@@ -401,7 +407,7 @@ function PruebaAxios() {
         String(a.DEP_NOMBRE ?? '').localeCompare(String(b.DEP_NOMBRE ?? ''), 'es', { sensitivity: 'base' })
       ));
     } catch (err: any) {
-      setError('Error cargando departamentos: ' + (err.response?.data?.error || err.message));
+      setError('Error cargando departamentos: ' + getApiErrorMessage(err, 'Error cargando departamentos'));
     } finally {
       setCargandoDeps(false);
     }
@@ -652,9 +658,16 @@ function PruebaAxios() {
   };
 
   const handleTelefonoLocalChange = (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const digits = soloDigitos(event.target.value);
+    const maxLength = getPhoneLocalMaxLength(telefonoPais);
+
+    if (digits.length > maxLength) {
+      setError(getPhoneLengthMessage(telefonoPais));
+    }
+
     setForm((prev) => ({
       ...prev,
-      emp_telefono: buildPhoneValue(telefonoPais, event.target.value),
+      emp_telefono: buildPhoneValue(telefonoPais, digits),
     }));
   };
 
@@ -739,6 +752,16 @@ function PruebaAxios() {
       return false;
     }
 
+    const telefonoDigits = soloDigitos(form.emp_telefono);
+    const telefonoMaxLength = getPhoneLocalMaxLength(telefonoPais);
+    if (
+      telefonoDigits.length > telefonoMaxLength ||
+      Boolean(telefonoPais.localLength && telefonoDigits.length !== telefonoPais.localLength)
+    ) {
+      setError(`${getPhoneLengthMessage(telefonoPais)} Dependiendo de la region existe un rango limite de digitos.`);
+      return false;
+    }
+
     if (!esContratoIndefinido(form.tic_id) && !form.emp_fecha_fin_contrato) {
       setError('La fecha fin de contrato es obligatoria para contratos no indefinidos');
       return false;
@@ -819,7 +842,7 @@ function PruebaAxios() {
       await cargarEmpleados();
       return true;
     } catch (err: any) {
-      setError('Error guardando empleado: ' + (err.response?.data?.error || err.message));
+      setError('Error guardando empleado: ' + getApiErrorMessage(err, 'Error guardando empleado'));
       return false;
     }
   };
@@ -839,7 +862,7 @@ function PruebaAxios() {
 
       await cargarEmpleados();
     } catch (err: any) {
-      setError('Error eliminando empleado: ' + (err.response?.data?.error || err.message));
+      setError('Error eliminando empleado: ' + getApiErrorMessage(err, 'Error eliminando empleado'));
     }
   };
 
@@ -1060,7 +1083,7 @@ function PruebaAxios() {
                   </Button>
                 )}
                 <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.75 }}>
-                  JPG, PNG o WEBP. Entre 50 KB y 300 KB.
+                  JPG, PNG o WEBP.
                 </Typography>
               </Box>
             </Box>
@@ -1148,7 +1171,12 @@ function PruebaAxios() {
                   value={telefonoLocal}
                   onChange={handleTelefonoLocalChange}
                   required
-                  helperText={`Prefijo seleccionado: +${telefonoPais.dialCode}. Se guardara el numero local${telefonoLocal ? `: ${telefonoLocal}` : ''}`}
+                  error={Boolean(telefonoLocal && telefonoPais.localLength && telefonoLocal.length !== telefonoPais.localLength)}
+                  helperText={
+                    telefonoPais.localLength && telefonoLocal.length > 0 && telefonoLocal.length !== telefonoPais.localLength
+                      ? getPhoneLengthMessage(telefonoPais)
+                      : undefined
+                  }
                   slotProps={{
                     input: {
                       startAdornment: (
@@ -1291,7 +1319,6 @@ function PruebaAxios() {
               type="date"
               value={form.emp_fecha_inicio_contrato}
               onChange={handleChange}
-              helperText="Esta fecha se usara como fecha de contratacion inicial"
               slotProps={{
                 inputLabel: { shrink: true },
                 htmlInput: { min: getToday() }
@@ -1309,11 +1336,6 @@ function PruebaAxios() {
               value={esContratoIndefinido(form.tic_id) ? '' : form.emp_fecha_fin_contrato}
               onChange={handleChange}
               disabled={esContratoIndefinido(form.tic_id)}
-              helperText={
-                esContratoIndefinido(form.tic_id)
-                  ? 'No aplica para contratos indefinidos'
-                  : 'Requerida para contratos temporales o con plazo'
-              }
               slotProps={{
                 inputLabel: { shrink: true },
                 htmlInput: { min: minFechaContratoFin }
@@ -1339,7 +1361,6 @@ function PruebaAxios() {
                 name="emp_motivo_cambio_contrato"
                 value={form.emp_motivo_cambio_contrato || ''}
                 onChange={handleChange}
-                helperText="Ej: renovacion, cambio a indefinido, cambio de jornada"
                 required
               />
             </Grid>
@@ -1354,7 +1375,6 @@ function PruebaAxios() {
               value={form.emp_sueldo}
               onChange={handleChange}
               onBlur={abrirJustificacionSalario}
-              helperText="Se llena con el salario base del puesto, pero puedes modificarlo para este empleado"
               slotProps={{
                 input: {
                   startAdornment: <InputAdornment position="start">Q</InputAdornment>,

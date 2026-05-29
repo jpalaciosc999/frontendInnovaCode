@@ -126,14 +126,14 @@ export function UnsavedChangesProvider({ children }: { children: ReactNode }) {
       <Dialog open={!!pendingPath} onClose={closeDialog} maxWidth="xs" fullWidth>
         <DialogTitle>Datos sin guardar</DialogTitle>
         <DialogContent>
-          <DialogContentText>¿Desea guardar los datos?</DialogContentText>
+          <DialogContentText>Desea guardar los datos antes de salir?</DialogContentText>
         </DialogContent>
         <DialogActions>
           <Button onClick={handleDiscard} disabled={saving} color="inherit">
             No guardar
           </Button>
           <Button onClick={handleSaveAndExit} disabled={saving} variant="contained">
-            {saving ? 'Guardando...' : 'Guardar y Salir'}
+            {saving ? 'Guardando...' : 'Guardar y salir'}
           </Button>
         </DialogActions>
       </Dialog>

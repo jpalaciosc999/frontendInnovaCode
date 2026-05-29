@@ -4,7 +4,7 @@ import type { ButtonProps } from '@mui/material/Button';
 import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
 
 import { downloadElementPdf } from '../../utils/pdfDownload';
-import api from '../../api/axios';
+import api, { SERVER_CONNECTION_MESSAGE } from '../../api/axios';
 
 type ReportPdfButtonProps = {
   filename: string;
@@ -42,8 +42,8 @@ const getBlobErrorMessage = async (error: unknown) => {
   const axiosError = error as { message?: string; response?: { data?: unknown } };
   const responseData = axiosError?.response?.data;
 
-  if (!axiosError?.response && axiosError?.message === 'Network Error') {
-    return 'Network Error: no se pudo conectar con el backend. Verifica que el servidor esté levantado y que CORS permita el puerto del frontend.';
+  if (!axiosError?.response) {
+    return axiosError?.message || SERVER_CONNECTION_MESSAGE;
   }
 
   if (responseData instanceof Blob) {

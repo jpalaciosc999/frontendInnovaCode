@@ -6,34 +6,34 @@
 
 export type FieldCharacterRule = 'name' | 'code' | 'description' | 'numeric' | 'free';
 
-const LETTERS = 'A-Za-zÁÉÍÓÚÜÑáéíóúüñ';
+const LETTERS = '\\p{L}';
 
 export const PATTERNS = {
   // Letras, numeros, espacios y acentos espanoles.
-  NOMBRE: new RegExp(`^[${LETTERS}0-9\\s]*$`),
+  NOMBRE: new RegExp(`^[${LETTERS}0-9\\s]*$`, 'u'),
 
   // Codigos tecnicos: letras, numeros, guion y guion bajo.
   CODIGO: /^[a-zA-Z0-9_-]*$/,
 
   // Texto descriptivo con puntuacion basica de uso comun.
-  DESCRIPCION: new RegExp(`^[${LETTERS}0-9\\s.,;:¿?¡!%°+\\-_/()[\\]'""]*$`),
+  DESCRIPCION: new RegExp(`^[${LETTERS}0-9\\s.,;:¿?¡!%°+\\-_/()[\\]'""]*$`, 'u'),
 
   // Solo digitos.
   NUMERICO: /^[0-9]*$/,
 };
 
 export const REGEX_PATTERNS = {
-  NOMBRE_SANITIZE: new RegExp(`[^${LETTERS}0-9\\s]`, 'g'),
+  NOMBRE_SANITIZE: new RegExp(`[^${LETTERS}0-9\\s]`, 'gu'),
   CODIGO_SANITIZE: /[^a-zA-Z0-9_-]/g,
-  DESCRIPCION_SANITIZE: new RegExp(`[^${LETTERS}0-9\\s.,;:¿?¡!%°+\\-_/()[\\]'""]`, 'g'),
+  DESCRIPCION_SANITIZE: new RegExp(`[^${LETTERS}0-9\\s.,;:¿?¡!%°+\\-_/()[\\]'""]`, 'gu'),
   NUMERICO_SANITIZE: /[^0-9]/g,
 };
 
 export const ERROR_MESSAGES = {
-  NOMBRE: 'Solo se permiten letras, números, espacios y acentos',
-  CODIGO: 'Solo se permiten letras, números, guion y guion bajo',
+  NOMBRE: 'Solo se permiten letras, numeros, espacios y acentos',
+  CODIGO: 'Solo se permiten letras, numeros, guion y guion bajo',
   DESCRIPCION: 'Contiene caracteres especiales no permitidos',
-  NUMERICO: 'Solo se permiten números',
+  NUMERICO: 'Solo se permiten numeros',
 };
 
 const normalizeHint = (value: string) =>

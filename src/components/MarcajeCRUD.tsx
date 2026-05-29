@@ -30,6 +30,7 @@ import {
   registrarMarcaje,
   updateMarcaje,
 } from '../services/marcaje.service';
+import { getApiErrorMessage } from '../api/errors';
 
 import { obtenerEmpleados } from '../services/empleados.service';
 import { obtenerLiquidaciones } from '../services/liquidacion.service';
@@ -178,6 +179,9 @@ const obtenerMensajeErrorMarcaje = (
 function MarcajeCRUD() {
   const authCtx = useAuth();
   const esEmpleado = isRole(authCtx.user as any, 'empleado');
+  const esSupervisorAsistencia = isRole(authCtx.user as any, 'supervisor_asistencia');
+  const usuarioEmpId = (authCtx.user as any)?.emp_id ?? (authCtx.user as any)?.EMP_ID ?? '';
+  const usuarioSedeId = (authCtx.user as any)?.sed_id ?? (authCtx.user as any)?.SED_ID ?? '';
   const [datos, setDatos] = useState<Marcaje[]>([]);
   const [empleados, setEmpleados] = useState<Empleado[]>([]);
   const [liquidaciones, setLiquidaciones] = useState<Liquidacion[]>([]);
@@ -213,10 +217,8 @@ function MarcajeCRUD() {
           // si es supervisor de asistencia, filtrar por SED_ID del usuario
           (async () => {
             try {
-              const auth = authCtx;
-              if (auth && isRole(auth.user as any, 'supervisor_asistencia')) {
-                const sed = (auth.user as any)?.SED_ID ?? (auth.user as any)?.sed_id ?? '';
-                return await obtenerEmpleados(sed ? { sed_id: String(sed) } : undefined);
+              if (esSupervisorAsistencia) {
+                return await obtenerEmpleados(usuarioSedeId ? { sed_id: String(usuarioSedeId) } : undefined);
               }
             } catch (e) {
               // ignore and fallback
@@ -237,7 +239,7 @@ function MarcajeCRUD() {
       } catch (err: any) {
         setError(
           'Error al obtener empleados u horarios del servidor: ' +
-            (err.response?.data?.message || err.message || '')
+            getApiErrorMessage(err, 'Error al obtener datos del servidor.')
         );
       } finally {
         setCargandoEmpleados(false);
@@ -245,7 +247,7 @@ function MarcajeCRUD() {
     };
 
     cargarCatalogos();
-    }, [authCtx.user, esEmpleado]);
+    }, [esEmpleado, esSupervisorAsistencia, usuarioEmpId, usuarioSedeId]);
 
   const empleadosLiquidadosIds = useMemo(
     () => new Set(liquidaciones.map((liquidacion) => String(liquidacion.EMP_ID))),
@@ -305,7 +307,7 @@ function MarcajeCRUD() {
         }
       } catch (err: any) {
         setError(
-          err.response?.data?.message || 'Error al obtener datos del servidor.'
+          getApiErrorMessage(err, 'Error al obtener datos del servidor.')
         );
       } finally {
         setCargandoMas(false);
@@ -341,7 +343,7 @@ function MarcajeCRUD() {
     try {
       const res = await registrarMarcaje(empleadoSeleccionado.EMP_ID);
 
-      alert(res.message);
+      alert(res.message || 'Marcaje registrado correctamente.');
 
       setOffset(0);
       await cargarDatos(0);
@@ -362,7 +364,7 @@ function MarcajeCRUD() {
       await cargarDatos(0);
     } catch (err: any) {
       alert(
-        err.response?.data?.message || 'Error al actualizar la autorización.'
+        getApiErrorMessage(err, 'Error al actualizar la autorizacion.')
       );
     }
   };
