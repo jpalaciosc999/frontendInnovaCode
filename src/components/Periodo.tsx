@@ -173,6 +173,13 @@ function Periodos() {
   useUnsavedFormGuard(form, initialForm, guardarPeriodo);
 
   const handleEliminar = async (id: number) => {
+    const periodo = datos.find((periodoItem) => periodoItem.PER_ID === id);
+    const estado = normalizePeriodoEstado(periodo?.PER_ESTADO);
+    if (['EN_REVISION', 'APROBADO', 'CERRADO'].includes(estado)) {
+      setError('No se puede eliminar un periodo en revision, aprobado o cerrado.');
+      return;
+    }
+
     if (!window.confirm('¿Deseas eliminar este periodo?')) return;
     try {
       setError('');
@@ -187,6 +194,12 @@ function Periodos() {
   };
 
   const handleEditar = (per: Periodo) => {
+    const estado = normalizePeriodoEstado(per.PER_ESTADO);
+    if (['EN_REVISION', 'APROBADO', 'CERRADO'].includes(estado)) {
+      setError('Este periodo esta bloqueado. Solo se pueden editar periodos abiertos.');
+      return;
+    }
+
     setModoEdicion(true);
     setPerId(per.PER_ID);
     setMensaje('');
@@ -402,7 +415,10 @@ function Periodos() {
             </TableHead>
             <TableBody>
               {datos.length > 0 ? (
-                datos.map((per) => (
+                datos.map((per) => {
+                  const periodoBloqueado = ['EN_REVISION', 'APROBADO', 'CERRADO'].includes(normalizePeriodoEstado(per.PER_ESTADO));
+
+                  return (
                   <TableRow key={per.PER_ID} hover>
                     <TableCell>{per.PER_ID}</TableCell>
                     <TableCell>
@@ -427,6 +443,7 @@ function Periodos() {
                           variant="outlined"
                           startIcon={<EditIcon />}
                           onClick={() => handleEditar(per)}
+                          disabled={periodoBloqueado}
                         >
                           Editar
                         </Button>
@@ -436,13 +453,15 @@ function Periodos() {
                           color="error"
                           startIcon={<DeleteIcon />}
                           onClick={() => handleEliminar(per.PER_ID)}
+                          disabled={periodoBloqueado}
                         >
                           Eliminar
                         </Button>
                       </Box>
                     </TableCell>
                   </TableRow>
-                ))
+                  );
+                })
               ) : (
                 <TableRow>
                   <TableCell colSpan={7} align="center">No hay periodos registrados</TableCell>

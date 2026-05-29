@@ -1,5 +1,6 @@
 import api from '../api/axios';
 import type { Empleado } from '../interfaces/empleados';
+import type { ControlLaboral } from '../interfaces/controlLaboral';
 import type { Departamento } from '../interfaces/departamentos';
 import type { Sede } from '../interfaces/sede';
 import type {
@@ -48,14 +49,12 @@ function formatAntiguedad(anios: number): string {
   return `${anios} años`;
 }
 
-/**
- * Simula días disfrutados de forma determinista usando el EMP_ID.
- * En producción, esto vendría de la tabla de registro de vacaciones.
- */
-function simularDiasDisfrutados(empId: number, diasAcumulados: number): number {
-  if (diasAcumulados === 0) return 0;
-  const ratio = [0.8, 0.5, 0.4, 0.2, 0.15, 0.6, 0.35, 0.75, 0.9, 0.1][empId % 10];
-  return Math.floor(diasAcumulados * ratio);
+function getInclusiveDays(start?: string | null, end?: string | null): number {
+  const startDate = parseDate(start);
+  const endDate = parseDate(end || start);
+  if (!startDate || !endDate || endDate < startDate) return 0;
+
+  return Math.floor((endDate.getTime() - startDate.getTime()) / 86400000) + 1;
 }
 
 function calcEstado(
@@ -75,18 +74,27 @@ export const getReporteVacaciones = async (
 ): Promise<VacacionesResponse> => {
   const hoy = new Date();
 
-  const [empleadosRes, depRes, sedesRes] = await Promise.all([
+  const [empleadosRes, depRes, sedesRes, controlesRes] = await Promise.all([
     api.get<Empleado[]>('/empleados'),
     api.get<Departamento[]>('/departamentos'),
     api.get<Sede[]>('/sedes').catch(() => ({ data: [] as Sede[] })),
+    api.get<ControlLaboral[]>('/control-laboral').catch(() => ({ data: [] as ControlLaboral[] })),
   ]);
 
   const empleados: Empleado[] = empleadosRes.data;
   const departamentos: Departamento[] = depRes.data;
   const sedes: Sede[] = sedesRes.data;
+  const controles: ControlLaboral[] = controlesRes.data;
 
   const depMap  = new Map(departamentos.map((d) => [d.DEP_ID, d]));
   const sedeMap = new Map(sedes.map((s) => [s.SED_ID, s]));
+  const vacacionesAprobadasPorEmpleado = controles
+    .filter((control) => control.CTL_MOTIVO === 'VAC' && control.CTL_ESTADO === 'A')
+    .reduce((map, control) => {
+      const empId = Number(control.EMP_ID);
+      map.set(empId, (map.get(empId) ?? 0) + getInclusiveDays(control.CTL_FECHA_INICIO, control.CTL_FECHA_REGRESO));
+      return map;
+    }, new Map<number, number>());
 
   // Only active employees
   let base = empleados.filter((e) => e.EMP_ESTADO === 'A');
@@ -105,7 +113,7 @@ export const getReporteVacaciones = async (
 
     const aniosCumplidos  = calcAniosCumplidos(emp.EMP_FECHA_CONTRATACION, hoy);
     const diasAcumulados  = aniosCumplidos * DIAS_POR_ANIO;
-    const diasDisfrutados = simularDiasDisfrutados(emp.EMP_ID, diasAcumulados);
+    const diasDisfrutados = Math.min(diasAcumulados, vacacionesAprobadasPorEmpleado.get(emp.EMP_ID) ?? 0);
     const diasPendientes  = diasAcumulados - diasDisfrutados;
     const usoPct          = diasAcumulados > 0
       ? Math.round((diasDisfrutados / diasAcumulados) * 100)

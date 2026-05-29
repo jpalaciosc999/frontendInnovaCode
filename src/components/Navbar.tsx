@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+﻿import { useMemo, useState } from 'react';
 import type { MouseEvent, ReactNode } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import {
@@ -14,6 +14,8 @@ import {
   Box,
   Divider,
   Collapse,
+  Stack,
+  Avatar,
 } from '@mui/material';
 
 import MenuIcon from '@mui/icons-material/Menu';
@@ -50,6 +52,7 @@ import ApprovalIcon from '@mui/icons-material/Approval';
 import HealthAndSafetyIcon from '@mui/icons-material/HealthAndSafety';
 import GavelIcon from '@mui/icons-material/Gavel';
 import PlaylistAddCheckIcon from '@mui/icons-material/PlaylistAddCheck';
+import DownloadIcon from '@mui/icons-material/Download';
 import { appViews } from '../config/roleViews';
 import { useAuth } from '../context/AuthContext';
 import { useUnsavedChanges } from '../context/UnsavedChangesContext';
@@ -124,6 +127,7 @@ const viewIcons: Record<string, ReactNode> = {
   'reporte-horas-extra':  <SummarizeIcon />,
   'reporte-liquidacion':  <SummarizeIcon />,
   'dashboard-ejecutivo': <SummarizeIcon />,
+  'generar-csv': <DownloadIcon />,
   'tipos-descuento': <PercentIcon />,
   'prestamos-banco': <AccountBalanceIcon />,
   'aprobacion-nomina': <ApprovalIcon />,
@@ -180,7 +184,7 @@ const processSections: Array<{ key: string; text: string; icon: ReactNode; viewK
     key: 'nomina',
     text: 'Operaciones de pago',
     icon: <PaymentsIcon />,
-    viewKeys: ['nomina-asignaciones', 'nomina-detalle', 'liquidacion', 'calculadora-igss', 'calculadora-isr'],
+    viewKeys: ['nomina-asignaciones', 'nomina-detalle', 'liquidacion', 'calculadora-igss', 'calculadora-isr', 'generar-csv'],
   },
   {
     key: 'administracion',
@@ -229,7 +233,7 @@ function Navbar() {
     administracion: false,
     auditoria: false,
     asistencia: false,
-    REPORTES: true,
+    Reportes: true,
   });
 
   const location = useLocation();
@@ -312,27 +316,37 @@ function Navbar() {
 
   return (
     <>
-      <AppBar position="sticky" elevation={2}>
-        <Toolbar>
+      <AppBar position="sticky" elevation={0}>
+        <Toolbar sx={{ minHeight: 66 }}>
           <IconButton
             color="inherit"
             edge="start"
             onClick={toggleDrawer(true)}
-            sx={{ mr: 2 }}
+            sx={{ mr: 1.5, border: '1px solid', borderColor: 'divider' }}
           >
             <MenuIcon />
           </IconButton>
 
-          <Typography variant="h6" sx={{ fontWeight: 700 }}>
-            Frontend Innova
-          </Typography>
+          <Box>
+            <Typography variant="h6" sx={{ fontWeight: 900, lineHeight: 1.05 }}>
+              Innova Nominas
+            </Typography>
+            <Typography variant="caption" color="text.secondary" sx={{ display: { xs: 'none', sm: 'block' } }}>
+              Gestion de planilla y asistencia
+            </Typography>
+          </Box>
 
           <Box sx={{ flexGrow: 1 }} />
 
           {user && (
-            <Typography variant="body2" sx={{ mr: 1, display: { xs: 'none', sm: 'block' } }}>
-              {user.nombre_completo || user.email}
-            </Typography>
+            <Stack direction="row" spacing={1} sx={{ alignItems: 'center', mr: 1, display: { xs: 'none', sm: 'flex' } }}>
+              <Avatar sx={{ width: 30, height: 30, bgcolor: 'primary.light', color: 'primary.dark', fontSize: 13 }}>
+                {(user.nombre_completo || user.email || 'U').slice(0, 1).toUpperCase()}
+              </Avatar>
+              <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                {user.nombre_completo || user.email}
+              </Typography>
+            </Stack>
           )}
 
           <IconButton color="inherit" title="Cerrar sesión" onClick={logout}>
@@ -341,14 +355,19 @@ function Navbar() {
         </Toolbar>
       </AppBar>
 
-      <Drawer anchor="left" open={open} onClose={toggleDrawer(false)}>
-        <Box sx={{ width: 310 }} role="presentation">
-          <Box sx={{ p: 2 }}>
-            <Typography variant="h6" sx={{ fontWeight: 700 }}>
+      <Drawer
+        anchor="left"
+        open={open}
+        onClose={toggleDrawer(false)}
+        slotProps={{ paper: { sx: { width: 328, bgcolor: 'background.default' } } }}
+      >
+        <Box role="presentation">
+          <Box sx={{ p: 2.25 }}>
+            <Typography variant="h6" sx={{ fontWeight: 900 }}>
               Menu principal
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              Navegacion por proceso
+              Navegacion por proceso de nomina
             </Typography>
           </Box>
 
@@ -451,3 +470,4 @@ function Navbar() {
 }
 
 export default Navbar;
+

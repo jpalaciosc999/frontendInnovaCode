@@ -1,4 +1,4 @@
-import { useDeferredValue, useEffect, useMemo, useState } from 'react';
+﻿import { useDeferredValue, useEffect, useMemo, useState } from 'react';
 import type { Empleado, EmpleadoForm } from '../interfaces/empleados';
 import type { Horario } from '../interfaces/horario';
 import type { Puesto } from '../interfaces/puestos';
@@ -65,6 +65,10 @@ import VisibilityIcon from '@mui/icons-material/Visibility';
 import PhotoCameraIcon from '@mui/icons-material/PhotoCamera';
 import ArticleIcon from '@mui/icons-material/Article';
 import { useUnsavedFormGuard } from '../hooks/useUnsavedFormGuard';
+import PageHeader from './common/PageHeader';
+import SummaryCard from './common/SummaryCard';
+import StateBlock from './common/StateBlock';
+import DigitField from './common/DigitField';
 
 const initialForm: EmpleadoForm = {
   emp_nombre: '',
@@ -456,6 +460,10 @@ function PruebaAxios() {
     setForm((prev) => ({ ...prev, [name as string]: value }));
   };
 
+  const handleDigitFieldChange = (name: string, value: string) => {
+    setForm((prev) => ({ ...prev, [name]: value }));
+  };
+
   const handleFilterChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement> | SelectChangeEvent
   ) => {
@@ -531,7 +539,7 @@ function PruebaAxios() {
       form.emp_fecha_fin_contrato &&
       form.emp_fecha_fin_contrato < form.emp_fecha_inicio_contrato
     ) {
-      setError('La fecha fin de contrato no puede ser anterior a la fecha de contratación');
+      setError('La fecha fin de contrato no puede ser anterior a la fecha de contrataciÃ³n');
       return false;
     }
 
@@ -576,7 +584,7 @@ function PruebaAxios() {
   useUnsavedFormGuard(form, initialForm, guardarEmpleado);
 
   const handleEliminar = async (id: number) => {
-    if (!window.confirm('¿Deseas eliminar este empleado?')) return;
+    if (!window.confirm('Â¿Deseas eliminar este empleado?')) return;
 
     try {
       setError('');
@@ -663,10 +671,10 @@ function PruebaAxios() {
     const dias: string[] = [];
     if (hor.HOR_LUNES) dias.push('Lun');
     if (hor.HOR_MARTES) dias.push('Mar');
-    if (hor.HOR_MIERCOLES) dias.push('Mié');
+    if (hor.HOR_MIERCOLES) dias.push('MiÃ©');
     if (hor.HOR_JUEVES) dias.push('Jue');
     if (hor.HOR_VIERNES) dias.push('Vie');
-    if (hor.HOR_SABADO) dias.push('Sáb');
+    if (hor.HOR_SABADO) dias.push('SÃ¡b');
     if (hor.HOR_DOMINGO) dias.push('Dom');
     return dias.join(', ');
   };
@@ -708,7 +716,7 @@ function PruebaAxios() {
   };
 
   const formatearFechaSimple = (fecha?: string) =>
-    fecha ? String(fecha).slice(0, 10) : '—';
+    fecha ? String(fecha).slice(0, 10) : 'â€”';
 
   const deferredFilters = useDeferredValue(filters);
 
@@ -746,21 +754,20 @@ function PruebaAxios() {
   if (cargando) {
     return (
       <Box sx={{ p: 3 }}>
-        <Typography variant="h6">Cargando empleados...</Typography>
+        <StateBlock title="Cargando empleados..." loading />
       </Box>
     );
   }
 
   return (
     <Box sx={{ py: 2 }}>
-      <Paper elevation={3} sx={{ p: 3, mb: 3 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 3 }}>
-          <PeopleIcon color="primary" />
-          <Typography variant="h4" sx={{ fontWeight: 'bold' }}>
-            CRUD de Empleados
-          </Typography>
-        </Box>
+      <PageHeader
+        title="Empleados"
+        subtitle="Administra datos personales, contratos, puesto, horario, sede y salario base de cada colaborador."
+        icon={<PeopleIcon />}
+      />
 
+      <Paper sx={{ p: { xs: 2, md: 3 }, mb: 3 }}>
         <Typography variant="h6" sx={{ mb: 2 }}>
           {modoEdicion ? 'Editar empleado' : 'Nuevo empleado'}
         </Typography>
@@ -822,64 +829,41 @@ function PruebaAxios() {
               required
             />
           </Grid>
-
           <Grid size={{ xs: 12, md: 6 }}>
-            <TextField
-              fullWidth
+            <DigitField
               label="DPI"
               name="emp_dpi"
               value={form.emp_dpi}
-              onChange={handleChange}
+              maxLength={13}
+              onValueChange={handleDigitFieldChange}
               required
-              slotProps={{
-                htmlInput: {
-                  inputMode: 'numeric',
-                  pattern: '[0-9]*',
-                  maxLength: 13
-                }
-              }}
-              helperText="Solo números. Máximo 13 dígitos para DPI."
+              helperText="Solo numeros. Maximo 13 digitos para DPI."
             />
           </Grid>
 
           <Grid size={{ xs: 12, md: 6 }}>
-            <TextField
-              fullWidth
+            <DigitField
               label="NIT"
               name="emp_nit"
               value={form.emp_nit}
-              onChange={handleChange}
+              maxLength={9}
+              onValueChange={handleDigitFieldChange}
               required
-              slotProps={{
-                htmlInput: {
-                  inputMode: 'numeric',
-                  pattern: '[0-9]*',
-                  maxLength: 9
-                }
-              }}
-              helperText="Solo números. Máximo 9 dígitos para NIT."
+              helperText="Solo numeros. Maximo 9 digitos para NIT."
             />
           </Grid>
 
           <Grid size={{ xs: 12, md: 6 }}>
-            <TextField
-              fullWidth
-              label="Teléfono"
+            <DigitField
+              label="Telefono"
               name="emp_telefono"
               value={form.emp_telefono}
-              onChange={handleChange}
+              maxLength={8}
+              onValueChange={handleDigitFieldChange}
               required
-              slotProps={{
-                htmlInput: {
-                  inputMode: 'numeric',
-                  pattern: '[0-9]*',
-                  maxLength: 8
-                }
-              }}
-              helperText="Solo números. Máximo 8 dígitos para teléfono guatemalteco."
+              helperText="Solo numeros. Maximo 8 digitos para telefono guatemalteco."
             />
           </Grid>
-
           <Grid size={{ xs: 12, md: 6 }}>
             <FormControl fullWidth required>
               <InputLabel>Estado</InputLabel>
@@ -919,7 +903,7 @@ function PruebaAxios() {
             <TextField
               fullWidth
               label="Horario"
-              value={horNombre ? `#${form.hor_id} — ${horNombre}` : ''}
+              value={horNombre ? `#${form.hor_id} â€” ${horNombre}` : ''}
               placeholder="Haz clic para seleccionar un horario"
               onClick={abrirModalHorarios}
               slotProps={{
@@ -1090,19 +1074,30 @@ function PruebaAxios() {
         </Grid>
       </Paper>
 
-      <Paper elevation={3} sx={{ p: 3 }}>
+      <Paper sx={{ p: { xs: 2, md: 3 } }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 2, flexWrap: 'wrap', mb: 2 }}>
           <Typography variant="h6">
             Listado de empleados: {empleadosFiltrados.length} de {datos.length}
           </Typography>
-          <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-            <Chip label={`Activos: ${resumenEmpleados.activos}`} color="success" size="small" />
-            <Chip label={`Sin horario: ${resumenEmpleados.sinHorario}`} color="warning" size="small" />
-            <Chip label={`Sin sede: ${resumenEmpleados.sinSede}`} color="warning" size="small" />
-            <Chip label={`Sin puesto: ${resumenEmpleados.sinPuesto}`} color="warning" size="small" />
-            <Chip label={`Sin contrato: ${resumenEmpleados.sinContrato}`} color="warning" size="small" />
-          </Box>
         </Box>
+
+        <Grid container spacing={2} sx={{ mb: 2 }}>
+          <Grid size={{ xs: 12, sm: 6, md: 2.4 }}>
+            <SummaryCard title="Activos" value={resumenEmpleados.activos} tone="success" />
+          </Grid>
+          <Grid size={{ xs: 12, sm: 6, md: 2.4 }}>
+            <SummaryCard title="Sin horario" value={resumenEmpleados.sinHorario} tone={resumenEmpleados.sinHorario ? 'warning' : 'neutral'} />
+          </Grid>
+          <Grid size={{ xs: 12, sm: 6, md: 2.4 }}>
+            <SummaryCard title="Sin sede" value={resumenEmpleados.sinSede} tone={resumenEmpleados.sinSede ? 'warning' : 'neutral'} />
+          </Grid>
+          <Grid size={{ xs: 12, sm: 6, md: 2.4 }}>
+            <SummaryCard title="Sin puesto" value={resumenEmpleados.sinPuesto} tone={resumenEmpleados.sinPuesto ? 'warning' : 'neutral'} />
+          </Grid>
+          <Grid size={{ xs: 12, sm: 6, md: 2.4 }}>
+            <SummaryCard title="Sin contrato" value={resumenEmpleados.sinContrato} tone={resumenEmpleados.sinContrato ? 'warning' : 'neutral'} />
+          </Grid>
+        </Grid>
 
         {empleadosFiltrados.length > EMPLOYEE_TABLE_LIMIT && (
           <Alert severity="info" sx={{ mb: 2 }}>
@@ -1204,8 +1199,8 @@ function PruebaAxios() {
                 <TableCell><strong>Apellido</strong></TableCell>
                 <TableCell><strong>DPI</strong></TableCell>
                 <TableCell><strong>NIT</strong></TableCell>
-                <TableCell><strong>Teléfono</strong></TableCell>
-                <TableCell><strong>F. Contratación</strong></TableCell>
+                <TableCell><strong>TelÃ©fono</strong></TableCell>
+                <TableCell><strong>F. ContrataciÃ³n</strong></TableCell>
                 <TableCell><strong>Horario</strong></TableCell>
                 <TableCell><strong>Sede</strong></TableCell>
                 <TableCell><strong>Puesto</strong></TableCell>
@@ -1238,19 +1233,19 @@ function PruebaAxios() {
                     <TableCell>
                       {empleado.EMP_FECHA_CONTRATACION
                         ? String(empleado.EMP_FECHA_CONTRATACION).slice(0, 10)
-                        : '—'}
+                        : 'â€”'}
                     </TableCell>
                     <TableCell>
-                      {empleado.HOR_ID ? obtenerChipHorario(empleado.HOR_ID) : '—'}
+                      {empleado.HOR_ID ? obtenerChipHorario(empleado.HOR_ID) : 'â€”'}
                     </TableCell>
                     <TableCell>
-                      {empleado.SED_ID ? obtenerChipSede(empleado.SED_ID) : '—'}
+                      {empleado.SED_ID ? obtenerChipSede(empleado.SED_ID) : 'â€”'}
                     </TableCell>
                     <TableCell>
-                      {empleado.PUE_ID ? obtenerChipPuesto(empleado.PUE_ID) : '—'}
+                      {empleado.PUE_ID ? obtenerChipPuesto(empleado.PUE_ID) : 'â€”'}
                     </TableCell>
                     <TableCell>
-                      {empleado.TIC_ID ? obtenerChipTipoContrato(empleado.TIC_ID) : '—'}
+                      {empleado.TIC_ID ? obtenerChipTipoContrato(empleado.TIC_ID) : 'â€”'}
                     </TableCell>
                     <TableCell>
                       {empleado.TIC_ID && esContratoIndefinido(empleado.TIC_ID)
@@ -1328,7 +1323,7 @@ function PruebaAxios() {
           <TextField
             fullWidth
             autoFocus
-            placeholder="Buscar por nombre, descripción o ID..."
+            placeholder="Buscar por nombre, descripciÃ³n o ID..."
             value={filtroDep}
             onChange={(e) => setFiltroDep(e.target.value)}
             sx={{ mb: 2 }}
@@ -1354,7 +1349,7 @@ function PruebaAxios() {
                   <TableRow>
                     <TableCell><strong>ID</strong></TableCell>
                     <TableCell><strong>Nombre</strong></TableCell>
-                    <TableCell><strong>Descripción</strong></TableCell>
+                    <TableCell><strong>DescripciÃ³n</strong></TableCell>
                     <TableCell><strong>Estado</strong></TableCell>
                   </TableRow>
                 </TableHead>
@@ -1369,7 +1364,7 @@ function PruebaAxios() {
                       >
                         <TableCell>{dep.DEP_ID}</TableCell>
                         <TableCell>{dep.DEP_NOMBRE}</TableCell>
-                        <TableCell>{dep.DEP_DESCRIPCION || '—'}</TableCell>
+                        <TableCell>{dep.DEP_DESCRIPCION || 'â€”'}</TableCell>
                         <TableCell>
                           <Chip
                             label={dep.DEP_ESTADO === 'A' ? 'Activo' : 'Inactivo'}
@@ -1416,7 +1411,7 @@ function PruebaAxios() {
           <TextField
             fullWidth
             autoFocus
-            placeholder="Buscar por descripción, horario o ID..."
+            placeholder="Buscar por descripciÃ³n, horario o ID..."
             value={filtroHor}
             onChange={(e) => setFiltroHor(e.target.value)}
             sx={{ mb: 2 }}
@@ -1441,10 +1436,10 @@ function PruebaAxios() {
                 <TableHead>
                   <TableRow>
                     <TableCell><strong>ID</strong></TableCell>
-                    <TableCell><strong>Descripción</strong></TableCell>
+                    <TableCell><strong>DescripciÃ³n</strong></TableCell>
                     <TableCell><strong>Hora inicio</strong></TableCell>
                     <TableCell><strong>Hora fin</strong></TableCell>
-                    <TableCell><strong>Días</strong></TableCell>
+                    <TableCell><strong>DÃ­as</strong></TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -1523,18 +1518,18 @@ function PruebaAxios() {
             <Grid container spacing={2}>
               <Grid size={{ xs: 12, md: 6 }}>
                 <Typography variant="caption" color="text.secondary">NIT</Typography>
-                <Typography>{perfilEmpleado.EMP_NIT || '—'}</Typography>
+                <Typography>{perfilEmpleado.EMP_NIT || 'â€”'}</Typography>
               </Grid>
               <Grid size={{ xs: 12, md: 6 }}>
-                <Typography variant="caption" color="text.secondary">Teléfono</Typography>
-                <Typography>{perfilEmpleado.EMP_TELEFONO || '—'}</Typography>
+                <Typography variant="caption" color="text.secondary">TelÃ©fono</Typography>
+                <Typography>{perfilEmpleado.EMP_TELEFONO || 'â€”'}</Typography>
               </Grid>
               <Grid size={{ xs: 12, md: 6 }}>
-                <Typography variant="caption" color="text.secondary">Fecha de contratación</Typography>
+                <Typography variant="caption" color="text.secondary">Fecha de contrataciÃ³n</Typography>
                 <Typography>
                   {perfilEmpleado.EMP_FECHA_CONTRATACION
                     ? String(perfilEmpleado.EMP_FECHA_CONTRATACION).slice(0, 10)
-                    : '—'}
+                    : 'â€”'}
                 </Typography>
               </Grid>
               <Grid size={{ xs: 12, md: 6 }}>
@@ -1546,31 +1541,31 @@ function PruebaAxios() {
               <Grid size={{ xs: 12, md: 6 }}>
                 <Typography variant="caption" color="text.secondary">Departamento del puesto</Typography>
                 <Box sx={{ mt: 0.5 }}>
-                  {perfilEmpleado.PUE_ID ? obtenerDepartamentoPuesto(perfilEmpleado.PUE_ID) : '—'}
+                  {perfilEmpleado.PUE_ID ? obtenerDepartamentoPuesto(perfilEmpleado.PUE_ID) : 'â€”'}
                 </Box>
               </Grid>
               <Grid size={{ xs: 12, md: 6 }}>
                 <Typography variant="caption" color="text.secondary">Horario</Typography>
                 <Box sx={{ mt: 0.5 }}>
-                  {perfilEmpleado.HOR_ID ? obtenerChipHorario(perfilEmpleado.HOR_ID) : '—'}
+                  {perfilEmpleado.HOR_ID ? obtenerChipHorario(perfilEmpleado.HOR_ID) : 'â€”'}
                 </Box>
               </Grid>
               <Grid size={{ xs: 12, md: 6 }}>
                 <Typography variant="caption" color="text.secondary">Sede</Typography>
                 <Box sx={{ mt: 0.5 }}>
-                  {perfilEmpleado.SED_ID ? obtenerChipSede(perfilEmpleado.SED_ID) : '—'}
+                  {perfilEmpleado.SED_ID ? obtenerChipSede(perfilEmpleado.SED_ID) : 'â€”'}
                 </Box>
               </Grid>
               <Grid size={{ xs: 12, md: 6 }}>
                 <Typography variant="caption" color="text.secondary">Puesto</Typography>
                 <Box sx={{ mt: 0.5 }}>
-                  {perfilEmpleado.PUE_ID ? obtenerChipPuesto(perfilEmpleado.PUE_ID) : '—'}
+                  {perfilEmpleado.PUE_ID ? obtenerChipPuesto(perfilEmpleado.PUE_ID) : 'â€”'}
                 </Box>
               </Grid>
               <Grid size={{ xs: 12, md: 6 }}>
                 <Typography variant="caption" color="text.secondary">Tipo de contrato</Typography>
                 <Box sx={{ mt: 0.5 }}>
-                  {perfilEmpleado.TIC_ID ? obtenerChipTipoContrato(perfilEmpleado.TIC_ID) : '—'}
+                  {perfilEmpleado.TIC_ID ? obtenerChipTipoContrato(perfilEmpleado.TIC_ID) : 'â€”'}
                 </Box>
               </Grid>
               <Grid size={{ xs: 12, md: 6 }}>

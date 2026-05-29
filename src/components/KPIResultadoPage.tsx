@@ -19,13 +19,9 @@ import {
   Box,
   Button,
   Chip,
-  FormControl,
   Grid,
   InputAdornment,
-  InputLabel,
-  MenuItem,
   Paper,
-  Select,
   Snackbar,
   Table,
   TableBody,
@@ -43,6 +39,7 @@ import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AssessmentIcon from '@mui/icons-material/Assessment';
 import { useUnsavedFormGuard } from '../hooks/useUnsavedFormGuard';
+import LookupSelect from './common/LookupSelect';
 
 const initialForm: KPIResultadoForm = {
   kre_monto_total: '',
@@ -287,29 +284,31 @@ function KPIResultadoCRUD() {
 
         <Grid container spacing={2}>
           <Grid size={{ xs: 12, md: 6 }}>
-            <FormControl fullWidth>
-              <InputLabel>Empleado</InputLabel>
-              <Select name="emp_id" value={form.emp_id ?? ''} label="Empleado" onChange={handleChange}>
-                {empleados.map((empleado) => (
-                  <MenuItem key={empleado.EMP_ID} value={String(empleado.EMP_ID)}>
-                    {obtenerNombreEmpleado(empleado)}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
+            <LookupSelect
+              label="Empleado"
+              value={form.emp_id ?? ''}
+              placeholder="Buscar empleado"
+              options={empleados.map((empleado) => ({
+                value: String(empleado.EMP_ID),
+                label: obtenerNombreEmpleado(empleado) || `Empleado #${empleado.EMP_ID}`,
+                description: `ID ${empleado.EMP_ID}`,
+              }))}
+              onChange={(value) => setForm((prev) => ({ ...prev, emp_id: value }))}
+            />
           </Grid>
 
           <Grid size={{ xs: 12, md: 6 }}>
-            <FormControl fullWidth>
-              <InputLabel>KPI</InputLabel>
-              <Select name="kpi_id" value={form.kpi_id} label="KPI" onChange={handleChange}>
-                {kpis.map((kpi) => (
-                  <MenuItem key={kpi.KPI_ID} value={String(kpi.KPI_ID)}>
-                    {kpi.KPI_NOMBRE} - Base {formatearMoneda(kpi.KPI_VALOR)}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
+            <LookupSelect
+              label="KPI"
+              value={form.kpi_id}
+              placeholder="Buscar KPI"
+              options={kpis.map((kpi) => ({
+                value: String(kpi.KPI_ID),
+                label: kpi.KPI_NOMBRE,
+                description: `Base ${formatearMoneda(kpi.KPI_VALOR)}`,
+              }))}
+              onChange={(value) => setForm((prev) => ({ ...prev, kpi_id: value }))}
+            />
           </Grid>
 
           <Grid size={{ xs: 12, md: 4 }}>

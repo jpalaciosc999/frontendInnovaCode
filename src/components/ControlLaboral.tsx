@@ -42,6 +42,7 @@ import AssignmentIndIcon from '@mui/icons-material/AssignmentInd';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CancelIcon from '@mui/icons-material/Cancel';
 import { useUnsavedFormGuard } from '../hooks/useUnsavedFormGuard';
+import LookupSelect from './common/LookupSelect';
 
 const getToday = () => new Date().toISOString().slice(0, 10);
 const VACATION_DAYS_PER_YEAR = 15;
@@ -429,22 +430,18 @@ function ControlLaboralPage() {
         <Grid container spacing={2}>
           <Grid size={{ xs: 12, md: 6 }}>
             {empleados.length > 0 ? (
-              <FormControl fullWidth>
-                <InputLabel>Empleado</InputLabel>
-                <Select
-                  name="emp_id"
-                  value={form.emp_id}
-                  label="Empleado"
-                  onChange={handleChange}
-                  disabled={cargandoEmpleados}
-                >
-                  {empleados.map((empleado) => (
-                    <MenuItem key={empleado.EMP_ID} value={String(empleado.EMP_ID)}>
-                      {obtenerNombreEmpleado(empleado)}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
+              <LookupSelect
+                label="Empleado"
+                value={form.emp_id}
+                placeholder="Buscar empleado"
+                disabled={cargandoEmpleados}
+                options={empleados.map((empleado) => ({
+                  value: String(empleado.EMP_ID),
+                  label: obtenerNombreEmpleado(empleado),
+                  description: `ID ${empleado.EMP_ID}`,
+                }))}
+                onChange={(value) => setForm((prev) => ({ ...prev, emp_id: value }))}
+              />
             ) : (
               <TextField
                 fullWidth
@@ -576,17 +573,17 @@ function ControlLaboralPage() {
         <Grid container spacing={2} sx={{ mb: 2 }}>
           <Grid size={{ xs: 12, md: 3 }}>
             {empleados.length > 0 ? (
-              <FormControl fullWidth size="small">
-                <InputLabel>Empleado</InputLabel>
-                <Select name="empleado" value={filters.empleado} label="Empleado" onChange={handleFilterChange}>
-                  <MenuItem value="">Todos</MenuItem>
-                  {empleados.map((empleado) => (
-                    <MenuItem key={empleado.EMP_ID} value={String(empleado.EMP_ID)}>
-                      {obtenerNombreEmpleado(empleado)}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
+              <LookupSelect
+                label="Empleado"
+                value={filters.empleado}
+                placeholder="Todos"
+                options={empleados.map((empleado) => ({
+                  value: String(empleado.EMP_ID),
+                  label: obtenerNombreEmpleado(empleado),
+                  description: `ID ${empleado.EMP_ID}`,
+                }))}
+                onChange={(value) => setFilters((prev) => ({ ...prev, empleado: value }))}
+              />
             ) : (
               <TextField
                 fullWidth

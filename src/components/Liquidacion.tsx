@@ -40,6 +40,7 @@ import SaveIcon from '@mui/icons-material/Save';
 import CleaningServicesIcon from '@mui/icons-material/CleaningServices';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
+import LookupSelect from './common/LookupSelect';
 import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
 import { useUnsavedFormGuard } from '../hooks/useUnsavedFormGuard';
 
@@ -278,17 +279,17 @@ function LiquidacionCRUD() {
 
         <Grid container spacing={2}>
           <Grid size={{ xs: 12, md: 6 }}>
-            <FormControl fullWidth>
-              <InputLabel>Empleado</InputLabel>
-              <Select name="emp_id" value={String(form.emp_id)} label="Empleado" onChange={handleChange}>
-                <MenuItem value="">Seleccione empleado</MenuItem>
-                {empleadosDisponibles.map((empleado) => (
-                  <MenuItem key={empleado.EMP_ID} value={String(empleado.EMP_ID)}>
-                    {obtenerNombreEmpleado(empleado)}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
+            <LookupSelect
+              label="Empleado"
+              value={String(form.emp_id)}
+              placeholder="Buscar empleado"
+              options={empleadosDisponibles.map((empleado) => ({
+                value: String(empleado.EMP_ID),
+                label: obtenerNombreEmpleado(empleado) || `Empleado #${empleado.EMP_ID}`,
+                description: `ID ${empleado.EMP_ID}`,
+              }))}
+              onChange={(value) => setForm((prev) => ({ ...prev, emp_id: value }))}
+            />
           </Grid>
 
           <Grid size={{ xs: 12, md: 3 }}>

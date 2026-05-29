@@ -41,6 +41,7 @@ import { obtenerEmpleados } from '../services/empleados.service';
 import { getApiErrorMessage } from '../api/errors';
 import { formatearFecha, formatearMoneda, obtenerNombreEmpleado } from '../utils/relations';
 import { useUnsavedFormGuard } from '../hooks/useUnsavedFormGuard';
+import LookupSelect from './common/LookupSelect';
 
 const initialForm: PrestamoForm = {
   emp_id: '',
@@ -255,17 +256,17 @@ function PrestamoCRUD() {
 
         <Grid container spacing={2}>
           <Grid size={{ xs: 12, md: 6 }}>
-            <FormControl fullWidth>
-              <InputLabel>Empleado</InputLabel>
-              <Select name="emp_id" value={String(form.emp_id ?? '')} label="Empleado" onChange={handleChange}>
-                <MenuItem value="">Seleccione empleado</MenuItem>
-                {empleados.map((empleado) => (
-                  <MenuItem key={empleado.EMP_ID} value={String(empleado.EMP_ID)}>
-                    {obtenerNombreEmpleado(empleado) || `Empleado #${empleado.EMP_ID}`}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
+            <LookupSelect
+              label="Empleado"
+              value={String(form.emp_id ?? '')}
+              placeholder="Buscar empleado"
+              options={empleados.map((empleado) => ({
+                value: String(empleado.EMP_ID),
+                label: obtenerNombreEmpleado(empleado) || `Empleado #${empleado.EMP_ID}`,
+                description: `ID ${empleado.EMP_ID}`,
+              }))}
+              onChange={(value) => setForm((prev) => ({ ...prev, emp_id: value }))}
+            />
             {empleados.length === 0 && (
               <Typography variant="caption" color="error">
                 No se pudieron cargar empleados. Revisa el endpoint /empleados.

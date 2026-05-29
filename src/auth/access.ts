@@ -120,8 +120,12 @@ const pathToVista: Record<string, keyof typeof permisosVista> = {
   '/tipo-ingresos': 'ingresos',
   '/descuentos': 'descuentos',
   '/prestamos': 'prestamos',
+  '/prestamo-detalle': 'prestamos',
   '/liquidacion': 'liquidaciones',
   '/aprobacion-nomina': 'nominas',
+  '/calculadora-igss': 'nominas',
+  '/calculadora-isr': 'nominas',
+  '/generar-csv': 'nominas',
 };
 
 function getNormalizedRole(usuario: AuthUserWithPermissions | null | undefined) {
@@ -278,6 +282,7 @@ const managerPaths = [
   '/tipo-ingresos',
   '/descuentos',
   '/prestamos',
+  '/prestamo-detalle',
   '/nomina',
   '/aprobacion-nomina',
   '/departamentos',
@@ -304,6 +309,7 @@ const analystPaths = [
   '/tipo-ingresos',
   '/descuentos',
   '/prestamos',
+  '/prestamo-detalle',
   '/nomina',
   '/departamentos',
   '/puestos',
@@ -313,6 +319,9 @@ const analystPaths = [
   '/nomina-asignaciones',
   '/nomina-detalle',
   '/liquidacion',
+  '/calculadora-igss',
+  '/calculadora-isr',
+  '/generar-csv',
 ];
 
 const roleAllowedPaths: Record<AppRole, Set<string> | null> = {
@@ -323,10 +332,14 @@ const roleAllowedPaths: Record<AppRole, Set<string> | null> = {
     '/tipo-ingresos',
     '/descuentos',
     '/prestamos',
+    '/prestamo-detalle',
     '/nomina',
     '/nomina-asignaciones',
     '/nomina-detalle',
     '/liquidacion',
+    '/calculadora-igss',
+    '/calculadora-isr',
+    '/generar-csv',
   ]),
   GERENTE: new Set(managerPaths),
   AUDITORIA: new Set(['/bitacora', '/usuario-bitacora', '/auditoria']),
@@ -369,6 +382,9 @@ export function canAccessPath(usuario: AuthUserWithPermissions | null | undefine
       '/nomina-asignaciones',
       '/periodo',
       '/empleados',
+      '/calculadora-igss',
+      '/calculadora-isr',
+      '/generar-csv',
       '/reporte-igss',
       '/reporte-isr',
     ]);

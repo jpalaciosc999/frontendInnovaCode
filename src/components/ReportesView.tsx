@@ -9,14 +9,13 @@ import {
   FormControl,
   InputLabel,
   MenuItem,
-  Paper,
   Select,
-  Typography,
 } from '@mui/material';
 import SummarizeIcon from '@mui/icons-material/Summarize';
 
 import { useAuth } from '../context/AuthContext';
 import { getCurrentUserRole, reportesPorRol } from '../config/roleViews';
+import PageHeader from './common/PageHeader';
 
 const ReporteMarcajes = lazy(() => import('./ReporteMarcajes'));
 const ReporteIgss = lazy(() => import('./ReporteIgss'));
@@ -89,27 +88,11 @@ export default function ReportesView() {
 
   return (
     <Box>
-      <Paper sx={{ p: 2.5, mb: 3 }}>
-        <Box
-          sx={{
-            display: 'flex',
-            alignItems: { xs: 'stretch', md: 'center' },
-            flexDirection: { xs: 'column', md: 'row' },
-            gap: 2,
-          }}
-        >
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flex: 1 }}>
-            <SummarizeIcon sx={{ color: 'primary.main', fontSize: 34 }} />
-            <Box>
-              <Typography variant="h5" sx={{ fontWeight: 700 }}>
-                Reportes
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Selecciona el reporte que quieres consultar.
-              </Typography>
-            </Box>
-          </Box>
-
+      <PageHeader
+        title="Reportes"
+        subtitle="Selecciona el reporte que quieres consultar y revisa indicadores contables, laborales o gerenciales."
+        icon={<SummarizeIcon />}
+        actions={
           <FormControl size="small" sx={{ minWidth: { xs: '100%', md: 340 } }}>
             <InputLabel>Reporte</InputLabel>
             <Select
@@ -125,8 +108,8 @@ export default function ReportesView() {
               ))}
             </Select>
           </FormControl>
-        </Box>
-      </Paper>
+        }
+      />
 
       {!reporteSeleccionado ? (
         <Alert severity="warning">No tienes reportes disponibles para consultar.</Alert>

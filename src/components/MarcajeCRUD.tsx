@@ -167,7 +167,7 @@ function MarcajeCRUD() {
           (async () => {
             try {
               const auth = authCtx;
-              if (auth && isRole(auth.user as any, 'SUPER\u005FVISOR_ASISTENCIA')) {
+              if (auth && isRole(auth.user as any, 'supervisor_asistencia')) {
                 const sed = (auth.user as any)?.SED_ID ?? (auth.user as any)?.sed_id ?? '';
                 return await obtenerEmpleados(sed ? { sed_id: String(sed) } : undefined);
               }
