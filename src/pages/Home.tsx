@@ -29,6 +29,7 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import ScheduleIcon from '@mui/icons-material/Schedule';
 import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
 import AssessmentIcon from '@mui/icons-material/Assessment';
+import PlaylistAddCheckIcon from '@mui/icons-material/PlaylistAddCheck';
 
 import type { Empleado } from '../interfaces/empleados';
 import type { ControlLaboral } from '../interfaces/controlLaboral';
@@ -41,6 +42,7 @@ import { obtenerCuentas } from '../services/cuentaBancaria.service';
 import { obtenerContratos } from '../services/empleado_contrato.service';
 import { useAuth } from '../context/AuthContext';
 import { isRole } from '../auth/access';
+import PageHeader from '../components/common/PageHeader';
 
 type GuideStep = {
   title: string;
@@ -230,7 +232,7 @@ function Home() {
       (emp) => !cuentas.some((cuenta) => cuenta.EMP_ID === emp.EMP_ID)
     ).length;
     const empleadosSinContrato = empleados.filter(
-      (emp) => !contratos.some((contrato) => Number(contrato.TIC_ID) === emp.EMP_ID)
+      (emp) => !contratos.some((contrato) => Number(contrato.EMP_ID) === emp.EMP_ID)
     ).length;
     const controlesPendientes = controles.filter((control) => control.CTL_ESTADO === 'P').length;
     const progresoBase = [
@@ -258,27 +260,19 @@ function Home() {
   if (esEmpleado) {
     return (
       <Box sx={{ py: 1 }} data-skip-unsaved="true">
-        <Paper elevation={2} sx={{ p: { xs: 2.5, md: 3 }, mb: 3, overflow: 'hidden' }}>
-          <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} sx={{ justifyContent: 'space-between', alignItems: { md: 'center' } }}>
-            <Box>
-              <Typography variant="overline" color="text.secondary">
-                Portal del empleado
-              </Typography>
-              <Typography variant="h4" sx={{ fontWeight: 900 }}>
-                Hola, {empleadoSesion ? `${empleadoSesion.EMP_NOMBRE} ${empleadoSesion.EMP_APELLIDO}` : user?.nombre_completo || 'bienvenido'}
-              </Typography>
-              <Typography color="text.secondary">
-                Revisa tu jornada, marca asistencia y consulta tus pagos desde un solo lugar.
-              </Typography>
-            </Box>
+        <PageHeader
+          title={`Hola, ${empleadoSesion ? `${empleadoSesion.EMP_NOMBRE} ${empleadoSesion.EMP_APELLIDO}` : user?.nombre_completo || 'bienvenido'}`}
+          subtitle="Revisa tu jornada, marca asistencia y consulta tus pagos desde un solo lugar."
+          icon={<PeopleIcon />}
+          meta={
             <Chip
               icon={<CalendarMonthIcon />}
               label={new Date().toLocaleDateString('es-GT', { weekday: 'long', day: '2-digit', month: 'long' })}
               color="primary"
               variant="outlined"
             />
-          </Stack>
-        </Paper>
+          }
+        />
 
         {error ? <Alert severity="warning" sx={{ mb: 2 }}>{error}</Alert> : null}
 
@@ -326,21 +320,20 @@ function Home() {
 
   return (
     <Box sx={{ py: 1 }}>
-      <Paper elevation={2} sx={{ p: { xs: 2, md: 3 }, mb: 3 }}>
-        <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} sx={{ justifyContent: 'space-between' }}>
-          <Box>
-            <Typography variant="h4" sx={{ fontWeight: 800 }}>Guia de nomina</Typography>
-            <Typography color="text.secondary">
-              Sigue el flujo de trabajo de izquierda a derecha hasta generar y revisar la planilla.
-            </Typography>
-          </Box>
-          <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', alignItems: 'center' }}>
+      <PageHeader
+        title="Guia de nomina"
+        subtitle="Sigue el flujo de trabajo de izquierda a derecha hasta generar y revisar la planilla."
+        icon={<PlaylistAddCheckIcon />}
+        meta={
+          <>
             <Chip icon={<CheckCircleIcon />} label={`${metrics.progreso}% preparado`} color="primary" />
             <Chip label={`${empleados.length} empleados`} />
             <Chip color={metrics.controlesPendientes ? 'warning' : 'success'} label={`${metrics.controlesPendientes} pendientes`} />
-          </Stack>
-        </Stack>
+          </>
+        }
+      />
 
+      <Paper sx={{ p: { xs: 2, md: 3 }, mb: 3 }}>
         <Box sx={{ mt: 3 }}>
           <LinearProgress variant="determinate" value={metrics.progreso} sx={{ height: 8, borderRadius: 1 }} />
         </Box>

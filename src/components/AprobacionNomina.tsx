@@ -4,12 +4,8 @@ import {
   Box,
   Button,
   Chip,
-  FormControl,
   Grid,
-  InputLabel,
-  MenuItem,
   Paper,
-  Select,
   Snackbar,
   Table,
   TableBody,
@@ -18,12 +14,13 @@ import {
   TableFooter,
   TableHead,
   TableRow,
-  Typography
 } from '@mui/material';
-import type { SelectChangeEvent } from '@mui/material/Select';
 import ApprovalIcon from '@mui/icons-material/Approval';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CancelIcon from '@mui/icons-material/Cancel';
+import PaidIcon from '@mui/icons-material/Paid';
+import PercentIcon from '@mui/icons-material/Percent';
+import PeopleIcon from '@mui/icons-material/People';
 
 import type { Empleado } from '../interfaces/empleados';
 import type { Nomina, NominaForm } from '../interfaces/nomina';
@@ -44,6 +41,11 @@ import { obtenerDescuentos } from '../services/descuentos.service';
 import { getApiErrorMessage } from '../api/errors';
 import { formatearFecha, formatearMoneda, obtenerNombreEmpleado } from '../utils/relations';
 import { esPeriodoEnRevision, normalizePeriodoEstado, periodoEstadoLabels } from '../utils/payroll';
+import { getDescuentoCategoria, getIngresoCategoria } from '../utils/conceptClassifier';
+import PageHeader from './common/PageHeader';
+import SummaryCard from './common/SummaryCard';
+import StateBlock from './common/StateBlock';
+import LookupSelect from './common/LookupSelect';
 
 type TotalesNomina = {
   ingresos: number;
@@ -109,15 +111,6 @@ const obtenerClaveConcepto = (detalle: NominaDetalle) => {
 
 const sumar = <T,>(items: T[], selector: (item: T) => number) =>
   items.reduce((total, item) => total + selector(item), 0);
-
-const normalizarCodigo = (value?: string | null) =>
-  String(value ?? '')
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toUpperCase();
-
-const esCodigo = (codigo: string, tokens: string[]) =>
-  tokens.some((token) => codigo.includes(token));
 
 const obtenerEstado = (estado: string) => {
   if (estado === 'P') return <Chip label="Pendiente" color="warning" size="small" />;
@@ -283,37 +276,34 @@ function AprobacionNomina() {
     const detallesNomina = detallesPorNomina.get(String(nomina.NOM_ID)) ?? [];
     const ingresosDetalle = detallesNomina.filter((detalle) => !detalle.TDS_ID);
     const descuentosDetalle = detallesNomina.filter((detalle) => detalle.TDS_ID);
-    const ingresoPorCodigo = (tokens: string[]) =>
+    const ingresoPorCategoria = (categoria: ReturnType<typeof getIngresoCategoria>) =>
       sumar(ingresosDetalle, (detalle) => {
         const ingreso = detalle.TIS_ID ? ingresosPorId.get(String(detalle.TIS_ID)) : undefined;
-        const codigo = ingreso ? normalizarCodigo(`${ingreso.TIS_CODIGO} ${ingreso.TIS_NOMBRE}`) : '';
-        return ingreso && esCodigo(codigo, tokens) ? Number(detalle.DET_MONTO || 0) : 0;
+        return ingreso && getIngresoCategoria(ingreso) === categoria ? Number(detalle.DET_MONTO || 0) : 0;
       });
-    const descuentoPorCodigo = (tokens: string[]) =>
+    const descuentoPorCategoria = (categoria: ReturnType<typeof getDescuentoCategoria>) =>
       sumar(descuentosDetalle, (detalle) => {
         const descuento = descuentosPorId.get(String(detalle.TDS_ID));
-        const codigo = descuento ? normalizarCodigo(`${descuento.TDS_CODIGO} ${descuento.TDS_NOMBRE}`) : '';
-        return descuento && esCodigo(codigo, tokens) ? Number(detalle.DET_MONTO || 0) : 0;
+        return descuento && getDescuentoCategoria(descuento) === categoria ? Number(detalle.DET_MONTO || 0) : 0;
       });
     const horasExtra = sumar(ingresosDetalle, (detalle) => {
       const ingreso = detalle.TIS_ID ? ingresosPorId.get(String(detalle.TIS_ID)) : undefined;
-      const codigo = ingreso ? normalizarCodigo(`${ingreso.TIS_CODIGO} ${ingreso.TIS_NOMBRE}`) : '';
-      return ingreso && esCodigo(codigo, ['EXTRA']) ? Number(detalle.DET_REFERENCIA || 0) : 0;
+      return ingreso && getIngresoCategoria(ingreso) === 'horas_extra' ? Number(detalle.DET_REFERENCIA || 0) : 0;
     });
 
-    const salarioOrdinario = ingresoPorCodigo(['SALARIO', 'SUELDO']);
-    const bonificacion = ingresoPorCodigo(['BONIF', 'BONIFICACION', 'DECRETO', 'INCENTIVO']);
-    const sueldoExtraordinario = ingresoPorCodigo(['EXTRA']);
-    const comisiones = ingresoPorCodigo(['COMISION', 'KPI']) + sumar(ingresosDetalle, (detalle) =>
+    const salarioOrdinario = ingresoPorCategoria('salario');
+    const bonificacion = ingresoPorCategoria('bonificacion');
+    const sueldoExtraordinario = ingresoPorCategoria('horas_extra');
+    const comisiones = ingresoPorCategoria('comision') + sumar(ingresosDetalle, (detalle) =>
       detalle.KRE_ID && !detalle.TIS_ID ? Number(detalle.DET_MONTO || 0) : 0
     );
     const ingresosClasificados = salarioOrdinario + bonificacion + sueldoExtraordinario + comisiones;
     const totalIngresos = sumar(ingresosDetalle, (detalle) => Number(detalle.DET_MONTO || 0));
-    const anticipo = descuentoPorCodigo(['ANTICIPO']);
-    const igss = descuentoPorCodigo(['IGSS']);
-    const isr = descuentoPorCodigo(['ISR']);
-    const prestamo = descuentoPorCodigo(['PRESTAMO']);
-    const descuentosJudiciales = descuentoPorCodigo(['JUD', 'EMBARGO', 'PENSION']);
+    const anticipo = descuentoPorCategoria('anticipo');
+    const igss = descuentoPorCategoria('igss');
+    const isr = descuentoPorCategoria('isr');
+    const prestamo = descuentoPorCategoria('prestamo');
+    const descuentosJudiciales = descuentoPorCategoria('judicial');
     const egresosClasificados = anticipo + igss + isr + prestamo + descuentosJudiciales;
     const totalEgresos = sumar(descuentosDetalle, (detalle) => Number(detalle.DET_MONTO || 0));
     const liquido = totalIngresos - totalEgresos;
@@ -437,47 +427,37 @@ function AprobacionNomina() {
     }
   };
 
-  const handlePeriodoChange = (event: SelectChangeEvent) => {
-    setPeriodoRevisionId(event.target.value);
-  };
-
   if (cargando) {
     return (
       <Box sx={{ p: 3 }}>
-        <Typography variant="h6">Cargando nominas pendientes...</Typography>
+        <StateBlock title="Cargando nominas pendientes..." loading />
       </Box>
     );
   }
 
   return (
     <Box sx={{ py: 2 }}>
-      <Paper elevation={3} sx={{ p: 3, mb: 3 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-          <ApprovalIcon color="primary" />
-          <Typography variant="h4" sx={{ fontWeight: 'bold' }}>
-            Aprobacion de Nomina
-          </Typography>
-        </Box>
+      <PageHeader
+        title="Aprobacion de Nomina"
+        subtitle="Revisa la planilla enviada por Contabilidad. Al aprobarla queda lista para pago y generacion de CSV."
+        icon={<ApprovalIcon />}
+      />
 
-        <Alert severity="info">
-          Aqui el gerente revisa la planilla enviada por Contabilidad. Debe aprobarse completa para quedar lista para pago y CSV.
-        </Alert>
-      </Paper>
-
-      <Paper elevation={3} sx={{ p: 3 }}>
+      <Paper sx={{ p: { xs: 2, md: 3 } }}>
         <Grid container spacing={2} sx={{ alignItems: 'center', mb: 2 }}>
           <Grid size={{ xs: 12, md: 5 }}>
-            <FormControl fullWidth>
-              <InputLabel>Periodo pendiente</InputLabel>
-              <Select value={periodoActivoId} label="Periodo pendiente" onChange={handlePeriodoChange}>
-                {periodosPendientes.length === 0 && <MenuItem value="">Sin periodos pendientes</MenuItem>}
-                {periodosPendientes.map((periodo) => (
-                  <MenuItem key={periodo.PER_ID} value={String(periodo.PER_ID)}>
-                    {obtenerEtiquetaPeriodo(periodo)} - {periodoEstadoLabels[normalizePeriodoEstado(periodo.PER_ESTADO) || 'EN_REVISION']}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
+            <LookupSelect
+              label="Periodo pendiente"
+              value={periodoActivoId}
+              placeholder="Buscar periodo pendiente"
+              options={periodosPendientes.map((periodo) => ({
+                value: String(periodo.PER_ID),
+                label: obtenerEtiquetaPeriodo(periodo),
+                description: periodoEstadoLabels[normalizePeriodoEstado(periodo.PER_ESTADO) || 'EN_REVISION'],
+              }))}
+              onChange={setPeriodoRevisionId}
+              helperText={periodosPendientes.length === 0 ? 'Sin periodos pendientes' : undefined}
+            />
           </Grid>
 
           <Grid size={{ xs: 12, md: 2 }}>
@@ -512,6 +492,21 @@ function AprobacionNomina() {
             >
               Rechazar planilla
             </Button>
+          </Grid>
+        </Grid>
+
+        <Grid container spacing={2} sx={{ mb: 2 }}>
+          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+            <SummaryCard title="Empleados" value={filasPlanilla.length} helper="Pendientes del periodo" icon={<PeopleIcon />} />
+          </Grid>
+          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+            <SummaryCard title="Total ingresos" value={formatearMoneda(totalesPlanilla.totalIngresos)} icon={<PaidIcon />} tone="success" />
+          </Grid>
+          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+            <SummaryCard title="Total descuentos" value={formatearMoneda(totalesPlanilla.totalEgresos)} icon={<PercentIcon />} tone="warning" />
+          </Grid>
+          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+            <SummaryCard title="Liquido a pagar" value={formatearMoneda(totalesPlanilla.liquido)} icon={<CheckCircleIcon />} tone="primary" />
           </Grid>
         </Grid>
 

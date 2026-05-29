@@ -1,7 +1,18 @@
 import type { FormEvent, KeyboardEvent, MouseEvent, ReactNode } from 'react';
-import { Suspense, lazy, useEffect } from 'react';
+import { Suspense, lazy, useEffect, useRef, useState } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
-import { Box, Container, CssBaseline, CircularProgress } from '@mui/material';
+import {
+  Box,
+  Button,
+  CircularProgress,
+  Container,
+  CssBaseline,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogContentText,
+  DialogTitle,
+} from '@mui/material';
 
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { UnsavedChangesProvider, useUnsavedChanges } from './context/UnsavedChangesContext';
@@ -43,6 +54,10 @@ const HorarioCRUD = lazy(() => import('./components/HorarioCRUD'));
 const SuspensionIgss = lazy(() => import('./components/SuspensionIgss'));
 const AprobacionNomina = lazy(() => import('./components/AprobacionNomina'));
 const ReportesView = lazy(() => import('./components/ReportesView'));
+const PrestamoDetalle = lazy(() => import('./components/PrestamoDetalle'));
+const GenerarCSV = lazy(() => import('./components/Generarcsv'));
+const CalculadoraIgss = lazy(() => import('./components/CalculadoraIgss'));
+const CalculadoraIsr = lazy(() => import('./components/CalculadoraIsr'));
 
 function GuardedRoute({
   path,
@@ -62,6 +77,74 @@ function GuardedRoute({
 
 function UnsavedAwareContainer({ children }: { children: ReactNode }) {
   const { setHasUnsavedChanges } = useUnsavedChanges();
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const pendingDeleteButtonRef = useRef<HTMLButtonElement | null>(null);
+  const nativeConfirmRef = useRef(window.confirm);
+  const allowConfirmedDeleteRef = useRef(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+
+  const getActionButton = (target: HTMLElement) => target.closest<HTMLButtonElement>('button');
+
+  const getActionLabel = (button: HTMLButtonElement) =>
+    [
+      button.textContent,
+      button.getAttribute('aria-label'),
+      button.getAttribute('title'),
+    ]
+      .filter(Boolean)
+      .join(' ')
+      .toLowerCase();
+
+  const isEditAction = (target: HTMLElement) => {
+    const button = getActionButton(target);
+    if (!button) return false;
+
+    const label = getActionLabel(button);
+
+    return label.includes('editar') || Boolean(button.querySelector('[data-testid="EditIcon"]'));
+  };
+
+  const isDeleteAction = (target: HTMLElement) => {
+    const button = getActionButton(target);
+    if (!button) return false;
+
+    const label = getActionLabel(button);
+
+    return label.includes('eliminar') || Boolean(button.querySelector('[data-testid="DeleteIcon"]'));
+  };
+
+  const scrollToForm = () => {
+    window.setTimeout(() => {
+      containerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 0);
+  };
+
+  const requestDeleteConfirmation = (button: HTMLButtonElement) => {
+    pendingDeleteButtonRef.current = button;
+    setDeleteDialogOpen(true);
+  };
+
+  const cancelDelete = () => {
+    pendingDeleteButtonRef.current = null;
+    setDeleteDialogOpen(false);
+  };
+
+  const confirmDelete = () => {
+    const button = pendingDeleteButtonRef.current;
+    pendingDeleteButtonRef.current = null;
+    setDeleteDialogOpen(false);
+
+    if (!button) return;
+
+    allowConfirmedDeleteRef.current = true;
+    window.confirm = () => true;
+    button.click();
+
+    window.setTimeout(() => {
+      allowConfirmedDeleteRef.current = false;
+      window.confirm = nativeConfirmRef.current;
+    }, 0);
+  };
 
   const markUnsavedChange = (event: FormEvent<HTMLElement>) => {
     const target = event.target;
@@ -84,6 +167,16 @@ function UnsavedAwareContainer({ children }: { children: ReactNode }) {
     const target = event.target;
 
     if (!(target instanceof HTMLElement)) return;
+    if (isDeleteAction(target) && !allowConfirmedDeleteRef.current) {
+      const button = getActionButton(target);
+      if (button instanceof HTMLButtonElement) {
+        event.preventDefault();
+        event.stopPropagation();
+        requestDeleteConfirmation(button);
+        return;
+      }
+    }
+    if (isEditAction(target)) scrollToForm();
     if (target.closest('[data-skip-unsaved="true"]')) return;
 
     const interactiveControl = target.closest(
@@ -124,16 +217,34 @@ function UnsavedAwareContainer({ children }: { children: ReactNode }) {
   };
 
   return (
-    <Container
-      maxWidth="xl"
-      onChangeCapture={markUnsavedChange}
-      onInputCapture={markUnsavedChange}
-      onClickCapture={markMuiControlInteraction}
-      onKeyDownCapture={markKeyboardControlInteraction}
-      sx={{ py: 3 }}
-    >
-      {children}
-    </Container>
+    <>
+      <Container
+        ref={containerRef}
+        maxWidth="xl"
+        onChangeCapture={markUnsavedChange}
+        onInputCapture={markUnsavedChange}
+        onClickCapture={markMuiControlInteraction}
+        onKeyDownCapture={markKeyboardControlInteraction}
+        sx={{ py: 3 }}
+      >
+        {children}
+      </Container>
+
+      <Dialog open={deleteDialogOpen} onClose={cancelDelete}>
+        <DialogTitle>Confirmar eliminación</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            ¿Estás segura de que quieres eliminar este dato? Esta acción no se puede deshacer.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={cancelDelete}>Cancelar</Button>
+          <Button color="error" variant="contained" onClick={confirmDelete}>
+            Eliminar
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </>
   );
 }
 
@@ -268,7 +379,13 @@ function Layout() {
 
   return (
     <UnsavedChangesProvider>
-      <Box sx={{ minHeight: '100vh', bgcolor: 'grey.100' }}>
+      <Box
+        sx={{
+          minHeight: '100vh',
+          bgcolor: 'background.default',
+          backgroundImage: 'linear-gradient(180deg, #eef5ff 0%, #f6f8fb 260px)',
+        }}
+      >
         <InputCharacterGuard />
         <Navbar />
 
@@ -312,7 +429,10 @@ function Layout() {
           <Route path="/suspensiones-igss" element={guarded('/suspensiones-igss', <SuspensionIgss />)} />
           <Route path="/tipos-descuento" element={<Navigate to="/descuentos" replace />} />
           <Route path="/prestamos-banco" element={<Navigate to="/prestamos" replace />} />
-          <Route path="/prestamo-detalle" element={<Navigate to="/prestamos" replace />} />
+          <Route path="/prestamo-detalle" element={guarded('/prestamo-detalle', <PrestamoDetalle />)} />
+          <Route path="/generar-csv" element={guarded('/generar-csv', <GenerarCSV />)} />
+          <Route path="/calculadora-igss" element={guarded('/calculadora-igss', <CalculadoraIgss />)} />
+          <Route path="/calculadora-isr" element={guarded('/calculadora-isr', <CalculadoraIsr />)} />
           <Route path="/resumen-marcaje" element={guarded('/resumen-marcaje', <ResumenMarcaje />)} />
           <Route path="/registro-vacaciones" element={<Navigate to="/control-laboral" replace />} />
           <Route path="/isr" element={<Navigate to="/descuentos" replace />} />

@@ -44,6 +44,7 @@ import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
 import { useUnsavedFormGuard } from '../hooks/useUnsavedFormGuard';
+import LookupSelect from './common/LookupSelect';
 
 const initialForm: PrestamoDetalleForm = {
   pde_numero_cuota: '',
@@ -280,17 +281,17 @@ function PrestamoDetalleView() {
 
         <Grid container spacing={2}>
           <Grid size={{ xs: 12, md: 3 }}>
-            <FormControl fullWidth>
-              <InputLabel>Prestamo</InputLabel>
-              <Select name="pre_id" value={form.pre_id} label="Prestamo" onChange={handleChange}>
-                <MenuItem value="">Seleccione prestamo</MenuItem>
-                {prestamos.map((prestamo) => (
-                  <MenuItem key={prestamo.PRE_ID} value={String(prestamo.PRE_ID)}>
-                    {obtenerEtiquetaPrestamo(prestamo)}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
+            <LookupSelect
+              label="Prestamo"
+              value={form.pre_id}
+              placeholder="Buscar prestamo"
+              options={prestamos.map((prestamo) => ({
+                value: String(prestamo.PRE_ID),
+                label: `Prestamo #${prestamo.PRE_ID}`,
+                description: `Monto ${formatearMoneda(prestamo.PRE_MONTO_TOTAL)} - saldo ${formatearMoneda(prestamo.PRE_SALDO_PENDIENTE)}`,
+              }))}
+              onChange={(value) => setForm((prev) => ({ ...prev, pre_id: value }))}
+            />
           </Grid>
           <Grid size={{ xs: 12, md: 3 }}>
             <TextField fullWidth type="number" label="No. Cuota" name="pde_numero_cuota" value={form.pde_numero_cuota} onChange={handleChange} />

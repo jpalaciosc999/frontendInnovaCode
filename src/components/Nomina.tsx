@@ -5,12 +5,8 @@ import {
   Box,
   Button,
   Chip,
-  FormControl,
   Grid,
-  InputLabel,
-  MenuItem,
   Paper,
-  Select,
   Snackbar,
   Stack,
   Step,
@@ -35,6 +31,9 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import ErrorOutlinedIcon from '@mui/icons-material/ErrorOutlined';
+import PaidIcon from '@mui/icons-material/Paid';
+import PercentIcon from '@mui/icons-material/Percent';
+import PeopleIcon from '@mui/icons-material/People';
 
 import type { Nomina, NominaForm } from '../interfaces/nomina';
 import type { NominaDetalle } from '../interfaces/nomina-detalle';
@@ -67,8 +66,13 @@ import {
   normalizePeriodoEstado,
   periodoEstadoLabels,
 } from '../utils/payroll';
+import { getDescuentoCategoria, getIngresoCategoria, isConceptoBaseBoleta } from '../utils/conceptClassifier';
 import { downloadPayStubPdf } from '../utils/payStubPdf';
 import PeriodoBadge from './common/PeriodoBadge';
+import PageHeader from './common/PageHeader';
+import SummaryCard from './common/SummaryCard';
+import StateBlock from './common/StateBlock';
+import LookupSelect from './common/LookupSelect';
 
 type TotalesNomina = {
   ingresos: number;
@@ -163,15 +167,6 @@ const obtenerClaveConcepto = (detalle: NominaDetalle) => {
 
 const sumar = <T,>(items: T[], selector: (item: T) => number) =>
   items.reduce((total, item) => total + selector(item), 0);
-
-const normalizarCodigo = (value?: string | null) =>
-  String(value ?? '')
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toUpperCase();
-
-const esCodigo = (codigo: string, tokens: string[]) =>
-  tokens.some((token) => codigo.includes(token));
 
 const sanitizarNombreArchivo = (value: string) =>
   value
@@ -404,36 +399,33 @@ function NominaCRUD() {
     const detallesNomina = detalles.filter((detalle) => String(detalle.NOM_ID) === String(nomina.NOM_ID));
     const ingresosDetalle = detallesNomina.filter((detalle) => !detalle.TDS_ID);
     const descuentosDetalle = detallesNomina.filter((detalle) => detalle.TDS_ID);
-    const ingresoPorCodigo = (tokens: string[]) =>
+    const ingresoPorCategoria = (categoria: ReturnType<typeof getIngresoCategoria>) =>
       sumar(ingresosDetalle, (detalle) => {
         const ingreso = detalle.TIS_ID ? ingresosPorId.get(String(detalle.TIS_ID)) : undefined;
-        const codigo = ingreso ? normalizarCodigo(`${ingreso.TIS_CODIGO} ${ingreso.TIS_NOMBRE}`) : '';
-        return ingreso && esCodigo(codigo, tokens) ? Number(detalle.DET_MONTO || 0) : 0;
+        return ingreso && getIngresoCategoria(ingreso) === categoria ? Number(detalle.DET_MONTO || 0) : 0;
       });
-    const descuentoPorCodigo = (tokens: string[]) =>
+    const descuentoPorCategoria = (categoria: ReturnType<typeof getDescuentoCategoria>) =>
       sumar(descuentosDetalle, (detalle) => {
         const descuento = descuentosPorId.get(String(detalle.TDS_ID));
-        const codigo = descuento ? normalizarCodigo(`${descuento.TDS_CODIGO} ${descuento.TDS_NOMBRE}`) : '';
-        return descuento && esCodigo(codigo, tokens) ? Number(detalle.DET_MONTO || 0) : 0;
+        return descuento && getDescuentoCategoria(descuento) === categoria ? Number(detalle.DET_MONTO || 0) : 0;
       });
     const horasExtra = sumar(ingresosDetalle, (detalle) => {
       const ingreso = detalle.TIS_ID ? ingresosPorId.get(String(detalle.TIS_ID)) : undefined;
-      const codigo = ingreso ? normalizarCodigo(`${ingreso.TIS_CODIGO} ${ingreso.TIS_NOMBRE}`) : '';
-      return ingreso && esCodigo(codigo, ['EXTRA']) ? Number(detalle.DET_REFERENCIA || 0) : 0;
+      return ingreso && getIngresoCategoria(ingreso) === 'horas_extra' ? Number(detalle.DET_REFERENCIA || 0) : 0;
     });
-    const salarioOrdinario = ingresoPorCodigo(['SALARIO', 'SUELDO']);
-    const bonificacion = ingresoPorCodigo(['BONIF', 'BONIFICACION', 'DECRETO', 'INCENTIVO']);
-    const sueldoExtraordinario = ingresoPorCodigo(['EXTRA']);
-    const comisiones = ingresoPorCodigo(['COMISION', 'KPI']) + sumar(ingresosDetalle, (detalle) =>
+    const salarioOrdinario = ingresoPorCategoria('salario');
+    const bonificacion = ingresoPorCategoria('bonificacion');
+    const sueldoExtraordinario = ingresoPorCategoria('horas_extra');
+    const comisiones = ingresoPorCategoria('comision') + sumar(ingresosDetalle, (detalle) =>
       detalle.KRE_ID && !detalle.TIS_ID ? Number(detalle.DET_MONTO || 0) : 0
     );
     const ingresosClasificados = salarioOrdinario + bonificacion + sueldoExtraordinario + comisiones;
     const totalIngresos = sumar(ingresosDetalle, (detalle) => Number(detalle.DET_MONTO || 0));
-    const anticipo = descuentoPorCodigo(['ANTICIPO']);
-    const igss = descuentoPorCodigo(['IGSS']);
-    const isr = descuentoPorCodigo(['ISR']);
-    const prestamo = descuentoPorCodigo(['PRESTAMO']);
-    const descuentosJudiciales = descuentoPorCodigo(['JUD', 'EMBARGO', 'PENSION']);
+    const anticipo = descuentoPorCategoria('anticipo');
+    const igss = descuentoPorCategoria('igss');
+    const isr = descuentoPorCategoria('isr');
+    const prestamo = descuentoPorCategoria('prestamo');
+    const descuentosJudiciales = descuentoPorCategoria('judicial');
     const egresosClasificados = anticipo + igss + isr + prestamo + descuentosJudiciales;
     const totalEgresos = sumar(descuentosDetalle, (detalle) => Number(detalle.DET_MONTO || 0));
     const liquido = totalIngresos - totalEgresos;
@@ -833,24 +825,7 @@ function NominaCRUD() {
       { label: 'Fecha de Ingreso:', value: formatearFecha(empleado?.EMP_FECHA_CONTRATACION) },
     ].filter(({ value }) => value && value !== 'Sin puesto' && value !== 'Sin departamento');
     const esConceptoPlantillaCubierto = (concepto: ReturnType<typeof obtenerConceptosBoleta>[number]) => {
-      const codigo = normalizarCodigo(`${concepto.codigo} ${concepto.nombre}`);
-      return esCodigo(codigo, [
-        'SALARIO',
-        'SUELDO',
-        'EXTRA',
-        'COMISION',
-        'KPI',
-        'BONIF',
-        'BONIFICACION',
-        'INCENTIVO',
-        'IGSS',
-        'ISR',
-        'PRESTAMO',
-        'ANTICIPO',
-        'JUD',
-        'EMBARGO',
-        'PENSION',
-      ]);
+      return isConceptoBaseBoleta(concepto);
     };
     const conceptosAdicionales = conceptos
       .filter((concepto) => !esConceptoPlantillaCubierto(concepto))
@@ -961,25 +936,21 @@ function NominaCRUD() {
   if (cargando) {
     return (
       <Box sx={{ p: 3 }}>
-        <Typography variant="h6">Cargando nominas...</Typography>
+        <StateBlock title="Cargando nominas..." loading />
       </Box>
     );
   }
 
   return (
     <Box sx={{ py: 2 }}>
-      <Paper elevation={2} sx={{ p: { xs: 2, md: 3 }, mb: 3 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 3, flexWrap: 'wrap' }}>
-          <CalculateIcon color="primary" />
-          <Typography variant="h4" sx={{ fontWeight: 'bold' }}>
-            Asistente para generar nomina
-          </Typography>
-          {periodoActivo && (
-            <Box sx={{ ml: 'auto' }}>
-              <PeriodoBadge estado={periodoActivo.PER_ESTADO} />
-            </Box>
-          )}
-        </Box>
+      <PageHeader
+        title="Asistente para generar nomina"
+        subtitle="Genera, valida y envia planillas con el mismo orden del proceso de pago."
+        icon={<CalculateIcon />}
+        meta={periodoActivo ? <PeriodoBadge estado={periodoActivo.PER_ESTADO} /> : undefined}
+      />
+
+      <Paper sx={{ p: { xs: 2, md: 3 }, mb: 3 }}>
 
         <Stepper activeStep={guiaCompletada ? guiaPasos.length : pasoActivo} orientation="vertical" sx={{ mb: 3 }}>
           {guiaPasos.map((paso) => (
@@ -1011,27 +982,19 @@ function NominaCRUD() {
 
         <Grid container spacing={2}>
           <Grid size={{ xs: 12, md: 4 }}>
-            <FormControl fullWidth required>
-              <InputLabel>Periodo</InputLabel>
-              <Select
-                name="per_id"
-                value={generacionForm.per_id}
-                label="Periodo"
-                onChange={handleGeneracionChange}
-              >
-                <MenuItem value="">Seleccione periodo</MenuItem>
-                {periodosAbiertos.length === 0 && (
-                  <MenuItem value="" disabled>
-                    No hay periodos abiertos
-                  </MenuItem>
-                )}
-                {periodosAbiertos.map((periodo) => (
-                  <MenuItem key={periodo.PER_ID} value={String(periodo.PER_ID)}>
-                    {obtenerEtiquetaPeriodo(periodo)} - Pago {formatearFecha(periodo.PER_FECHA_PAGO)}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
+            <LookupSelect
+              required
+              label="Periodo"
+              value={generacionForm.per_id}
+              placeholder="Buscar periodo abierto"
+              options={periodosAbiertos.map((periodo) => ({
+                value: String(periodo.PER_ID),
+                label: obtenerEtiquetaPeriodo(periodo),
+                description: `Pago ${formatearFecha(periodo.PER_FECHA_PAGO)}`,
+              }))}
+              onChange={(value) => setGeneracionForm((prev) => ({ ...prev, per_id: value }))}
+              helperText={periodosAbiertos.length === 0 ? 'No hay periodos abiertos' : undefined}
+            />
           </Grid>
 
           <Grid size={{ xs: 12, md: 4 }}>
@@ -1048,22 +1011,17 @@ function NominaCRUD() {
           </Grid>
 
           <Grid size={{ xs: 12, md: 4 }}>
-            <FormControl fullWidth>
-              <InputLabel>Empleado opcional</InputLabel>
-              <Select
-                name="empleado_id"
-                value={generacionForm.empleado_id}
-                label="Empleado opcional"
-                onChange={handleGeneracionChange}
-              >
-                <MenuItem value="">Todos los elegibles</MenuItem>
-                {empleadosGenerables.map((empleado) => (
-                  <MenuItem key={empleado.EMP_ID} value={String(empleado.EMP_ID)}>
-                    {obtenerNombreEmpleado(empleado)}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
+            <LookupSelect
+              label="Empleado opcional"
+              value={generacionForm.empleado_id}
+              placeholder="Todos los elegibles"
+              options={empleadosGenerables.map((empleado) => ({
+                value: String(empleado.EMP_ID),
+                label: obtenerNombreEmpleado(empleado) || `Empleado #${empleado.EMP_ID}`,
+                description: `ID ${empleado.EMP_ID}`,
+              }))}
+              onChange={(value) => setGeneracionForm((prev) => ({ ...prev, empleado_id: value }))}
+            />
           </Grid>
 
           <Grid size={{ xs: 12 }}>
@@ -1091,7 +1049,7 @@ function NominaCRUD() {
         </Grid>
       </Paper>
 
-      <Paper elevation={2} sx={{ p: { xs: 2, md: 3 }, mb: 3 }}>
+      <Paper sx={{ p: { xs: 2, md: 3 }, mb: 3 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 3 }}>
           <SummarizeIcon color="primary" />
           <Typography variant="h4" sx={{ fontWeight: 'bold' }}>
@@ -1103,23 +1061,34 @@ function NominaCRUD() {
           Cuando la revision marque OK, envia la planilla al gerente. Si ya esta aprobada, descarga el CSV para pago.
         </Alert>
 
+        <Grid container spacing={2} sx={{ mb: 2 }}>
+          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+            <SummaryCard title="Empleados en planilla" value={filasPlanilla.length} helper="Filas revisadas" icon={<PeopleIcon />} />
+          </Grid>
+          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+            <SummaryCard title="Ingresos" value={formatearMoneda(totalesPlanilla.totalIngresos)} icon={<PaidIcon />} tone="success" />
+          </Grid>
+          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+            <SummaryCard title="Descuentos" value={formatearMoneda(totalesPlanilla.totalEgresos)} icon={<PercentIcon />} tone="warning" />
+          </Grid>
+          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+            <SummaryCard title="Liquido" value={formatearMoneda(totalesPlanilla.liquido)} helper={planillaTieneInconsistencias ? 'Con revisiones pendientes' : 'Total a pagar'} icon={<CheckCircleIcon />} tone={planillaTieneInconsistencias ? 'error' : 'primary'} />
+          </Grid>
+        </Grid>
+
         <Grid container spacing={2} sx={{ alignItems: 'center', mb: 2 }}>
           <Grid size={{ xs: 12, md: 4 }}>
-            <FormControl fullWidth>
-              <InputLabel>Periodo de planilla</InputLabel>
-              <Select
-                value={planillaPeriodoId}
-                label="Periodo de planilla"
-                onChange={(event) => setPlanillaPeriodoId(event.target.value)}
-              >
-                <MenuItem value="">Seleccione periodo</MenuItem>
-                {periodos.map((periodo) => (
-                  <MenuItem key={periodo.PER_ID} value={String(periodo.PER_ID)}>
-                    {obtenerEtiquetaPeriodoConEstado(periodo)} - Pago {formatearFecha(periodo.PER_FECHA_PAGO)}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
+            <LookupSelect
+              label="Periodo de planilla"
+              value={planillaPeriodoId}
+              placeholder="Buscar periodo"
+              options={periodos.map((periodo) => ({
+                value: String(periodo.PER_ID),
+                label: obtenerEtiquetaPeriodoConEstado(periodo),
+                description: `Pago ${formatearFecha(periodo.PER_FECHA_PAGO)}`,
+              }))}
+              onChange={setPlanillaPeriodoId}
+            />
           </Grid>
 
           <Grid size={{ xs: 12, md: 2.5 }}>

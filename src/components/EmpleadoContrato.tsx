@@ -27,6 +27,8 @@ import {
 import ArticleIcon from '@mui/icons-material/Article';
 import CleaningServicesIcon from '@mui/icons-material/CleaningServices';
 import DeleteIcon from '@mui/icons-material/Delete';
+import PageHeader from './common/PageHeader';
+import StateBlock from './common/StateBlock';
 
 const initialFilters = {
     empleado: '',
@@ -263,28 +265,20 @@ function EmpleadoContratoCRUD() {
     if (cargando) {
         return (
             <Box sx={{ p: 3 }}>
-                <Typography variant="h6">Cargando contratos...</Typography>
+                <StateBlock title="Cargando contratos..." loading />
             </Box>
         );
     }
 
     return (
         <Box sx={{ py: 2 }}>
-            <Paper elevation={3} sx={{ p: 3, mb: 3 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 3 }}>
-                    <ArticleIcon color="primary" />
-                    <Typography variant="h4" sx={{ fontWeight: 'bold' }}>
-                        Historial de Contratos
-                    </Typography>
-                </Box>
+            <PageHeader
+                title="Historial de Contratos"
+                subtitle="Consulta los contratos actuales e historicos de cada empleado. Si un empleado no aparece aqui, revisa su tipo de contrato desde el registro de empleados."
+                icon={<ArticleIcon />}
+            />
 
-                <Typography color="text.secondary">
-                    Consulta los contratos actuales e historicos de cada empleado. Si un empleado no aparece aqui,
-                    revisa su tipo de contrato desde el registro de empleados.
-                </Typography>
-            </Paper>
-
-            <Paper elevation={3} sx={{ p: 3 }}>
+            <Paper sx={{ p: { xs: 2, md: 3 } }}>
                 <Typography variant="h6" sx={{ mb: 2 }}>
                     Registros de contratos: {filasFiltradas.length} de {filasHistorial.length}
                 </Typography>
