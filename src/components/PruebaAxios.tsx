@@ -1,5 +1,7 @@
 ﻿import { useDeferredValue, useEffect, useMemo, useState } from 'react';
 import type { Empleado, EmpleadoForm } from '../interfaces/empleados';
+import { useRef } from 'react';
+import type { UIEvent } from 'react';
 import type { Horario } from '../interfaces/horario';
 import type { Puesto } from '../interfaces/puestos';
 import type { Sede } from '../interfaces/sede';
@@ -13,12 +15,14 @@ import {
   eliminarEmpleado
 } from '../services/empleados.service';
 import { getApiErrorMessage } from '../api/errors';
+import type { EmpleadoContrato } from '../interfaces/empleado_contrato';
 
 import { obtenerHorarios } from '../services/horario.service';
 import { obtenerPuestos } from '../services/puestos.service';
 import { obtenerSedes } from '../services/sede.service';
 import { obtenerTiposContrato } from '../services/tipoContrato.service';
 import { obtenerDepartamentos } from '../services/departamentos.service';
+import { obtenerContratos } from '../services/empleado_contrato.service';
 
 import {
   Alert,
@@ -68,6 +72,7 @@ import VisibilityIcon from '@mui/icons-material/Visibility';
 import PhotoCameraIcon from '@mui/icons-material/PhotoCamera';
 import ArticleIcon from '@mui/icons-material/Article';
 import { useUnsavedFormGuard } from '../hooks/useUnsavedFormGuard';
+import { notifyPayrollGuideStepCompleted } from '../context/PayrollGuideContext';
 import PageHeader from './common/PageHeader';
 import SummaryCard from './common/SummaryCard';
 import StateBlock from './common/StateBlock';
@@ -98,12 +103,25 @@ const getToday = () => new Date().toISOString().slice(0, 10);
 const soloDigitos = (valor: string) => valor.replace(/\D+/g, '');
 const limitarLongitud = (valor: string, maxLength: number) => valor.slice(0, maxLength);
 const normalizarMonto = (valor: number | string | undefined) => Math.round(Number(valor || 0) * 100);
+const normalizarTextoBusqueda = (valor: unknown) =>
+  String(valor ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/\bjornada\b/g, '')
+    .replace(/\bcontrato\b/g, '')
+    .replace(/\btemporal\b/g, '')
+    .replace(/\bindefinido\b/g, '')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
 
 type PhoneCountry = {
   code: string;
   name: string;
   dialCode: string;
   localLength?: number;
+  localMinLength?: number;
+  localMaxLength?: number;
 };
 
 const PHONE_COUNTRIES: PhoneCountry[] = [
@@ -119,7 +137,7 @@ const PHONE_COUNTRIES: PhoneCountry[] = [
   { code: 'PA', name: 'Panama', dialCode: '507' },
   { code: 'AR', name: 'Argentina', dialCode: '54' },
   { code: 'BO', name: 'Bolivia', dialCode: '591' },
-  { code: 'BR', name: 'Brasil', dialCode: '55' },
+  { code: 'BR', name: 'Brasil', dialCode: '55', localMinLength: 10, localMaxLength: 11 },
   { code: 'CL', name: 'Chile', dialCode: '56' },
   { code: 'CO', name: 'Colombia', dialCode: '57' },
   { code: 'EC', name: 'Ecuador', dialCode: '593' },
@@ -186,19 +204,33 @@ const PHONE_COUNTRIES: PhoneCountry[] = [
 ];
 
 const DEFAULT_PHONE_COUNTRY = PHONE_COUNTRIES[0];
+const SYSTEM_PHONE_MAX_DIGITS = 10;
 
-const getFlagEmoji = (countryCode: string) =>
-  countryCode
-    .toUpperCase()
-    .replace(/./g, (char) => String.fromCodePoint(127397 + char.charCodeAt(0)));
+const getPhoneLocalMinLength = (country: PhoneCountry) =>
+  country.localLength ?? country.localMinLength ?? Math.min(6, getPhoneLocalMaxLength(country));
 
 const getPhoneLocalMaxLength = (country: PhoneCountry) =>
-  country.localLength ?? Math.max(6, 15 - country.dialCode.length);
+  Math.min(
+    country.localLength ?? country.localMaxLength ?? Math.max(6, 15 - country.dialCode.length),
+    SYSTEM_PHONE_MAX_DIGITS
+  );
 
-const getPhoneLengthMessage = (country: PhoneCountry) =>
-  country.localLength
-    ? `El telefono para ${country.name} debe tener ${country.localLength} digitos.`
-    : `El telefono para ${country.name} no debe exceder ${getPhoneLocalMaxLength(country)} digitos.`;
+const isPhoneLengthInvalid = (country: PhoneCountry, localPhone: string) => {
+  const length = soloDigitos(localPhone).length;
+  if (length === 0) return false;
+  return length < getPhoneLocalMinLength(country) || length > getPhoneLocalMaxLength(country);
+};
+
+const getPhoneLengthMessage = (country: PhoneCountry) => {
+  const minLength = getPhoneLocalMinLength(country);
+  const maxLength = getPhoneLocalMaxLength(country);
+
+  if (minLength === maxLength) {
+    return `El telefono para ${country.name} debe tener ${maxLength} digitos.`;
+  }
+
+  return `El telefono para ${country.name} debe tener entre ${minLength} y ${maxLength} digitos.`;
+};
 
 const splitPhoneValue = (value: string, country: PhoneCountry) => {
   const digits = soloDigitos(value);
@@ -240,6 +272,20 @@ const initialFilters = {
 };
 
 const EMPLOYEE_TABLE_LIMIT = 75;
+const SALARY_MAX = 999999.99;
+const SALARY_DECIMALS = 2;
+
+const normalizarSalarioInput = (value: string) => {
+  const cleaned = value.replace(/[^\d.]/g, '');
+  const [integer = '', ...decimalParts] = cleaned.split('.');
+  const decimal = decimalParts.join('').slice(0, SALARY_DECIMALS);
+  const normalizedInteger = integer.replace(/^0+(?=\d)/, '');
+  const nextValue = decimalParts.length > 0 ? `${normalizedInteger || '0'}.${decimal}` : normalizedInteger;
+  const parsed = Number(nextValue);
+
+  if (Number.isFinite(parsed) && parsed > SALARY_MAX) return String(SALARY_MAX);
+  return nextValue;
+};
 
 const obtenerMimeImagen = (bytes: Uint8Array) => {
   if (bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return 'image/jpeg';
@@ -315,6 +361,7 @@ function PruebaAxios() {
   const [sedes, setSedes] = useState<Sede[]>([]);
   const [tiposContrato, setTiposContrato] = useState<TipoContrato[]>([]);
   const [departamentos, setDepartamentos] = useState<Departamento[]>([]);
+  const [contratos, setContratos] = useState<EmpleadoContrato[]>([]);
 
   const [cargandoHorarios, setCargandoHorarios] = useState(false);
   const [cargandoPuestos, setCargandoPuestos] = useState(false);
@@ -327,6 +374,10 @@ function PruebaAxios() {
   const [perfilEmpleado, setPerfilEmpleado] = useState<Empleado | null>(null);
   const [modalDepartamentos, setModalDepartamentos] = useState(false);
   const [filtroDep, setFiltroDep] = useState('');
+  const tablaEmpleadosRef = useRef<HTMLDivElement | null>(null);
+  const barraSuperiorRef = useRef<HTMLDivElement | null>(null);
+  const sincronizandoScrollRef = useRef(false);
+  const [anchoScrollEmpleados, setAnchoScrollEmpleados] = useState(1);
 
   const cargarEmpleados = async () => {
     try {
@@ -413,6 +464,16 @@ function PruebaAxios() {
     }
   };
 
+  const cargarContratos = async () => {
+    try {
+      const data = await obtenerContratos();
+      setContratos(data);
+    } catch (err: any) {
+      setContratos([]);
+      setError('Error cargando contratos de empleados: ' + getApiErrorMessage(err, 'Error cargando contratos'));
+    }
+  };
+
   useEffect(() => {
     cargarEmpleados();
     cargarHorarios();
@@ -420,6 +481,7 @@ function PruebaAxios() {
     cargarSedes();
     cargarTiposContrato();
     cargarDepartamentos();
+    cargarContratos();
   }, []);
 
   const abrirModalHorarios = async () => {
@@ -434,6 +496,24 @@ function PruebaAxios() {
     setForm((prev) => ({ ...prev, hor_id: String(hor.HOR_ID) }));
     setHorNombre(hor.HOR_DESCRIPCION);
     setModalHorarios(false);
+  };
+
+  const obtenerHorarioPorTipoContrato = (ticId: string) => {
+    const tipo = tiposContratoMap.get(String(ticId || ''));
+    const jornadaContrato = normalizarTextoBusqueda(tipo?.TIC_TIPO_JORNADA);
+    const nombreContrato = normalizarTextoBusqueda(tipo?.TIC_NOMBRE);
+    const clavesContrato = [jornadaContrato, nombreContrato].filter(Boolean);
+
+    if (clavesContrato.length === 0) return undefined;
+
+    return horarios.find((horario) => {
+      const descripcionHorario = normalizarTextoBusqueda(horario.HOR_DESCRIPCION);
+      return clavesContrato.some((clave) =>
+        descripcionHorario === clave ||
+        descripcionHorario.includes(clave) ||
+        clave.includes(descripcionHorario)
+      );
+    });
   };
 
   const horariosMap = useMemo(
@@ -460,6 +540,60 @@ function PruebaAxios() {
     () => new Map(departamentos.map((dep) => [String(dep.DEP_ID), dep])),
     [departamentos]
   );
+
+  const contratosActualesPorEmpleado = useMemo(() => {
+    const map = new Map<string, EmpleadoContrato>();
+
+    const readContratoField = (contrato: EmpleadoContrato, keys: string[]) => {
+      const record = contrato as unknown as Record<string, unknown>;
+      for (const key of keys) {
+        const value = record[key];
+        if (value !== undefined && value !== null && String(value).trim() !== '') return value;
+      }
+      return undefined;
+    };
+
+    const getContratoEmpId = (contrato: EmpleadoContrato) => {
+      return readContratoField(contrato, ['EMP_ID', 'emp_id', 'empleado_id', 'EMPLEADO_ID']);
+    };
+
+    const esActual = (contrato: EmpleadoContrato) => {
+      const actual = String(readContratoField(contrato, ['TCO_ES_ACTUAL', 'tco_es_actual']) ?? '').toUpperCase();
+      const estado = String(readContratoField(contrato, ['TCO_ESTADO', 'tco_estado']) ?? '').toUpperCase();
+      return actual === '1' || actual === 'TRUE' || estado === 'A' || estado === 'ACTIVO' || estado === 'VIGENTE';
+    };
+
+    const fechaInicioMs = (contrato: EmpleadoContrato) =>
+      new Date(String(readContratoField(contrato, [
+        'TCO_FECHA_INICIO',
+        'tco_fecha_inicio',
+        'TCO_FECHA_CREACION',
+        'tco_fecha_creacion',
+      ]) ?? '')).getTime() || 0;
+
+    contratos.forEach((contrato) => {
+      const empId = getContratoEmpId(contrato);
+      if (!empId) return;
+
+      const key = String(empId);
+      const previo = map.get(key);
+      if (!previo) {
+        map.set(key, contrato);
+        return;
+      }
+
+      if (esActual(contrato) && !esActual(previo)) {
+        map.set(key, contrato);
+        return;
+      }
+
+      if (esActual(contrato) === esActual(previo) && fechaInicioMs(contrato) > fechaInicioMs(previo)) {
+        map.set(key, contrato);
+      }
+    });
+
+    return map;
+  }, [contratos]);
 
   const fotosEmpleados = useMemo(
     () => new Map(datos.map((empleado) => [
@@ -498,6 +632,35 @@ function PruebaAxios() {
   const esContratoIndefinido = (ticId: number | string | undefined) => {
     const tipo = obtenerTipoContrato(ticId);
     return tipo?.TIC_NOMBRE.toLowerCase().includes('indefinido') ?? false;
+  };
+
+  const obtenerContratoActualEmpleado = (empleado: Empleado) =>
+    contratosActualesPorEmpleado.get(String(empleado.EMP_ID));
+
+  const leerCampo = (item: unknown, keys: string[]) => {
+    const record = item as Record<string, unknown>;
+    for (const key of keys) {
+      const value = record?.[key];
+      if (value !== undefined && value !== null && String(value).trim() !== '') return String(value);
+    }
+    return '';
+  };
+
+  const obtenerFechaInicioContratoEmpleado = (empleado: Empleado) => {
+    const contrato = obtenerContratoActualEmpleado(empleado);
+    return (
+      leerCampo(empleado, ['EMP_FECHA_INICIO_CONTRATO', 'emp_fecha_inicio_contrato']) ||
+      leerCampo(contrato, ['TCO_FECHA_INICIO', 'tco_fecha_inicio']) ||
+      leerCampo(empleado, ['EMP_FECHA_CONTRATACION', 'emp_fecha_contratacion'])
+    );
+  };
+
+  const obtenerFechaFinContratoEmpleado = (empleado: Empleado) => {
+    const contrato = obtenerContratoActualEmpleado(empleado);
+    return (
+      leerCampo(empleado, ['EMP_FECHA_FIN_CONTRATO', 'emp_fecha_fin_contrato']) ||
+      leerCampo(contrato, ['TCO_FECHA_FIN', 'tco_fecha_fin', 'fecha_fin'])
+    );
   };
 
   const puestoSeleccionado = puestosMap.get(String(form.pue_id || ''));
@@ -573,6 +736,8 @@ function PruebaAxios() {
   ) => {
     const { name, value } = e.target;
     if (name === 'tic_id') {
+      const horarioRelacionado = obtenerHorarioPorTipoContrato(String(value));
+
       setForm((prev) => {
         const fechaInicio =
           modoEdicion && String(value) !== String(contratoOriginal?.tic_id ?? '')
@@ -582,6 +747,7 @@ function PruebaAxios() {
         return {
           ...prev,
           tic_id: value,
+          hor_id: horarioRelacionado ? String(horarioRelacionado.HOR_ID) : prev.hor_id,
           emp_fecha_inicio_contrato: fechaInicio,
           emp_fecha_fin_contrato:
             esContratoIndefinido(value) ||
@@ -590,6 +756,10 @@ function PruebaAxios() {
               : prev.emp_fecha_fin_contrato
         };
       });
+
+      if (horarioRelacionado) {
+        setHorNombre(horarioRelacionado.HOR_DESCRIPCION);
+      }
       return;
     }
 
@@ -621,8 +791,12 @@ function PruebaAxios() {
 
     if (name === 'emp_sueldo') {
       const puesto = puestosMap.get(String(form.pue_id || ''));
-      const coincideConBase = puesto && normalizarMonto(value) === normalizarMonto(puesto.PUE_SALARIO_BASE);
-      setForm((prev) => ({ ...prev, emp_sueldo: value }));
+      const salarioNormalizado = normalizarSalarioInput(String(value));
+      const coincideConBase = puesto && normalizarMonto(salarioNormalizado) === normalizarMonto(puesto.PUE_SALARIO_BASE);
+      if (Number(salarioNormalizado) >= SALARY_MAX && Number(value) > SALARY_MAX) {
+        setError(`El salario no puede ser mayor a ${formatearMoneda(SALARY_MAX)}.`);
+      }
+      setForm((prev) => ({ ...prev, emp_sueldo: salarioNormalizado }));
       if (coincideConBase) {
         setJustificacionSalario('');
         setJustificacionSalarioDraft('');
@@ -705,6 +879,7 @@ function PruebaAxios() {
       String(form.emp_fecha_fin_contrato || '') !== contratoOriginal.fecha_fin
     )
   );
+  const debeMostrarMotivoContrato = modoEdicion && Boolean(form.tic_id);
   const minFechaContratoFin = form.emp_fecha_inicio_contrato || getToday();
 
   const abrirJustificacionSalario = () => {
@@ -753,11 +928,7 @@ function PruebaAxios() {
     }
 
     const telefonoDigits = soloDigitos(form.emp_telefono);
-    const telefonoMaxLength = getPhoneLocalMaxLength(telefonoPais);
-    if (
-      telefonoDigits.length > telefonoMaxLength ||
-      Boolean(telefonoPais.localLength && telefonoDigits.length !== telefonoPais.localLength)
-    ) {
+    if (isPhoneLengthInvalid(telefonoPais, telefonoDigits)) {
       setError(`${getPhoneLengthMessage(telefonoPais)} Dependiendo de la region existe un rango limite de digitos.`);
       return false;
     }
@@ -808,6 +979,16 @@ function PruebaAxios() {
       return false;
     }
 
+    if (Number(form.emp_sueldo) > SALARY_MAX) {
+      setError(`El salario no puede ser mayor a ${formatearMoneda(SALARY_MAX)}.`);
+      return false;
+    }
+
+    if (debeMostrarMotivoContrato && !form.emp_motivo_cambio_contrato?.trim()) {
+      setError('Indica el motivo del cambio de contrato');
+      return false;
+    }
+
     if (sueldoDiferenteAlPuesto && !justificacionSalarioValida) {
       setError('Ingresa la justificacion del cambio de salario para este empleado');
       abrirJustificacionSalario();
@@ -840,6 +1021,7 @@ function PruebaAxios() {
 
       limpiarFormulario();
       await cargarEmpleados();
+      notifyPayrollGuideStepCompleted();
       return true;
     } catch (err: any) {
       setError('Error guardando empleado: ' + getApiErrorMessage(err, 'Error guardando empleado'));
@@ -850,7 +1032,7 @@ function PruebaAxios() {
   useUnsavedFormGuard(form, initialForm, guardarEmpleado);
 
   const handleEliminar = async (id: number) => {
-    if (!window.confirm('Â¿Deseas eliminar este empleado?')) return;
+    if (!window.confirm('¿Deseas eliminar este empleado?')) return;
 
     try {
       setError('');
@@ -884,14 +1066,10 @@ function PruebaAxios() {
 
     setHorNombre(hor ? hor.HOR_DESCRIPCION : empleado.HOR_ID ? `Horario #${empleado.HOR_ID}` : '');
 
-    const fechaInicioContrato = empleado.EMP_FECHA_INICIO_CONTRATO
-      ? String(empleado.EMP_FECHA_INICIO_CONTRATO).slice(0, 10)
-      : empleado.EMP_FECHA_CONTRATACION
-        ? String(empleado.EMP_FECHA_CONTRATACION).slice(0, 10)
-        : '';
-    const fechaFinContrato = empleado.EMP_FECHA_FIN_CONTRATO
-      ? String(empleado.EMP_FECHA_FIN_CONTRATO).slice(0, 10)
-      : '';
+    const fechaInicioContratoRaw = obtenerFechaInicioContratoEmpleado(empleado);
+    const fechaFinContratoRaw = obtenerFechaFinContratoEmpleado(empleado);
+    const fechaInicioContrato = fechaInicioContratoRaw ? String(fechaInicioContratoRaw).slice(0, 10) : '';
+    const fechaFinContrato = fechaFinContratoRaw ? String(fechaFinContratoRaw).slice(0, 10) : '';
     const tipoContratoId = String(empleado.TIC_ID || '');
 
     setContratoOriginal({
@@ -945,10 +1123,10 @@ function PruebaAxios() {
     const dias: string[] = [];
     if (hor.HOR_LUNES) dias.push('Lun');
     if (hor.HOR_MARTES) dias.push('Mar');
-    if (hor.HOR_MIERCOLES) dias.push('MiÃ©');
+    if (hor.HOR_MIERCOLES) dias.push('Mié');
     if (hor.HOR_JUEVES) dias.push('Jue');
     if (hor.HOR_VIERNES) dias.push('Vie');
-    if (hor.HOR_SABADO) dias.push('SÃ¡b');
+    if (hor.HOR_SABADO) dias.push('Sáb');
     if (hor.HOR_DOMINGO) dias.push('Dom');
     return dias.join(', ');
   };
@@ -990,7 +1168,7 @@ function PruebaAxios() {
   };
 
   const formatearFechaSimple = (fecha?: string) =>
-    fecha ? String(fecha).slice(0, 10) : 'â€”';
+    fecha ? String(fecha).slice(0, 10) : '—';
 
   const deferredFilters = useDeferredValue(filters);
 
@@ -1016,6 +1194,42 @@ function PruebaAxios() {
     () => empleadosFiltrados.slice(0, EMPLOYEE_TABLE_LIMIT),
     [empleadosFiltrados]
   );
+
+  useEffect(() => {
+    const tabla = tablaEmpleadosRef.current;
+    if (!tabla) return undefined;
+
+    const actualizarAnchoScroll = () => {
+      setAnchoScrollEmpleados(Math.max(tabla.scrollWidth, tabla.clientWidth, 1));
+    };
+
+    actualizarAnchoScroll();
+
+    const resizeObserver = new ResizeObserver(actualizarAnchoScroll);
+    resizeObserver.observe(tabla);
+    if (tabla.firstElementChild) resizeObserver.observe(tabla.firstElementChild);
+    window.addEventListener('resize', actualizarAnchoScroll);
+
+    return () => {
+      resizeObserver.disconnect();
+      window.removeEventListener('resize', actualizarAnchoScroll);
+    };
+  }, [empleadosVisibles.length, empleadosFiltrados.length]);
+
+  const sincronizarScrollHorizontal = (origen: 'superior' | 'tabla') => (
+    event: UIEvent<HTMLDivElement>
+  ) => {
+    if (sincronizandoScrollRef.current) return;
+
+    const destino = origen === 'superior' ? tablaEmpleadosRef.current : barraSuperiorRef.current;
+    if (!destino) return;
+
+    sincronizandoScrollRef.current = true;
+    destino.scrollLeft = event.currentTarget.scrollLeft;
+    window.requestAnimationFrame(() => {
+      sincronizandoScrollRef.current = false;
+    });
+  };
 
   const resumenEmpleados = useMemo(() => {
     const empleadosActivos = datos.filter((empleado) =>
@@ -1142,22 +1356,16 @@ function PruebaAxios() {
                   value={telefonoPais}
                   onChange={handleTelefonoPaisChange}
                   disableClearable
-                  getOptionLabel={(country) => `${getFlagEmoji(country.code)} ${country.name} +${country.dialCode}`}
+                  getOptionLabel={(country) => country.name}
                   isOptionEqualToValue={(option, value) => option.code === value.code && option.dialCode === value.dialCode}
                   renderInput={(params) => (
                     <TextField {...params} label="Pais" required />
                   )}
                   renderOption={(props, country) => (
                     <Box component="li" {...props}>
-                      <Box component="span" sx={{ mr: 1.25, fontSize: 20 }}>
-                        {getFlagEmoji(country.code)}
-                      </Box>
                       <Box component="span" sx={{ flexGrow: 1 }}>
                         {country.name}
                       </Box>
-                      <Typography component="span" color="text.secondary">
-                        +{country.dialCode}
-                      </Typography>
                     </Box>
                   )}
                 />
@@ -1171,9 +1379,9 @@ function PruebaAxios() {
                   value={telefonoLocal}
                   onChange={handleTelefonoLocalChange}
                   required
-                  error={Boolean(telefonoLocal && telefonoPais.localLength && telefonoLocal.length !== telefonoPais.localLength)}
+                  error={isPhoneLengthInvalid(telefonoPais, telefonoLocal)}
                   helperText={
-                    telefonoPais.localLength && telefonoLocal.length > 0 && telefonoLocal.length !== telefonoPais.localLength
+                    isPhoneLengthInvalid(telefonoPais, telefonoLocal)
                       ? getPhoneLengthMessage(telefonoPais)
                       : undefined
                   }
@@ -1234,7 +1442,7 @@ function PruebaAxios() {
             <TextField
               fullWidth
               label="Horario"
-              value={horNombre ? `#${form.hor_id} â€” ${horNombre}` : ''}
+              value={horNombre ? `#${form.hor_id} — ${horNombre}` : ''}
               placeholder="Haz clic para seleccionar un horario"
               onClick={abrirModalHorarios}
               slotProps={{
@@ -1353,7 +1561,7 @@ function PruebaAxios() {
             </Grid>
           )}
 
-          {contratoCambioPendiente && (
+          {debeMostrarMotivoContrato && (
             <Grid size={{ xs: 12, md: 6 }}>
               <TextField
                 fullWidth
@@ -1378,7 +1586,7 @@ function PruebaAxios() {
               slotProps={{
                 input: {
                   startAdornment: <InputAdornment position="start">Q</InputAdornment>,
-                  inputProps: { min: 0, step: '0.01' }
+                  inputProps: { min: 0, max: SALARY_MAX, step: '0.01' }
                 }
               }}
               required
@@ -1527,7 +1735,30 @@ function PruebaAxios() {
           </Grid>
         </Grid>
 
-        <TableContainer>
+        <Box
+          ref={barraSuperiorRef}
+          onScroll={sincronizarScrollHorizontal('superior')}
+          sx={{
+            position: 'sticky',
+            top: 66,
+            zIndex: 3,
+            overflowX: 'auto',
+            overflowY: 'hidden',
+            height: 18,
+            mb: 0.5,
+            bgcolor: 'background.paper',
+            borderBottom: '1px solid',
+            borderColor: 'divider',
+            '&::-webkit-scrollbar': { height: 12 },
+          }}
+        >
+          <Box sx={{ width: anchoScrollEmpleados, height: 1 }} />
+        </Box>
+
+        <TableContainer
+          ref={tablaEmpleadosRef}
+          onScroll={sincronizarScrollHorizontal('tabla')}
+        >
           <Table>
             <TableHead>
               <TableRow>
@@ -1537,8 +1768,8 @@ function PruebaAxios() {
                 <TableCell><strong>Apellido</strong></TableCell>
                 <TableCell><strong>DPI</strong></TableCell>
                 <TableCell><strong>NIT</strong></TableCell>
-                <TableCell><strong>TelÃ©fono</strong></TableCell>
-                <TableCell><strong>F. ContrataciÃ³n</strong></TableCell>
+                <TableCell><strong>Teléfono</strong></TableCell>
+                <TableCell><strong>F. Contratación</strong></TableCell>
                 <TableCell><strong>Horario</strong></TableCell>
                 <TableCell><strong>Sede</strong></TableCell>
                 <TableCell><strong>Puesto</strong></TableCell>
@@ -1571,24 +1802,24 @@ function PruebaAxios() {
                     <TableCell>
                       {empleado.EMP_FECHA_CONTRATACION
                         ? String(empleado.EMP_FECHA_CONTRATACION).slice(0, 10)
-                        : 'â€”'}
+                        : '—'}
                     </TableCell>
                     <TableCell>
-                      {empleado.HOR_ID ? obtenerChipHorario(empleado.HOR_ID) : 'â€”'}
+                      {empleado.HOR_ID ? obtenerChipHorario(empleado.HOR_ID) : '—'}
                     </TableCell>
                     <TableCell>
-                      {empleado.SED_ID ? obtenerChipSede(empleado.SED_ID) : 'â€”'}
+                      {empleado.SED_ID ? obtenerChipSede(empleado.SED_ID) : '—'}
                     </TableCell>
                     <TableCell>
-                      {empleado.PUE_ID ? obtenerChipPuesto(empleado.PUE_ID) : 'â€”'}
+                      {empleado.PUE_ID ? obtenerChipPuesto(empleado.PUE_ID) : '—'}
                     </TableCell>
                     <TableCell>
-                      {empleado.TIC_ID ? obtenerChipTipoContrato(empleado.TIC_ID) : 'â€”'}
+                      {empleado.TIC_ID ? obtenerChipTipoContrato(empleado.TIC_ID) : '—'}
                     </TableCell>
                     <TableCell>
                       {empleado.TIC_ID && esContratoIndefinido(empleado.TIC_ID)
                         ? 'Indefinido'
-                        : formatearFechaSimple(empleado.EMP_FECHA_FIN_CONTRATO)}
+                        : formatearFechaSimple(obtenerFechaFinContratoEmpleado(empleado))}
                     </TableCell>
                     <TableCell>{formatearMoneda(obtenerSueldoEmpleado(empleado))}</TableCell>
                     <TableCell>{obtenerChipEstado(empleado.EMP_ESTADO)}</TableCell>
@@ -1697,7 +1928,7 @@ function PruebaAxios() {
           <TextField
             fullWidth
             autoFocus
-            placeholder="Buscar por nombre, descripciÃ³n o ID..."
+            placeholder="Buscar por nombre, descripción o ID..."
             value={filtroDep}
             onChange={(e) => setFiltroDep(e.target.value)}
             sx={{ mb: 2 }}
@@ -1723,7 +1954,7 @@ function PruebaAxios() {
                   <TableRow>
                     <TableCell><strong>ID</strong></TableCell>
                     <TableCell><strong>Nombre</strong></TableCell>
-                    <TableCell><strong>DescripciÃ³n</strong></TableCell>
+                    <TableCell><strong>Descripción</strong></TableCell>
                     <TableCell><strong>Estado</strong></TableCell>
                   </TableRow>
                 </TableHead>
@@ -1738,7 +1969,7 @@ function PruebaAxios() {
                       >
                         <TableCell>{dep.DEP_ID}</TableCell>
                         <TableCell>{dep.DEP_NOMBRE}</TableCell>
-                        <TableCell>{dep.DEP_DESCRIPCION || 'â€”'}</TableCell>
+                        <TableCell>{dep.DEP_DESCRIPCION || '—'}</TableCell>
                         <TableCell>
                           <Chip
                             label={dep.DEP_ESTADO === 'A' ? 'Activo' : 'Inactivo'}
@@ -1785,7 +2016,7 @@ function PruebaAxios() {
           <TextField
             fullWidth
             autoFocus
-            placeholder="Buscar por descripciÃ³n, horario o ID..."
+            placeholder="Buscar por descripción, horario o ID..."
             value={filtroHor}
             onChange={(e) => setFiltroHor(e.target.value)}
             sx={{ mb: 2 }}
@@ -1810,10 +2041,10 @@ function PruebaAxios() {
                 <TableHead>
                   <TableRow>
                     <TableCell><strong>ID</strong></TableCell>
-                    <TableCell><strong>DescripciÃ³n</strong></TableCell>
+                    <TableCell><strong>Descripción</strong></TableCell>
                     <TableCell><strong>Hora inicio</strong></TableCell>
                     <TableCell><strong>Hora fin</strong></TableCell>
-                    <TableCell><strong>DÃ­as</strong></TableCell>
+                    <TableCell><strong>Días</strong></TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -1892,18 +2123,18 @@ function PruebaAxios() {
             <Grid container spacing={2}>
               <Grid size={{ xs: 12, md: 6 }}>
                 <Typography variant="caption" color="text.secondary">NIT</Typography>
-                <Typography>{perfilEmpleado.EMP_NIT || 'â€”'}</Typography>
+                <Typography>{perfilEmpleado.EMP_NIT || '—'}</Typography>
               </Grid>
               <Grid size={{ xs: 12, md: 6 }}>
-                <Typography variant="caption" color="text.secondary">TelÃ©fono</Typography>
-                <Typography>{perfilEmpleado.EMP_TELEFONO || 'â€”'}</Typography>
+                <Typography variant="caption" color="text.secondary">Teléfono</Typography>
+                <Typography>{perfilEmpleado.EMP_TELEFONO || '—'}</Typography>
               </Grid>
               <Grid size={{ xs: 12, md: 6 }}>
-                <Typography variant="caption" color="text.secondary">Fecha de contrataciÃ³n</Typography>
+                <Typography variant="caption" color="text.secondary">Fecha de contratación</Typography>
                 <Typography>
                   {perfilEmpleado.EMP_FECHA_CONTRATACION
                     ? String(perfilEmpleado.EMP_FECHA_CONTRATACION).slice(0, 10)
-                    : 'â€”'}
+                    : '—'}
                 </Typography>
               </Grid>
               <Grid size={{ xs: 12, md: 6 }}>
@@ -1915,31 +2146,31 @@ function PruebaAxios() {
               <Grid size={{ xs: 12, md: 6 }}>
                 <Typography variant="caption" color="text.secondary">Departamento del puesto</Typography>
                 <Box sx={{ mt: 0.5 }}>
-                  {perfilEmpleado.PUE_ID ? obtenerDepartamentoPuesto(perfilEmpleado.PUE_ID) : 'â€”'}
+                  {perfilEmpleado.PUE_ID ? obtenerDepartamentoPuesto(perfilEmpleado.PUE_ID) : '—'}
                 </Box>
               </Grid>
               <Grid size={{ xs: 12, md: 6 }}>
                 <Typography variant="caption" color="text.secondary">Horario</Typography>
                 <Box sx={{ mt: 0.5 }}>
-                  {perfilEmpleado.HOR_ID ? obtenerChipHorario(perfilEmpleado.HOR_ID) : 'â€”'}
+                  {perfilEmpleado.HOR_ID ? obtenerChipHorario(perfilEmpleado.HOR_ID) : '—'}
                 </Box>
               </Grid>
               <Grid size={{ xs: 12, md: 6 }}>
                 <Typography variant="caption" color="text.secondary">Sede</Typography>
                 <Box sx={{ mt: 0.5 }}>
-                  {perfilEmpleado.SED_ID ? obtenerChipSede(perfilEmpleado.SED_ID) : 'â€”'}
+                  {perfilEmpleado.SED_ID ? obtenerChipSede(perfilEmpleado.SED_ID) : '—'}
                 </Box>
               </Grid>
               <Grid size={{ xs: 12, md: 6 }}>
                 <Typography variant="caption" color="text.secondary">Puesto</Typography>
                 <Box sx={{ mt: 0.5 }}>
-                  {perfilEmpleado.PUE_ID ? obtenerChipPuesto(perfilEmpleado.PUE_ID) : 'â€”'}
+                  {perfilEmpleado.PUE_ID ? obtenerChipPuesto(perfilEmpleado.PUE_ID) : '—'}
                 </Box>
               </Grid>
               <Grid size={{ xs: 12, md: 6 }}>
                 <Typography variant="caption" color="text.secondary">Tipo de contrato</Typography>
                 <Box sx={{ mt: 0.5 }}>
-                  {perfilEmpleado.TIC_ID ? obtenerChipTipoContrato(perfilEmpleado.TIC_ID) : 'â€”'}
+                  {perfilEmpleado.TIC_ID ? obtenerChipTipoContrato(perfilEmpleado.TIC_ID) : '—'}
                 </Box>
               </Grid>
               <Grid size={{ xs: 12, md: 6 }}>
@@ -1947,7 +2178,7 @@ function PruebaAxios() {
                 <Typography>
                   {perfilEmpleado.TIC_ID && esContratoIndefinido(perfilEmpleado.TIC_ID)
                     ? 'Indefinido'
-                    : formatearFechaSimple(perfilEmpleado.EMP_FECHA_FIN_CONTRATO)}
+                    : formatearFechaSimple(obtenerFechaFinContratoEmpleado(perfilEmpleado))}
                 </Typography>
               </Grid>
             </Grid>

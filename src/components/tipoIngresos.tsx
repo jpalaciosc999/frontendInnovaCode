@@ -7,7 +7,7 @@ import {
     eliminarIngreso
 } from '../services/tipoIngresos.service';
 import { getApiErrorMessage } from '../api/errors';
-import { validarCodigo, validarNombre, validarDescripcion, ERROR_MESSAGES } from '../utils/fieldValidation';
+import { validarNombre, validarDescripcion, ERROR_MESSAGES } from '../utils/fieldValidation';
 
 import {
     Alert,
@@ -204,6 +204,38 @@ const conceptosEstandar: Array<{
     }
 ];
 
+const normalizarCodigoIngreso = (value: string) =>
+    value
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toUpperCase()
+        .replace(/[^A-Z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '')
+        .slice(0, 18);
+
+const generarCodigoIngreso = (
+    nombre: string,
+    ingresos: Ingreso[],
+    ingresoId?: number | null
+) => {
+    const base = normalizarCodigoIngreso(nombre) || 'INGRESO';
+    const codigosExistentes = new Set(
+        ingresos
+            .filter((ingreso) => ingreso.TIS_ID !== ingresoId)
+            .map((ingreso) => ingreso.TIS_CODIGO.toUpperCase())
+    );
+
+    if (!codigosExistentes.has(base)) return base;
+
+    for (let index = 2; index < 1000; index += 1) {
+        const suffix = `-${index}`;
+        const candidate = `${base.slice(0, 18 - suffix.length)}${suffix}`;
+        if (!codigosExistentes.has(candidate)) return candidate;
+    }
+
+    return `${base.slice(0, 12)}-${Date.now().toString().slice(-5)}`;
+};
+
 function TipoIngresos() {
     const [datos, setDatos] = useState<Ingreso[]>([]);
     const [cargando, setCargando] = useState(true);
@@ -258,19 +290,18 @@ function TipoIngresos() {
         setMensaje('');
     };
 
+    const obtenerCodigoFormulario = () =>
+        form.tis_codigo.trim()
+            ? form.tis_codigo.trim()
+            : generarCodigoIngreso(form.tis_nombre, datos, ingresoId);
+
     const validarFormulario = () => {
         if (
-            !form.tis_codigo.trim() ||
             !form.tis_nombre.trim() ||
             form.tis_valor_base < 0 ||
             !form.tis_es_recurrente.trim()
         ) {
-            setError('Codigo, nombre, valor no negativo y recurrencia son obligatorios');
-            return false;
-        }
-
-        if (!validarCodigo(form.tis_codigo)) {
-            setError(`Código: ${ERROR_MESSAGES.CODIGO}`);
+            setError('Nombre, valor no negativo y recurrencia son obligatorios');
             return false;
         }
 
@@ -294,11 +325,16 @@ function TipoIngresos() {
 
             if (!validarFormulario()) return false;
 
+            const payload: IngresoForm = {
+                ...form,
+                tis_codigo: obtenerCodigoFormulario(),
+            };
+
             if (modoEdicion && ingresoId !== null) {
-                await actualizarIngreso(ingresoId, form);
+                await actualizarIngreso(ingresoId, payload);
                 setMensaje('Ingreso actualizado correctamente');
             } else {
-                await crearIngreso(form);
+                await crearIngreso(payload);
                 setMensaje('Ingreso creado correctamente');
             }
 
@@ -340,6 +376,8 @@ function TipoIngresos() {
         });
     };
 
+    const codigoPreview = obtenerCodigoFormulario();
+
     if (cargando) return <Box sx={{ p: 5, textAlign: 'center' }}><Typography>Cargando conceptos...</Typography></Box>;
 
     return (
@@ -375,10 +413,9 @@ function TipoIngresos() {
                                 fullWidth
                                 label="Código"
                                 name="tis_codigo"
-                                value={form.tis_codigo}
-                                onChange={handleChange}
-                                placeholder="Ej: BONO01"
-                                helperText="Solo letras y números (sin espacios)"
+                                value={codigoPreview}
+                                disabled
+                                helperText="Se genera automaticamente al guardar."
                             />
                         </Grid>
                         <Grid size={{ xs: 12, md: 5 }}>

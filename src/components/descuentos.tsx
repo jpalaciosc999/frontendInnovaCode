@@ -206,6 +206,38 @@ const conceptosEstandar: Array<{
   }
 ];
 
+const normalizarCodigoConcepto = (value: string) =>
+  value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 18);
+
+const generarCodigoConcepto = (
+  nombre: string,
+  descuentos: Descuento[],
+  descuentoId?: number | null
+) => {
+  const base = normalizarCodigoConcepto(nombre) || 'DESCUENTO';
+  const codigosExistentes = new Set(
+    descuentos
+      .filter((descuento) => descuento.TDS_ID !== descuentoId)
+      .map((descuento) => descuento.TDS_CODIGO.toUpperCase())
+  );
+
+  if (!codigosExistentes.has(base)) return base;
+
+  for (let index = 2; index < 1000; index += 1) {
+    const suffix = `-${index}`;
+    const candidate = `${base.slice(0, 18 - suffix.length)}${suffix}`;
+    if (!codigosExistentes.has(candidate)) return candidate;
+  }
+
+  return `${base.slice(0, 12)}-${Date.now().toString().slice(-5)}`;
+};
+
 function DescuentoCRUD() {
   const [datos, setDatos] = useState<Descuento[]>([]);
   const [cargando, setCargando] = useState(true);
@@ -255,9 +287,14 @@ function DescuentoCRUD() {
     setMensaje('');
   };
 
+  const obtenerCodigoFormulario = () =>
+    form.tds_codigo.trim()
+      ? form.tds_codigo.trim()
+      : generarCodigoConcepto(form.tds_nombre, datos, id);
+
   const validar = () => {
-    if (!form.tds_codigo.trim() || !form.tds_nombre.trim() || !form.tds_tipo_calculo.trim()) {
-      setError('Código, nombre y tipo de cálculo son obligatorios');
+    if (!form.tds_nombre.trim() || !form.tds_tipo_calculo.trim()) {
+      setError('Nombre y tipo de cálculo son obligatorios');
       return false;
     }
     return true;
@@ -269,11 +306,16 @@ function DescuentoCRUD() {
       setMensaje('');
       if (!validar()) return false;
 
+      const payload: DescuentoForm = {
+        ...form,
+        tds_codigo: obtenerCodigoFormulario(),
+      };
+
       if (modoEdicion && id !== null) {
-        await actualizarDescuento(id, form);
+        await actualizarDescuento(id, payload);
         setMensaje('Descuento actualizado correctamente');
       } else {
-        await crearDescuento(form);
+        await crearDescuento(payload);
         setMensaje('Descuento creado correctamente');
       }
 
@@ -337,6 +379,8 @@ function DescuentoCRUD() {
       ? <Chip label="Activo" color="success" size="small" />
       : <Chip label="Inactivo" color="default" size="small" />;
 
+  const codigoPreview = obtenerCodigoFormulario();
+
   if (cargando) {
     return <Box sx={{ p: 3 }}><Typography variant="h6">Cargando descuentos...</Typography></Box>;
   }
@@ -377,7 +421,9 @@ function DescuentoCRUD() {
         <Grid container spacing={2}>
           <Grid size={{ xs: 12, md: 6 }}>
             <TextField fullWidth label="Código" name="tds_codigo"
-              value={form.tds_codigo} onChange={handleChange} />
+              value={codigoPreview}
+              disabled
+              helperText="Se genera automaticamente al guardar." />
           </Grid>
 
           <Grid size={{ xs: 12, md: 6 }}>

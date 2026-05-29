@@ -1,6 +1,6 @@
-import { createContext, useCallback, useContext, useMemo, useRef, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import {
   Button,
   Dialog,
@@ -24,12 +24,82 @@ const UnsavedChangesContext = createContext<UnsavedChangesContextValue | null>(n
 
 export function UnsavedChangesProvider({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
+  const location = useLocation();
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [pendingPath, setPendingPath] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const saveHandlerRef = useRef<SaveHandler | null>(null);
   const pendingPathRef = useRef<string | null>(null);
+  const pendingHistoryDeltaRef = useRef<number | null>(null);
   const leavingAfterSaveRef = useRef(false);
+  const stablePathRef = useRef(`${location.pathname}${location.search}${location.hash}`);
+  const browserGuardPathRef = useRef<string | null>(null);
+  const restoringBrowserNavigationRef = useRef(false);
+
+  const currentPath = `${location.pathname}${location.search}${location.hash}`;
+
+  useEffect(() => {
+    if (!hasUnsavedChanges || leavingAfterSaveRef.current) return;
+    if (browserGuardPathRef.current === currentPath) return;
+
+    window.history.pushState(
+      { ...(window.history.state ?? {}), innovaUnsavedGuard: true },
+      '',
+      currentPath
+    );
+    browserGuardPathRef.current = currentPath;
+  }, [currentPath, hasUnsavedChanges]);
+
+  useEffect(() => {
+    if (pendingPath || restoringBrowserNavigationRef.current) return;
+    stablePathRef.current = currentPath;
+  }, [currentPath, pendingPath]);
+
+  useEffect(() => {
+    const handleBrowserNavigation = () => {
+      const attemptedPath = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+      const stablePath = stablePathRef.current;
+
+      if (!hasUnsavedChanges || leavingAfterSaveRef.current || attemptedPath === stablePath) {
+        if (hasUnsavedChanges && attemptedPath === stablePath && !leavingAfterSaveRef.current) {
+          restoringBrowserNavigationRef.current = true;
+          window.history.pushState(
+            { ...(window.history.state ?? {}), innovaUnsavedGuard: true },
+            '',
+            stablePath
+          );
+          window.setTimeout(() => {
+            restoringBrowserNavigationRef.current = false;
+          }, 0);
+
+          pendingHistoryDeltaRef.current = -2;
+          pendingPathRef.current = stablePath;
+          setPendingPath(stablePath);
+          return;
+        }
+
+        stablePathRef.current = attemptedPath;
+        return;
+      }
+
+      restoringBrowserNavigationRef.current = true;
+      window.history.pushState(window.history.state, '', stablePath);
+      navigate(stablePath, { replace: true });
+      window.setTimeout(() => {
+        restoringBrowserNavigationRef.current = false;
+      }, 0);
+
+      pendingPathRef.current = attemptedPath;
+      pendingHistoryDeltaRef.current = null;
+      setPendingPath(attemptedPath);
+    };
+
+    window.addEventListener('popstate', handleBrowserNavigation);
+
+    return () => {
+      window.removeEventListener('popstate', handleBrowserNavigation);
+    };
+  }, [hasUnsavedChanges, navigate]);
 
   const updateHasUnsavedChanges = useCallback((value: boolean) => {
     if (leavingAfterSaveRef.current && value) return;
@@ -59,6 +129,7 @@ export function UnsavedChangesProvider({ children }: { children: ReactNode }) {
       }
 
       pendingPathRef.current = path;
+      pendingHistoryDeltaRef.current = null;
       setPendingPath(path);
     },
     [hasUnsavedChanges, navigate]
@@ -67,15 +138,43 @@ export function UnsavedChangesProvider({ children }: { children: ReactNode }) {
   const closeDialog = () => {
     if (!saving) {
       pendingPathRef.current = null;
+      pendingHistoryDeltaRef.current = null;
       setPendingPath(null);
     }
   };
 
+  const cancelPendingNavigation = () => {
+    pendingPathRef.current = null;
+    pendingHistoryDeltaRef.current = null;
+    setPendingPath(null);
+  };
+
   const navigateToPath = (path: string | null, afterSave = false) => {
+    const historyDelta = pendingHistoryDeltaRef.current;
+
+    if (historyDelta !== null) {
+      if (afterSave) leavingAfterSaveRef.current = true;
+      pendingHistoryDeltaRef.current = null;
+      pendingPathRef.current = null;
+      browserGuardPathRef.current = null;
+      setPendingPath(null);
+      setHasUnsavedChanges(false);
+
+      window.setTimeout(() => {
+        window.history.go(historyDelta);
+        window.setTimeout(() => {
+          leavingAfterSaveRef.current = false;
+        }, 0);
+      }, 0);
+      return;
+    }
+
     if (!path) return;
 
     if (afterSave) leavingAfterSaveRef.current = true;
     pendingPathRef.current = null;
+    pendingHistoryDeltaRef.current = null;
+    browserGuardPathRef.current = null;
     setPendingPath(null);
     setHasUnsavedChanges(false);
 
@@ -101,8 +200,14 @@ export function UnsavedChangesProvider({ children }: { children: ReactNode }) {
 
     try {
       setSaving(true);
-      await saveHandlerRef.current();
+      const saved = await saveHandlerRef.current();
+      if (saved === false) {
+        cancelPendingNavigation();
+        return;
+      }
       navigateToPath(nextPath, true);
+    } catch {
+      cancelPendingNavigation();
     } finally {
       setSaving(false);
     }
@@ -126,7 +231,7 @@ export function UnsavedChangesProvider({ children }: { children: ReactNode }) {
       <Dialog open={!!pendingPath} onClose={closeDialog} maxWidth="xs" fullWidth>
         <DialogTitle>Datos sin guardar</DialogTitle>
         <DialogContent>
-          <DialogContentText>Desea guardar los datos antes de salir?</DialogContentText>
+          <DialogContentText>Desea Guardar los cambios</DialogContentText>
         </DialogContent>
         <DialogActions>
           <Button onClick={handleDiscard} disabled={saving} color="inherit">

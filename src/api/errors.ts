@@ -22,5 +22,9 @@ export const getApiErrorMessage = (err: unknown, fallback: string) => {
     return 'No se pudo guardar porque una referencia no existe en la base de datos. En liquidaciones, verifica que el empleado seleccionado exista y que el backend reciba el EMP_ID correcto.';
   }
 
+  if (message.includes('ORA-01438')) {
+    return 'Uno de los campos numericos excede la cantidad de digitos permitida. Revisa DPI, NIT, telefono y salario antes de guardar.';
+  }
+
   return message;
 };

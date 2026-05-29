@@ -56,7 +56,7 @@ import type { Departamento } from '../interfaces/departamentos';
 import type { Periodo } from '../interfaces/periodo';
 import ReportPdfButton from './common/ReportPdfButton';
 
-// â”€â”€ helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── helpers ───────────────────────────────────────────────────────────────────
 
 const ANOS_DISPONIBLES = Array.from({ length: 4 }, (_, i) => new Date().getFullYear() - i);
 
@@ -86,7 +86,7 @@ function estadoColor(estado: string): 'success' | 'warning' | 'default' {
   return 'default';
 }
 
-// â”€â”€ component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── component ─────────────────────────────────────────────────────────────────
 
 export default function ReporteIsr() {
   const [anioFiscal, setAnioFiscal] = useState(new Date().getFullYear());
@@ -157,7 +157,7 @@ export default function ReporteIsr() {
 
   return (
     <Box data-report-pdf-root>
-      {/* â”€â”€ Header â”€â”€ */}
+      {/* ── Header ── */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 3 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
           <SummarizeIcon sx={{ color: 'primary.main', fontSize: 34 }} />
@@ -201,7 +201,7 @@ export default function ReporteIsr() {
         </Box>
       </Box>
 
-      {/* â”€â”€ Filtros â”€â”€ */}
+      {/* ── Filtros ── */}
       <Paper sx={{ p: 2, mb: 3 }}>
         <Grid container spacing={2}>
           <Grid size={{ xs: 12, sm: 6, md: 3 }}>
@@ -280,7 +280,7 @@ export default function ReporteIsr() {
 
       {!cargando && reporte && (
         <>
-          {/* â”€â”€ KPI cards â”€â”€ */}
+          {/* ── KPI cards ── */}
           <Grid container spacing={2} sx={{ mb: 3 }}>
             <Grid size={{ xs: 12, sm: 6, md: 3 }}>
               <Paper sx={{ p: 2 }}>
@@ -409,9 +409,9 @@ export default function ReporteIsr() {
             )}
           </Paper>
 
-          {/* â”€â”€ GrÃ¡fico mensual + Panel legal â”€â”€ */}
+          {/* ── Gráfico mensual + Panel legal ── */}
           <Grid container spacing={2} sx={{ mb: 3 }}>
-            {/* GrÃ¡fico barras + lÃ­nea */}
+            {/* Gráfico barras + línea */}
             <Grid size={{ xs: 12, md: 7 }}>
               <Paper sx={{ p: 2 }}>
                 <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 0.5 }}>
