@@ -1,4 +1,4 @@
-import type { FormEvent, KeyboardEvent, MouseEvent, ReactNode } from 'react';
+import type { MouseEvent, ReactNode } from 'react';
 import { Suspense, lazy, useEffect, useRef, useState } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import {
@@ -76,7 +76,7 @@ function GuardedRoute({
 }
 
 function UnsavedAwareContainer({ children }: { children: ReactNode }) {
-  const { setHasUnsavedChanges } = useUnsavedChanges();
+  const { requestNavigation } = useUnsavedChanges();
   const containerRef = useRef<HTMLDivElement | null>(null);
   const pendingDeleteButtonRef = useRef<HTMLButtonElement | null>(null);
   const nativeConfirmRef = useRef(window.confirm);
@@ -146,27 +146,36 @@ function UnsavedAwareContainer({ children }: { children: ReactNode }) {
     }, 0);
   };
 
-  const markUnsavedChange = (event: FormEvent<HTMLElement>) => {
-    const target = event.target;
-
-    if (target instanceof HTMLElement && target.closest('[data-skip-unsaved="true"]')) return;
-
-    if (
-      target instanceof HTMLInputElement ||
-      target instanceof HTMLTextAreaElement ||
-      target instanceof HTMLSelectElement
-    ) {
-      const ignoredTypes = ['button', 'submit', 'reset', 'hidden'];
-      if (target instanceof HTMLInputElement && ignoredTypes.includes(target.type)) return;
-
-      setHasUnsavedChanges(true);
-    }
-  };
-
-  const markMuiControlInteraction = (event: MouseEvent<HTMLElement>) => {
+  const handleContainerClick = (event: MouseEvent<HTMLElement>) => {
     const target = event.target;
 
     if (!(target instanceof HTMLElement)) return;
+
+    const link = target.closest<HTMLAnchorElement>('a[href]');
+    if (
+      link &&
+      link.target !== '_blank' &&
+      !link.hasAttribute('download') &&
+      !event.metaKey &&
+      !event.ctrlKey &&
+      !event.shiftKey &&
+      !event.altKey
+    ) {
+      const url = new URL(link.href, window.location.origin);
+
+      if (url.origin === window.location.origin) {
+        const nextPath = `${url.pathname}${url.search}${url.hash}`;
+        const currentPath = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+
+        if (nextPath === currentPath) return;
+
+        event.preventDefault();
+        event.stopPropagation();
+        requestNavigation(nextPath);
+        return;
+      }
+    }
+
     if (isDeleteAction(target) && !allowConfirmedDeleteRef.current) {
       const button = getActionButton(target);
       if (button instanceof HTMLButtonElement) {
@@ -178,42 +187,6 @@ function UnsavedAwareContainer({ children }: { children: ReactNode }) {
     }
     if (isEditAction(target)) scrollToForm();
     if (target.closest('[data-skip-unsaved="true"]')) return;
-
-    const interactiveControl = target.closest(
-      [
-        'input',
-        'textarea',
-        'select',
-        '[role="combobox"]',
-        '[role="spinbutton"]',
-        '[contenteditable="true"]',
-        '.MuiSelect-select',
-        '.MuiCheckbox-root',
-        '.MuiRadio-root',
-        '.MuiSwitch-root',
-      ].join(',')
-    );
-
-    if (!interactiveControl) return;
-    if (interactiveControl instanceof HTMLInputElement) {
-      const ignoredTypes = ['button', 'submit', 'reset', 'hidden'];
-      if (ignoredTypes.includes(interactiveControl.type)) return;
-    }
-
-    setHasUnsavedChanges(true);
-  };
-
-  const markKeyboardControlInteraction = (event: KeyboardEvent<HTMLElement>) => {
-    const target = event.target;
-
-    if (!(target instanceof HTMLElement)) return;
-    if (target.closest('[data-skip-unsaved="true"]')) return;
-    if (!target.matches('input, textarea, select, [role="combobox"], [contenteditable="true"]')) return;
-
-    const ignoredKeys = ['Tab', 'Shift', 'Control', 'Alt', 'Meta', 'Escape'];
-    if (ignoredKeys.includes(event.key)) return;
-
-    setHasUnsavedChanges(true);
   };
 
   return (
@@ -221,10 +194,7 @@ function UnsavedAwareContainer({ children }: { children: ReactNode }) {
       <Container
         ref={containerRef}
         maxWidth="xl"
-        onChangeCapture={markUnsavedChange}
-        onInputCapture={markUnsavedChange}
-        onClickCapture={markMuiControlInteraction}
-        onKeyDownCapture={markKeyboardControlInteraction}
+        onClickCapture={handleContainerClick}
         sx={{ py: 3 }}
       >
         {children}

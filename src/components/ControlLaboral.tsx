@@ -175,6 +175,14 @@ function ControlLaboralPage() {
       }
 
       if (
+        fieldName === 'ctl_fecha_inicio' &&
+        next.ctl_fecha_regreso &&
+        next.ctl_fecha_regreso < value
+      ) {
+        next.ctl_fecha_regreso = next.ctl_motivo === 'PER' ? value : '';
+      }
+
+      if (
         autoHoursMotives.includes(next.ctl_motivo) &&
         ['ctl_motivo', 'ctl_fecha_inicio', 'ctl_fecha_regreso'].includes(fieldName)
       ) {
@@ -271,6 +279,16 @@ function ControlLaboralPage() {
 
     if (!ctl_fecha_inicio || (dateRangeMotives.includes(ctl_motivo) && !ctl_fecha_regreso)) {
       setError('Completa las fechas requeridas para este motivo');
+      return false;
+    }
+
+    const today = getToday();
+    if (ctl_fecha_inicio < today) {
+      setError('La fecha de inicio no puede ser anterior a la fecha actual');
+      return false;
+    }
+    if (ctl_fecha_regreso && ctl_fecha_regreso < today) {
+      setError('La fecha de regreso no puede ser anterior a la fecha actual');
       return false;
     }
     if (ctl_fecha_regreso && new Date(ctl_fecha_regreso) < new Date(ctl_fecha_inicio)) {
@@ -474,9 +492,12 @@ function ControlLaboralPage() {
                   type="date"
                   label={form.ctl_motivo === 'PER' ? 'Fecha del permiso' : 'Fecha de inicio'}
                   name="ctl_fecha_inicio"
-                  slotProps={{ inputLabel: { shrink: true } }}
                   value={form.ctl_fecha_inicio}
                   onChange={handleChange}
+                  slotProps={{
+                    inputLabel: { shrink: true },
+                    htmlInput: { min: getToday() },
+                  }}
                 />
               </Grid>
 
@@ -487,9 +508,12 @@ function ControlLaboralPage() {
                     type="date"
                     label="Fecha de regreso"
                     name="ctl_fecha_regreso"
-                    slotProps={{ inputLabel: { shrink: true } }}
                     value={form.ctl_fecha_regreso}
                     onChange={handleChange}
+                    slotProps={{
+                      inputLabel: { shrink: true },
+                      htmlInput: { min: form.ctl_fecha_inicio || getToday() },
+                    }}
                   />
                 </Grid>
               ) : null}

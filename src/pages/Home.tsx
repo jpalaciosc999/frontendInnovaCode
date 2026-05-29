@@ -21,6 +21,7 @@ import PeopleIcon from '@mui/icons-material/People';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import AccountBalanceIcon from '@mui/icons-material/AccountBalance';
 import BadgeIcon from '@mui/icons-material/Badge';
+import BeachAccessIcon from '@mui/icons-material/BeachAccess';
 import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
 import PaymentsIcon from '@mui/icons-material/Payments';
 import CalculateIcon from '@mui/icons-material/Calculate';
@@ -30,16 +31,19 @@ import ScheduleIcon from '@mui/icons-material/Schedule';
 import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
 import AssessmentIcon from '@mui/icons-material/Assessment';
 import PlaylistAddCheckIcon from '@mui/icons-material/PlaylistAddCheck';
+import MedicalServicesIcon from '@mui/icons-material/MedicalServices';
 
 import type { Empleado } from '../interfaces/empleados';
 import type { ControlLaboral } from '../interfaces/controlLaboral';
 import type { CuentaBancaria } from '../interfaces/cuentaBancaria';
 import type { EmpleadoContrato } from '../interfaces/empleado_contrato';
+import type { SuspensionIgss } from '../interfaces/suspensionIgss';
 
 import { obtenerEmpleados } from '../services/empleados.service';
 import { obtenerControles } from '../services/controlLaboral.service';
 import { obtenerCuentas } from '../services/cuentaBancaria.service';
 import { obtenerContratos } from '../services/empleado_contrato.service';
+import { obtenerSuspensionesIgss } from '../services/suspensionIgss.service';
 import { useAuth } from '../context/AuthContext';
 import { isRole } from '../auth/access';
 import PageHeader from '../components/common/PageHeader';
@@ -158,6 +162,200 @@ const getEmpleadoSesion = (user: unknown, empleados: Empleado[]) => {
   ) ?? null;
 };
 
+const isEmpleadoActivoNomina = (empleado: Empleado) => {
+  const estado = String(empleado.EMP_ESTADO || 'A').toUpperCase();
+  return estado === 'A' && !empleado.EMP_FECHA_LIQUIDACION;
+};
+
+const isContratoActual = (value: unknown) => {
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'number') return value === 1;
+  const normalized = String(value ?? '').trim().toUpperCase();
+  return ['1', 'S', 'SI', 'Y', 'YES', 'TRUE', 'A', 'ACTUAL'].includes(normalized);
+};
+
+const empleadoTieneContrato = (empleado: Empleado, contratos: EmpleadoContrato[]) => {
+  if (empleado.TIC_ID) return true;
+
+  return contratos.some((contrato) => {
+    if (Number(contrato.EMP_ID) !== Number(empleado.EMP_ID)) return false;
+    const estado = String(contrato.TCO_ESTADO || 'A').toUpperCase();
+    return isContratoActual(contrato.TCO_ES_ACTUAL) || estado === 'A';
+  });
+};
+
+const getNombreEmpleado = (user: unknown, empleado: Empleado | null) => {
+  if (empleado) return `${empleado.EMP_NOMBRE} ${empleado.EMP_APELLIDO}`;
+
+  const record = (user && typeof user === 'object' ? user : {}) as Record<string, unknown>;
+  const nombre = String(record.nombre_completo ?? '').trim();
+  return nombre || 'bienvenido';
+};
+
+const getBienvenidaEmpleado = (fecha = new Date()) => {
+  const hora = fecha.getHours();
+
+  if (hora < 12) {
+    return {
+      saludo: 'Buenos dias',
+      mensaje: 'Listo para iniciar la jornada con energia: revisa tu horario, marca asistencia y consulta tus pagos desde un solo lugar.',
+    };
+  }
+
+  if (hora < 18) {
+    return {
+      saludo: 'Buenas tardes',
+      mensaje: 'Tu jornada sigue avanzando: registra tu asistencia, confirma tu horario y mantente al dia con tus pagos.',
+    };
+  }
+
+  return {
+    saludo: 'Buenas noches',
+    mensaje: 'Cierra tu jornada con tranquilidad: revisa tus marcajes, tu horario y tus pagos en un solo lugar.',
+  };
+};
+
+const parseLocalDate = (value?: string) => {
+  if (!value) return null;
+  const date = new Date(`${value.slice(0, 10)}T00:00:00`);
+  return Number.isNaN(date.getTime()) ? null : date;
+};
+
+const addDays = (date: Date, days: number) => {
+  const next = new Date(date);
+  next.setDate(next.getDate() + days);
+  return next;
+};
+
+const formatFechaLarga = (date: Date) =>
+  date.toLocaleDateString('es-GT', {
+    weekday: 'long',
+    day: '2-digit',
+    month: 'long',
+  });
+
+const getPaymentDayForMonth = (year: number, month: number, preferredDay: number) => {
+  const lastDayOfMonth = new Date(year, month + 1, 0).getDate();
+  return Math.min(preferredDay, lastDayOfMonth);
+};
+
+const getProximoPago = (fecha = new Date()) => {
+  const today = new Date(fecha.getFullYear(), fecha.getMonth(), fecha.getDate());
+  const year = today.getFullYear();
+  const month = today.getMonth();
+  const day = today.getDate();
+  const firstPayDay = 15;
+  const secondPayDay = getPaymentDayForMonth(year, month, 30);
+
+  let paymentDate: Date;
+
+  if (day <= firstPayDay) {
+    paymentDate = new Date(year, month, firstPayDay);
+  } else if (day <= secondPayDay) {
+    paymentDate = new Date(year, month, secondPayDay);
+  } else {
+    paymentDate = new Date(year, month + 1, 15);
+  }
+
+  const daysRemaining = Math.max(
+    0,
+    Math.round((paymentDate.getTime() - today.getTime()) / 86400000)
+  );
+
+  return {
+    date: paymentDate,
+    daysRemaining,
+    label: formatFechaLarga(paymentDate),
+  };
+};
+
+const isDateInRange = (date: Date, start?: string, end?: string) => {
+  const startDate = parseLocalDate(start);
+  const endDate = parseLocalDate(end);
+  if (!startDate || !endDate) return false;
+
+  return date >= startDate && date <= endDate;
+};
+
+const getSituacionEmpleado = (
+  empleado: Empleado | null,
+  controles: ControlLaboral[],
+  suspensiones: SuspensionIgss[],
+  fecha = new Date()
+) => {
+  if (!empleado) return null;
+
+  const empId = Number(empleado.EMP_ID);
+  const suspensionIgss = suspensiones.find((suspension) =>
+    Number(suspension.EMP_ID) === empId &&
+    suspension.SUS_ESTADO === 'A' &&
+    isDateInRange(fecha, suspension.SUS_FECHA_INICIO, suspension.SUS_FECHA_FIN)
+  );
+
+  if (suspensionIgss) {
+    const fechaFin = parseLocalDate(suspensionIgss.SUS_FECHA_FIN);
+    const regreso = fechaFin ? addDays(fechaFin, 1) : null;
+    const tipo = suspensionIgss.SUS_TIPO ? suspensionIgss.SUS_TIPO.toLowerCase() : 'salud';
+
+    return {
+      icon: <MedicalServicesIcon />,
+      titlePrefix: 'Estamos contigo',
+      message: regreso
+        ? `Tu suspension IGSS por ${tipo} esta activa. Cuidate con calma; tenemos registrado tu regreso estimado a labores para el ${formatFechaLarga(regreso)}.`
+        : 'Tu suspension IGSS esta activa. Cuidate con calma; el equipo esta pendiente de tu recuperacion y seguimiento.',
+    };
+  }
+
+  const controlActivo = controles.find((control) =>
+    Number(control.EMP_ID) === empId &&
+    control.CTL_ESTADO === 'A' &&
+    isDateInRange(fecha, control.CTL_FECHA_INICIO, control.CTL_FECHA_REGRESO)
+  );
+
+  if (!controlActivo) return null;
+
+  const regreso = parseLocalDate(controlActivo.CTL_FECHA_REGRESO);
+  const regresoTexto = regreso ? ` Tu regreso a labores esta previsto para el ${formatFechaLarga(regreso)}.` : '';
+
+  if (controlActivo.CTL_MOTIVO === 'VAC') {
+    return {
+      icon: <BeachAccessIcon />,
+      titlePrefix: 'Felices vacaciones',
+      message: `Disfruta este descanso, desconectate y recarga energia.${regresoTexto}`,
+    };
+  }
+
+  if (controlActivo.CTL_MOTIVO === 'ENF') {
+    return {
+      icon: <MedicalServicesIcon />,
+      titlePrefix: 'Pronta recuperacion',
+      message: `Tu ausencia por salud esta registrada. Toma el tiempo necesario para recuperarte.${regresoTexto}`,
+    };
+  }
+
+  if (controlActivo.CTL_MOTIVO === 'SUS') {
+    return {
+      icon: <ScheduleIcon />,
+      titlePrefix: 'Ausencia registrada',
+      message: `Tu suspension laboral esta registrada en el sistema.${regresoTexto}`,
+    };
+  }
+
+  if (controlActivo.CTL_MOTIVO === 'PER') {
+    return {
+      icon: <ScheduleIcon />,
+      titlePrefix: 'Permiso registrado',
+      message: `Tu permiso esta aprobado y registrado en el sistema.${regresoTexto}`,
+    };
+  }
+
+  return {
+    icon: <ScheduleIcon />,
+    titlePrefix: 'Ausencia registrada',
+    message: `Tu control laboral esta activo y registrado en el sistema.${regresoTexto}`,
+  };
+};
+
 const EmployeeActionCard = ({ title, helper, icon, to, color }: Omit<MetricCardProps, 'value'>) => (
   <Paper
     component={RouterLink}
@@ -191,6 +389,7 @@ function Home() {
   const [controles, setControles] = useState<ControlLaboral[]>([]);
   const [cuentas, setCuentas] = useState<CuentaBancaria[]>([]);
   const [contratos, setContratos] = useState<EmpleadoContrato[]>([]);
+  const [suspensionesIgss, setSuspensionesIgss] = useState<SuspensionIgss[]>([]);
   const [error, setError] = useState('');
   const { canAccessPath, user } = useAuth();
   const esEmpleado = isRole(user as any, 'empleado');
@@ -200,9 +399,17 @@ function Home() {
       setError('');
 
       if (esEmpleado) {
-        const empleadosRes = await Promise.allSettled([obtenerEmpleados()]);
-        if (empleadosRes[0].status === 'fulfilled') setEmpleados(empleadosRes[0].value);
-        if (empleadosRes[0].status === 'rejected') setError('No pudimos cargar tus datos de empleado por ahora.');
+        const [empleadosRes, controlesRes, suspensionesRes] = await Promise.allSettled([
+          obtenerEmpleados(),
+          obtenerControles(),
+          obtenerSuspensionesIgss(),
+        ]);
+        if (empleadosRes.status === 'fulfilled') setEmpleados(empleadosRes.value);
+        if (controlesRes.status === 'fulfilled') setControles(controlesRes.value);
+        if (suspensionesRes.status === 'fulfilled') setSuspensionesIgss(suspensionesRes.value);
+        if ([empleadosRes, controlesRes, suspensionesRes].some((item) => item.status === 'rejected')) {
+          setError('No pudimos cargar todos tus datos de asistencia por ahora.');
+        }
         return;
       }
 
@@ -227,18 +434,19 @@ function Home() {
   }, [esEmpleado]);
 
   const metrics = useMemo(() => {
-    const empleadosActivos = empleados.filter((emp) => emp.EMP_ESTADO === 'A').length;
-    const empleadosSinCuenta = empleados.filter(
-      (emp) => !cuentas.some((cuenta) => cuenta.EMP_ID === emp.EMP_ID)
+    const empleadosActivosNomina = empleados.filter(isEmpleadoActivoNomina);
+    const empleadosActivos = empleadosActivosNomina.length;
+    const empleadosSinCuenta = empleadosActivosNomina.filter(
+      (emp) => !cuentas.some((cuenta) => Number(cuenta.EMP_ID) === Number(emp.EMP_ID))
     ).length;
-    const empleadosSinContrato = empleados.filter(
-      (emp) => !contratos.some((contrato) => Number(contrato.EMP_ID) === emp.EMP_ID)
+    const empleadosSinContrato = empleadosActivosNomina.filter(
+      (emp) => !empleadoTieneContrato(emp, contratos)
     ).length;
     const controlesPendientes = controles.filter((control) => control.CTL_ESTADO === 'P').length;
     const progresoBase = [
       empleadosActivos > 0,
-      empleadosSinCuenta === 0 && empleados.length > 0,
-      empleadosSinContrato === 0 && empleados.length > 0,
+      empleadosSinCuenta === 0 && empleadosActivos > 0,
+      empleadosSinContrato === 0 && empleadosActivos > 0,
       controlesPendientes === 0,
       canAccessPath('/nomina'),
     ];
@@ -256,25 +464,91 @@ function Home() {
   const activeStep = visibleSteps.findIndex((step) => step.path === '/nomina');
   const startPath = visibleSteps[0]?.path || '/';
   const empleadoSesion = useMemo(() => getEmpleadoSesion(user, empleados), [empleados, user]);
+  const nombreEmpleado = useMemo(() => getNombreEmpleado(user, empleadoSesion), [empleadoSesion, user]);
+  const bienvenidaEmpleado = useMemo(() => getBienvenidaEmpleado(), []);
+  const situacionEmpleado = useMemo(
+    () => getSituacionEmpleado(empleadoSesion, controles, suspensionesIgss),
+    [controles, empleadoSesion, suspensionesIgss]
+  );
+  const proximoPago = useMemo(() => getProximoPago(), []);
 
   if (esEmpleado) {
     return (
       <Box sx={{ py: 1 }} data-skip-unsaved="true">
         <PageHeader
-          title={`Hola, ${empleadoSesion ? `${empleadoSesion.EMP_NOMBRE} ${empleadoSesion.EMP_APELLIDO}` : user?.nombre_completo || 'bienvenido'}`}
-          subtitle="Revisa tu jornada, marca asistencia y consulta tus pagos desde un solo lugar."
-          icon={<PeopleIcon />}
+          title={`${situacionEmpleado?.titlePrefix ?? bienvenidaEmpleado.saludo}, ${nombreEmpleado}`}
+          subtitle={situacionEmpleado?.message ?? bienvenidaEmpleado.mensaje}
+          icon={situacionEmpleado?.icon ?? <PeopleIcon />}
           meta={
-            <Chip
-              icon={<CalendarMonthIcon />}
-              label={new Date().toLocaleDateString('es-GT', { weekday: 'long', day: '2-digit', month: 'long' })}
-              color="primary"
-              variant="outlined"
-            />
+            <>
+              <Chip
+                icon={<CalendarMonthIcon />}
+                label={new Date().toLocaleDateString('es-GT', { weekday: 'long', day: '2-digit', month: 'long' })}
+                color="primary"
+                variant="outlined"
+              />
+              <Chip
+                icon={<PaymentsIcon />}
+                label={`Proximo pago: ${proximoPago.label}`}
+                color="success"
+                variant="outlined"
+              />
+            </>
           }
         />
 
         {error ? <Alert severity="warning" sx={{ mb: 2 }}>{error}</Alert> : null}
+
+        <Paper
+          elevation={1}
+          sx={{
+            p: 2.25,
+            mb: 2,
+            border: '1px solid',
+            borderColor: 'success.light',
+            bgcolor: 'rgba(46, 125, 50, 0.06)',
+          }}
+        >
+          <Stack
+            direction={{ xs: 'column', md: 'row' }}
+            spacing={2}
+            sx={{ alignItems: { xs: 'flex-start', md: 'center' }, justifyContent: 'space-between' }}
+          >
+            <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
+              <Box
+                sx={{
+                  width: 46,
+                  height: 46,
+                  borderRadius: 2,
+                  display: 'grid',
+                  placeItems: 'center',
+                  bgcolor: 'success.main',
+                  color: 'white',
+                  flexShrink: 0,
+                }}
+              >
+                <PaymentsIcon />
+              </Box>
+              <Box>
+                <Typography variant="overline" color="text.secondary">
+                  Proximo pago
+                </Typography>
+                <Typography variant="h5" sx={{ fontWeight: 900, lineHeight: 1.1 }}>
+                  {proximoPago.label}
+                </Typography>
+              </Box>
+            </Stack>
+            <Chip
+              color={proximoPago.daysRemaining === 0 ? 'success' : 'primary'}
+              label={
+                proximoPago.daysRemaining === 0
+                  ? 'Programado para hoy'
+                  : `Faltan ${proximoPago.daysRemaining} dias`
+              }
+              sx={{ fontWeight: 800 }}
+            />
+          </Stack>
+        </Paper>
 
         <Grid container spacing={2}>
           <Grid size={{ xs: 12, md: 6 }}>
@@ -297,8 +571,8 @@ function Home() {
           </Grid>
           <Grid size={{ xs: 12, md: 6 }}>
             <EmployeeActionCard
-              title="Mi boleta de pago"
-              helper="Visualiza tus ingresos, descuentos y liquido a recibir por nomina."
+              title="Boletas de Pago"
+              helper="Consulta y descarga tus boletas generadas por periodo."
               icon={<ReceiptLongIcon />}
               color="#2e7d32"
               to="/nomina-detalle"

@@ -10,7 +10,7 @@ import {
   DialogTitle,
 } from '@mui/material';
 
-type SaveHandler = () => Promise<boolean> | boolean;
+type SaveHandler = () => Promise<boolean | void> | boolean | void;
 
 type UnsavedChangesContextValue = {
   hasUnsavedChanges: boolean;
@@ -28,8 +28,16 @@ export function UnsavedChangesProvider({ children }: { children: ReactNode }) {
   const [pendingPath, setPendingPath] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const saveHandlerRef = useRef<SaveHandler | null>(null);
+  const pendingPathRef = useRef<string | null>(null);
+  const leavingAfterSaveRef = useRef(false);
+
+  const updateHasUnsavedChanges = useCallback((value: boolean) => {
+    if (leavingAfterSaveRef.current && value) return;
+    setHasUnsavedChanges(value);
+  }, []);
 
   const resetUnsavedChanges = useCallback(() => {
+    if (leavingAfterSaveRef.current) return;
     setHasUnsavedChanges(false);
   }, []);
 
@@ -45,48 +53,56 @@ export function UnsavedChangesProvider({ children }: { children: ReactNode }) {
 
   const requestNavigation = useCallback(
     (path: string) => {
-      if (!hasUnsavedChanges) {
+      if (!hasUnsavedChanges || leavingAfterSaveRef.current) {
         navigate(path);
         return;
       }
 
+      pendingPathRef.current = path;
       setPendingPath(path);
     },
     [hasUnsavedChanges, navigate]
   );
 
   const closeDialog = () => {
-    if (!saving) setPendingPath(null);
+    if (!saving) {
+      pendingPathRef.current = null;
+      setPendingPath(null);
+    }
   };
 
-  const navigateToPendingPath = () => {
-    if (!pendingPath) return;
+  const navigateToPath = (path: string | null, afterSave = false) => {
+    if (!path) return;
 
-    const nextPath = pendingPath;
+    if (afterSave) leavingAfterSaveRef.current = true;
+    pendingPathRef.current = null;
     setPendingPath(null);
     setHasUnsavedChanges(false);
-    navigate(nextPath);
+
+    window.setTimeout(() => {
+      navigate(path);
+      window.setTimeout(() => {
+        leavingAfterSaveRef.current = false;
+      }, 0);
+    }, 0);
   };
 
   const handleDiscard = () => {
-    navigateToPendingPath();
+    navigateToPath(pendingPathRef.current ?? pendingPath);
   };
 
   const handleSaveAndExit = async () => {
-    if (!pendingPath || !saveHandlerRef.current) {
-      navigateToPendingPath();
+    const nextPath = pendingPathRef.current ?? pendingPath;
+
+    if (!nextPath || !saveHandlerRef.current) {
+      navigateToPath(nextPath);
       return;
     }
 
     try {
       setSaving(true);
-      const saved = await saveHandlerRef.current();
-
-      if (saved) {
-        navigateToPendingPath();
-      } else {
-        setPendingPath(null);
-      }
+      await saveHandlerRef.current();
+      navigateToPath(nextPath, true);
     } finally {
       setSaving(false);
     }
@@ -95,12 +111,12 @@ export function UnsavedChangesProvider({ children }: { children: ReactNode }) {
   const value = useMemo(
     () => ({
       hasUnsavedChanges,
-      setHasUnsavedChanges,
+      setHasUnsavedChanges: updateHasUnsavedChanges,
       registerSaveHandler,
       requestNavigation,
       resetUnsavedChanges,
     }),
-    [hasUnsavedChanges, registerSaveHandler, requestNavigation, resetUnsavedChanges]
+    [hasUnsavedChanges, registerSaveHandler, requestNavigation, resetUnsavedChanges, updateHasUnsavedChanges]
   );
 
   return (
