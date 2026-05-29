@@ -45,6 +45,7 @@ import { obtenerCuentas } from '../services/cuentaBancaria.service';
 import { obtenerContratos } from '../services/empleado_contrato.service';
 import { obtenerSuspensionesIgss } from '../services/suspensionIgss.service';
 import { useAuth } from '../context/AuthContext';
+import { usePayrollGuide } from '../context/PayrollGuideContext';
 import { isRole } from '../auth/access';
 import PageHeader from '../components/common/PageHeader';
 
@@ -392,6 +393,7 @@ function Home() {
   const [suspensionesIgss, setSuspensionesIgss] = useState<SuspensionIgss[]>([]);
   const [error, setError] = useState('');
   const { canAccessPath, user } = useAuth();
+  const { startGuide } = usePayrollGuide();
   const esEmpleado = isRole(user as any, 'empleado');
 
   useEffect(() => {
@@ -462,7 +464,6 @@ function Home() {
 
   const visibleSteps = payrollSteps.filter((step) => canAccessPath(step.path));
   const activeStep = visibleSteps.findIndex((step) => step.path === '/nomina');
-  const startPath = visibleSteps[0]?.path || '/';
   const empleadoSesion = useMemo(() => getEmpleadoSesion(user, empleados), [empleados, user]);
   const nombreEmpleado = useMemo(() => getNombreEmpleado(user, empleadoSesion), [empleadoSesion, user]);
   const bienvenidaEmpleado = useMemo(() => getBienvenidaEmpleado(), []);
@@ -635,11 +636,10 @@ function Home() {
         )}
 
         <Button
-          component={RouterLink}
-          to={startPath}
           variant="contained"
           startIcon={<CalculateIcon />}
           disabled={!visibleSteps.length}
+          onClick={startGuide}
           sx={{ mt: 3 }}
         >
           Empezar flujo guiado

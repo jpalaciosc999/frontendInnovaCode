@@ -16,10 +16,12 @@ import {
 
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { UnsavedChangesProvider, useUnsavedChanges } from './context/UnsavedChangesContext';
+import { PayrollGuideProvider } from './context/PayrollGuideContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import LoginPage from './components/LoginPage';
 import Navbar from './components/Navbar';
 import AccessDenied from './components/common/AccessDenied';
+import PayrollGuidePanel from './components/PayrollGuidePanel';
 import { sanitizeFieldValue, shouldSkipInputSanitization } from './utils/fieldValidation';
 
 const Home = lazy(() => import('./pages/Home'));
@@ -321,7 +323,12 @@ function InputCharacterGuard() {
       const sanitizedValue = getSanitizedElementValue(event.target, event.target.value);
       if (sanitizedValue === event.target.value) return;
 
+      const nextCursorPosition = Math.min(
+        event.target.selectionStart ?? sanitizedValue.length,
+        sanitizedValue.length
+      );
       setNativeInputValue(event.target, sanitizedValue);
+      event.target.setSelectionRange(nextCursorPosition, nextCursorPosition);
     };
 
     document.addEventListener('beforeinput', handleBeforeInput, true);
@@ -349,22 +356,24 @@ function Layout() {
 
   return (
     <UnsavedChangesProvider>
-      <Box
-        sx={{
-          minHeight: '100vh',
-          bgcolor: 'background.default',
-          backgroundImage: 'linear-gradient(180deg, #eef5ff 0%, #f6f8fb 260px)',
-        }}
-      >
-        <InputCharacterGuard />
-        <Navbar />
+      <PayrollGuideProvider>
+        <Box
+          sx={{
+            minHeight: '100vh',
+            bgcolor: 'background.default',
+            backgroundImage: 'linear-gradient(180deg, #eef5ff 0%, #f6f8fb 260px)',
+          }}
+        >
+          <InputCharacterGuard />
+          <Navbar />
 
-        <UnsavedAwareContainer>
-          <Suspense fallback={
-            <Box sx={{ minHeight: '60vh', display: 'grid', placeItems: 'center' }}>
-              <CircularProgress />
-            </Box>
-          }>
+          <UnsavedAwareContainer>
+            <PayrollGuidePanel />
+            <Suspense fallback={
+              <Box sx={{ minHeight: '60vh', display: 'grid', placeItems: 'center' }}>
+                <CircularProgress />
+              </Box>
+            }>
             <Routes>
               <Route path="/" element={<Home />} />
 
@@ -423,9 +432,10 @@ function Layout() {
 
           <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
-          </Suspense>
-        </UnsavedAwareContainer>
-      </Box>
+            </Suspense>
+          </UnsavedAwareContainer>
+        </Box>
+      </PayrollGuideProvider>
     </UnsavedChangesProvider>
   );
 }
