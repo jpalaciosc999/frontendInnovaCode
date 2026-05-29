@@ -208,24 +208,20 @@ function MarcajeCRUD() {
     [liquidaciones]
   );
 
-  const empleadosDisponibles = useMemo(
-    () => empleados.filter((empleado) => {
+  const empleadosDisponibles = useMemo(() => {
+    if (esEmpleado && empleadoSeleccionado) return [empleadoSeleccionado];
+
+    return empleados.filter((empleado) => {
       const estado = String(empleado.EMP_ESTADO || 'A').toUpperCase();
       const estaLiquidado = empleadosLiquidadosIds.has(String(empleado.EMP_ID))
         || Boolean(empleado.EMP_FECHA_LIQUIDACION)
         || estado === 'L';
       return !estaLiquidado;
-    }),
-    [empleados, empleadosLiquidadosIds]
-  );
+    });
+  }, [empleadoSeleccionado, empleados, empleadosLiquidadosIds, esEmpleado]);
 
   const horarioSeleccionado = horarios.find(
     (horario) => horario.HOR_ID === empleadoSeleccionado?.HOR_ID
-  );
-
-  const empleadosDisponibles = useMemo(
-    () => esEmpleado && empleadoSeleccionado ? [empleadoSeleccionado] : empleados,
-    [empleadoSeleccionado, empleados, esEmpleado]
   );
 
   const marcajeHoy = useMemo(() => {
