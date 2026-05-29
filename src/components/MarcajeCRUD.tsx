@@ -136,6 +136,45 @@ const calcularDiferencia = (
   };
 };
 
+const obtenerMensajeErrorMarcaje = (
+  err: any,
+  marcajeHoy?: Marcaje,
+  horario?: Horario
+) => {
+  const mensajeServidor = String(
+    err?.response?.data?.message || err?.response?.data?.error || err?.message || ''
+  ).trim();
+  const mensajeNormalizado = normalizarTexto(mensajeServidor);
+
+  if (mensajeNormalizado) {
+    if (mensajeNormalizado.includes('ya') && mensajeNormalizado.includes('marc')) {
+      return 'Ya has marcado en este dia. Revisa tu historial de marcajes.';
+    }
+
+    if (mensajeNormalizado.includes('jornada') || mensajeNormalizado.includes('horario') || mensajeNormalizado.includes('ventana')) {
+      return 'Estas fuera de tu jornada laboral o de la ventana permitida para marcar.';
+    }
+
+    if (mensajeNormalizado.includes('entrada') && mensajeNormalizado.includes('salida')) {
+      return 'Tu jornada de hoy ya tiene entrada y salida registradas.';
+    }
+
+    if (!mensajeNormalizado.includes('error en el servidor')) {
+      return mensajeServidor;
+    }
+  }
+
+  if (marcajeHoy?.MAR_ENTRADA && marcajeHoy.MAR_SALIDA) {
+    return 'Ya has registrado entrada y salida para este dia.';
+  }
+
+  if (horario) {
+    return 'No fue posible registrar el marcaje. Verifica que estes dentro de tu jornada laboral.';
+  }
+
+  return 'No fue posible registrar el marcaje. Intenta nuevamente o consulta con Recursos Humanos.';
+};
+
 function MarcajeCRUD() {
   const authCtx = useAuth();
   const esEmpleado = isRole(authCtx.user as any, 'empleado');
@@ -150,6 +189,11 @@ function MarcajeCRUD() {
   const [error, setError] = useState('');
   const [offset, setOffset] = useState(0);
   const [fechaHoy, setFechaHoy] = useState(new Date());
+  const headerCellSx = {
+    bgcolor: esEmpleado ? '#0d47a1' : '#1565c0',
+    color: 'white',
+    fontWeight: 800,
+  };
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -302,7 +346,7 @@ function MarcajeCRUD() {
       setOffset(0);
       await cargarDatos(0);
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Error en el servidor.');
+      setError(obtenerMensajeErrorMarcaje(err, marcajeHoy, horarioSeleccionado));
     } finally {
       setCargandoMas(false);
     }
@@ -449,13 +493,13 @@ function MarcajeCRUD() {
 
       <TableContainer component={Paper} sx={{ borderRadius: 3 }}>
         <Table>
-          <TableHead sx={{ backgroundColor: '#1565c0' }}>
+          <TableHead>
             <TableRow>
-              <TableCell sx={{ color: 'white' }}>Fecha</TableCell>
-              <TableCell sx={{ color: 'white' }}>Entrada</TableCell>
-              <TableCell sx={{ color: 'white' }}>Salida</TableCell>
-              <TableCell sx={{ color: 'white' }}>Diferencia</TableCell>
-              <TableCell align="center" sx={{ color: 'white' }}>
+              <TableCell sx={headerCellSx}>Fecha</TableCell>
+              <TableCell sx={headerCellSx}>Entrada</TableCell>
+              <TableCell sx={headerCellSx}>Salida</TableCell>
+              <TableCell sx={headerCellSx}>Diferencia</TableCell>
+              <TableCell align="center" sx={headerCellSx}>
                 Autorización
               </TableCell>
             </TableRow>

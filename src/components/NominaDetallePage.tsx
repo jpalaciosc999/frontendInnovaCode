@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import type { NominaDetalle, NominaDetalleForm } from '../interfaces/nomina-detalle';
 import type { Nomina } from '../interfaces/nomina';
+import type { Periodo } from '../interfaces/periodo';
 import type { Ingreso } from '../interfaces/tipoIngresos';
 import type { Descuento } from '../interfaces/descuentos';
 import type { KPIResultado } from '../interfaces/kpi-resultado';
@@ -14,6 +15,7 @@ import {
     eliminarDetalleNomina
 } from '../services/nomina-detalle.service.ts';
 import { actualizarNomina, obtenerNominas } from '../services/nomina.service';
+import { obtenerPeriodos } from '../services/periodo.service';
 import { obtenerIngresos } from '../services/tipoIngresos.service';
 import { obtenerDescuentos } from '../services/descuentos.service';
 import { obtenerResultados } from '../services/kpi-resultado.service';
@@ -22,6 +24,7 @@ import { obtenerPuestos } from '../services/puestos.service';
 import { getApiErrorMessage } from '../api/errors';
 import { formatearMoneda, obtenerNombreEmpleado } from '../utils/relations';
 import { calcularISR, obtenerSueldoMensual, TASA_IGSS_LABORAL } from '../utils/payroll';
+import { downloadPayStubPdf } from '../utils/payStubPdf';
 import { useAuth } from '../context/AuthContext';
 import { isRole } from '../auth/access';
 
@@ -56,6 +59,7 @@ import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
 import AddIcon from '@mui/icons-material/Add';
+import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
 import { useUnsavedFormGuard } from '../hooks/useUnsavedFormGuard';
 
 const initialForm: NominaDetalleForm = {
@@ -71,6 +75,71 @@ type TipoConceptoNomina = '' | 'INGRESO' | 'DESCUENTO' | 'KPI';
 
 const redondearMoneda = (value: number) => Math.round(value * 100) / 100;
 const esNominaBloqueada = (estado?: string) => estado === 'P' || estado === 'A';
+const sanitizarNombreArchivo = (value: string) =>
+    value
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-zA-Z0-9_-]+/g, '_')
+        .replace(/^_+|_+$/g, '')
+        .toLowerCase();
+
+const obtenerTextoEstadoNomina = (estado?: string) => {
+    if (estado === 'A' || estado === 'Activo') return 'Aprobada';
+    if (estado === 'R' || estado === 'Rechazada') return 'Rechazada';
+    if (estado === 'I' || estado === 'Inactivo') return 'Inactiva';
+    if (estado === 'P' || estado === 'Pendiente') return 'Pendiente';
+    if (estado === 'B' || estado === 'Borrador') return 'Borrador';
+    return estado || 'Sin estado';
+};
+
+const numeroALetrasBasico = (value: number): string => {
+    const unidades = ['', 'uno', 'dos', 'tres', 'cuatro', 'cinco', 'seis', 'siete', 'ocho', 'nueve'];
+    const especiales: Record<number, string> = {
+        10: 'diez',
+        11: 'once',
+        12: 'doce',
+        13: 'trece',
+        14: 'catorce',
+        15: 'quince',
+        20: 'veinte',
+    };
+    const decenas = ['', '', 'veinti', 'treinta', 'cuarenta', 'cincuenta', 'sesenta', 'setenta', 'ochenta', 'noventa'];
+    const centenas = ['', 'ciento', 'doscientos', 'trescientos', 'cuatrocientos', 'quinientos', 'seiscientos', 'setecientos', 'ochocientos', 'novecientos'];
+
+    const convertirMenorMil = (num: number): string => {
+        if (num === 0) return '';
+        if (num === 100) return 'cien';
+        if (num < 10) return unidades[num];
+        if (especiales[num]) return especiales[num];
+        if (num < 20) return `dieci${unidades[num - 10]}`;
+        if (num < 30) return num === 20 ? especiales[20] : `${decenas[2]}${unidades[num - 20]}`;
+        if (num < 100) {
+            const decena = Math.floor(num / 10);
+            const unidad = num % 10;
+            return unidad ? `${decenas[decena]} y ${unidades[unidad]}` : decenas[decena];
+        }
+
+        const centena = Math.floor(num / 100);
+        const resto = num % 100;
+        return `${centenas[centena]} ${convertirMenorMil(resto)}`.trim();
+    };
+
+    const entero = Math.floor(Math.abs(value));
+    if (entero === 0) return 'cero';
+    if (entero < 1000) return convertirMenorMil(entero);
+
+    const miles = Math.floor(entero / 1000);
+    const resto = entero % 1000;
+    const textoMiles = miles === 1 ? 'mil' : `${convertirMenorMil(miles)} mil`;
+    return `${textoMiles} ${convertirMenorMil(resto)}`.trim();
+};
+
+const montoEnLetras = (value: number) => {
+    const centavos = Math.round((Math.abs(value) % 1) * 100);
+    const letras = numeroALetrasBasico(value).toUpperCase();
+    return `${letras} QUETZALES CON ${String(centavos).padStart(2, '0')}/100`;
+};
+
 const normalizarTexto = (value: unknown) =>
     String(value ?? '')
         .normalize('NFD')
@@ -103,6 +172,7 @@ function NominaDetalleCRUD() {
     const [detalleId, setDetalleId] = useState<number | null>(null);
     const [form, setForm] = useState<NominaDetalleForm>(initialForm);
     const [nominas, setNominas] = useState<Nomina[]>([]);
+    const [periodos, setPeriodos] = useState<Periodo[]>([]);
     const [ingresos, setIngresos] = useState<Ingreso[]>([]);
     const [descuentos, setDescuentos] = useState<Descuento[]>([]);
     const [resultadosKpi, setResultadosKpi] = useState<KPIResultado[]>([]);
@@ -116,9 +186,10 @@ function NominaDetalleCRUD() {
         try {
             setCargando(true);
             setError('');
-            const [detallesData, nominasData, ingresosData, descuentosData, resultadosData, empleadosData, puestosData] = await Promise.all([
+            const [detallesData, nominasData, periodosData, ingresosData, descuentosData, resultadosData, empleadosData, puestosData] = await Promise.all([
                 obtenerDetallesNomina(),
                 obtenerNominas(),
+                obtenerPeriodos(),
                 obtenerIngresos(),
                 obtenerDescuentos(),
                 obtenerResultados(),
@@ -132,6 +203,7 @@ function NominaDetalleCRUD() {
             const nominaIds = new Set(nominasFiltradas.map((nomina) => String(nomina.NOM_ID)));
             setDatos(esEmpleado ? detallesData.filter((detalle) => nominaIds.has(String(detalle.NOM_ID))) : detallesData);
             setNominas(nominasFiltradas);
+            setPeriodos(periodosData);
             setIngresos(ingresosData);
             setDescuentos(descuentosData);
             setResultadosKpi(resultadosData);
@@ -171,6 +243,11 @@ function NominaDetalleCRUD() {
         [nominas]
     );
 
+    const periodosPorId = useMemo(
+        () => new Map(periodos.map((periodo) => [String(periodo.PER_ID), periodo])),
+        [periodos]
+    );
+
     const ingresosPorId = useMemo(
         () => new Map(ingresos.map((ingreso) => [String(ingreso.TIS_ID), ingreso])),
         [ingresos]
@@ -196,6 +273,31 @@ function NominaDetalleCRUD() {
         if (oracleMatch) return `${oracleMatch[3]}-${oracleMatch[2]}-${oracleMatch[1]}`;
 
         return raw.slice(0, 10);
+    };
+
+    const formatearFechaBoleta = (value: string | null | undefined) => {
+        const input = toInputDate(value);
+        if (!input) return '';
+
+        const date = new Date(`${input}T00:00:00`);
+        if (Number.isNaN(date.getTime())) return input;
+
+        return date.toLocaleDateString('es-GT', {
+            day: '2-digit',
+            month: 'long',
+            year: 'numeric',
+        });
+    };
+
+    const formatearMesPeriodo = (periodo: Periodo) => {
+        const fechaBase = toInputDate(periodo.PER_FECHA_PAGO) || toInputDate(periodo.PER_FECHA_INICIO);
+        const date = new Date(`${fechaBase}T00:00:00`);
+        if (Number.isNaN(date.getTime())) return `Periodo #${periodo.PER_ID}`;
+
+        return date.toLocaleDateString('es-GT', {
+            month: 'long',
+            year: 'numeric',
+        });
     };
 
     const calcularTotalesNomina = (nomId: string | number, listaDetalles: NominaDetalle[]) =>
@@ -317,7 +419,13 @@ function NominaDetalleCRUD() {
     const obtenerEtiquetaNomina = (nomina?: Nomina) => {
         if (!nomina) return '';
         const empleado = empleadosPorId.get(String(nomina.EMP_ID));
-        return `Nomina #${nomina.NOM_ID} - ${obtenerNombreEmpleado(empleado) || `Empleado #${nomina.EMP_ID}`}`;
+        const periodo = periodosPorId.get(String(nomina.PER_ID));
+        const periodoTexto = periodo
+            ? `${formatearMesPeriodo(periodo)} (${toInputDate(periodo.PER_FECHA_INICIO)} al ${toInputDate(periodo.PER_FECHA_FIN)})`
+            : `Periodo #${nomina.PER_ID}`;
+        return esEmpleado
+            ? periodoTexto
+            : `Nomina #${nomina.NOM_ID} - ${obtenerNombreEmpleado(empleado) || `Empleado #${nomina.EMP_ID}`}`;
     };
 
     const handleTipoConceptoChange = (e: SelectChangeEvent) => {
@@ -507,6 +615,7 @@ function NominaDetalleCRUD() {
     const boletasEmpleado = useMemo(() =>
         nominas
             .filter((nomina) => !filtroNominaId || String(nomina.NOM_ID) === String(filtroNominaId))
+            .sort((a, b) => String(b.NOM_FECHA_GENERACION).localeCompare(String(a.NOM_FECHA_GENERACION)))
             .map((nomina) => {
                 const detalles = datos.filter((detalle) => String(detalle.NOM_ID) === String(nomina.NOM_ID));
                 const ingresosTotal = detalles
@@ -526,6 +635,73 @@ function NominaDetalleCRUD() {
         [datos, filtroNominaId, nominas]
     );
 
+    const obtenerConceptoDetalle = (detalle: NominaDetalle) => {
+        const ingreso = detalle.TIS_ID ? ingresosPorId.get(String(detalle.TIS_ID)) : undefined;
+        const descuento = detalle.TDS_ID ? descuentosPorId.get(String(detalle.TDS_ID)) : undefined;
+        const resultado = detalle.KRE_ID ? resultadosPorId.get(String(detalle.KRE_ID)) : undefined;
+
+        return {
+            label: ingreso
+                ? `${ingreso.TIS_CODIGO} - ${ingreso.TIS_NOMBRE}`
+                : descuento
+                    ? `${descuento.TDS_CODIGO} - ${descuento.TDS_NOMBRE}`
+                    : resultado
+                        ? `Resultado KPI #${resultado.KRE_ID}`
+                        : `Referencia ${detalle.DET_REFERENCIA}`,
+            amount: formatearMoneda(detalle.DET_MONTO),
+            esDescuento: Boolean(detalle.TDS_ID),
+        };
+    };
+
+    const descargarBoletaEmpleado = (
+        nomina: Nomina,
+        detalles: NominaDetalle[],
+        ingresosTotal: number,
+        descuentosTotal: number
+    ) => {
+        const empleado = empleadosPorId.get(String(nomina.EMP_ID));
+        const puesto = obtenerPuestoEmpleado(empleado);
+        const periodo = periodosPorId.get(String(nomina.PER_ID));
+        const nombreEmpleado = obtenerNombreEmpleado(empleado) || `Empleado #${nomina.EMP_ID}`;
+        const conceptos = detalles.map(obtenerConceptoDetalle);
+        const periodoTexto = periodo
+            ? `${formatearFechaBoleta(periodo.PER_FECHA_INICIO)} al ${formatearFechaBoleta(periodo.PER_FECHA_FIN)}`
+            : `Periodo #${nomina.PER_ID}`;
+        const mesPeriodo = periodo ? formatearMesPeriodo(periodo) : `periodo_${nomina.PER_ID}`;
+        const liquido = Number(nomina.NOM_SALARIO_LIQUIDO || ingresosTotal - descuentosTotal);
+
+        downloadPayStubPdf({
+            filename: `boleta_pago_${sanitizarNombreArchivo(mesPeriodo)}_${nomina.EMP_ID}.pdf`,
+            companyName: 'EMPRESA "Innova", S.A.',
+            companyNit: '123456-6',
+            title: 'BOLETA DE PAGO',
+            correlativo: String(nomina.NOM_ID),
+            periodo: periodoTexto,
+            fechaPago: formatearFechaBoleta(periodo?.PER_FECHA_PAGO) || 'N/A',
+            employeeFields: [
+                { label: 'Nombre Completo:', value: nombreEmpleado },
+                { label: 'No. Empleado:', value: String(nomina.EMP_ID) },
+                { label: 'DPI / NIT:', value: [empleado?.EMP_DPI, empleado?.EMP_NIT].filter(Boolean).join(' / ') },
+                { label: 'Cargo / Puesto:', value: puesto?.PUE_NOMBRE || 'Sin puesto' },
+                { label: 'Fecha de Ingreso:', value: formatearFechaBoleta(empleado?.EMP_FECHA_CONTRATACION) },
+            ].filter(({ value }) => value && value !== 'Sin puesto'),
+            payrollFields: [
+                { label: 'Mes / Periodo:', value: periodo ? formatearMesPeriodo(periodo) : `Periodo #${nomina.PER_ID}` },
+                { label: 'Fecha Generacion:', value: formatearFechaBoleta(nomina.NOM_FECHA_GENERACION) },
+                { label: 'Estado:', value: obtenerTextoEstadoNomina(nomina.NOM_ESTADO) },
+                { label: 'Salario Base:', value: formatearMoneda(obtenerSueldoNomina(nomina.NOM_ID)) },
+            ],
+            incomeItems: conceptos.filter((concepto) => !concepto.esDescuento).map(({ label, amount }) => ({ label, amount })),
+            deductionItems: conceptos.filter((concepto) => concepto.esDescuento).map(({ label, amount }) => ({ label, amount })),
+            totalIncome: formatearMoneda(ingresosTotal || nomina.NOM_TOTAL_INGRESOS),
+            totalDeductions: formatearMoneda(descuentosTotal || nomina.NOM_TOTAL_DESCUENTO),
+            netPay: formatearMoneda(liquido),
+            amountInWords: montoEnLetras(liquido),
+            employeeName: nombreEmpleado,
+            employeeDpi: String(empleado?.EMP_DPI ?? ''),
+        });
+    };
+
     if (cargando) {
         return (
             <Box sx={{ p: 3 }}>
@@ -541,13 +717,13 @@ function NominaDetalleCRUD() {
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 3 }}>
                     <ReceiptLongIcon color="primary" />
                     <Typography variant="h4" sx={{ fontWeight: 'bold' }}>
-                        {esEmpleado ? 'Mi boleta de pago' : 'Revision de Detalle de Nomina'}
+                        {esEmpleado ? 'Boletas de Pago' : 'Revision de Detalle de Nomina'}
                     </Typography>
                 </Box>
 
                 {esEmpleado ? (
                     <Alert severity="info" sx={{ mb: 2 }}>
-                        Consulta aqui el detalle de tus ingresos, descuentos y salario liquido por nomina.
+                        Consulta tus boletas generadas por periodo y descarga el PDF cuando lo necesites.
                     </Alert>
                 ) : (
                 <>
@@ -725,15 +901,15 @@ function NominaDetalleCRUD() {
             <Paper elevation={3} sx={{ p: 3 }}>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 2, mb: 2, flexWrap: 'wrap' }}>
                     <Typography variant="h6">
-                        {esEmpleado ? `Movimientos de pago: ${datosVisibles.length}` : `Listado de detalles: ${datosVisibles.length}`}
+                        {esEmpleado ? `Boletas disponibles: ${boletasEmpleado.length}` : `Listado de detalles: ${datosVisibles.length}`}
                     </Typography>
                     <FormControl sx={{ minWidth: 320 }}>
-                        <InputLabel>Filtrar por nomina</InputLabel>
-                        <Select value={filtroNominaId} label="Filtrar por nomina" onChange={handleFiltroNomina}>
-                            <MenuItem value="">{esEmpleado ? 'Todas mis nominas' : 'Todas'}</MenuItem>
+                        <InputLabel>{esEmpleado ? 'Filtrar por periodo' : 'Filtrar por nomina'}</InputLabel>
+                        <Select value={filtroNominaId} label={esEmpleado ? 'Filtrar por periodo' : 'Filtrar por nomina'} onChange={handleFiltroNomina}>
+                            <MenuItem value="">{esEmpleado ? 'Todos mis periodos' : 'Todas'}</MenuItem>
                             {nominas.map((nomina) => (
                                 <MenuItem key={nomina.NOM_ID} value={String(nomina.NOM_ID)}>
-                                    {obtenerEtiquetaNomina(nomina)} {esNominaBloqueada(nomina.NOM_ESTADO) ? '- Bloqueada' : ''}
+                                    {obtenerEtiquetaNomina(nomina)} {!esEmpleado && esNominaBloqueada(nomina.NOM_ESTADO) ? '- Bloqueada' : ''}
                                 </MenuItem>
                             ))}
                         </Select>
@@ -743,22 +919,40 @@ function NominaDetalleCRUD() {
                 {esEmpleado ? (
                 <Box sx={{ display: 'grid', gap: 2.5 }}>
                     {boletasEmpleado.length > 0 ? (
-                        boletasEmpleado.map(({ nomina, detalles, ingresosTotal, descuentosTotal }) => (
+                        boletasEmpleado.map(({ nomina, detalles, ingresosTotal, descuentosTotal }) => {
+                            const periodo = periodosPorId.get(String(nomina.PER_ID));
+
+                            return (
                             <Paper key={nomina.NOM_ID} variant="outlined" sx={{ p: 2.5, borderRadius: 2 }}>
                                 <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 2, flexWrap: 'wrap', mb: 2 }}>
                                     <Box>
                                         <Typography variant="overline" color="text.secondary">Boleta de pago</Typography>
                                         <Typography variant="h5" sx={{ fontWeight: 800 }}>
-                                            Nomina #{nomina.NOM_ID}
+                                            {periodo ? formatearMesPeriodo(periodo) : `Periodo #${nomina.PER_ID}`}
                                         </Typography>
                                         <Typography variant="body2" color="text.secondary">
-                                            Generada el {toInputDate(nomina.NOM_FECHA_GENERACION) || 'sin fecha'}
+                                            {periodo
+                                                ? `${formatearFechaBoleta(periodo.PER_FECHA_INICIO)} al ${formatearFechaBoleta(periodo.PER_FECHA_FIN)}`
+                                                : `Nomina #${nomina.NOM_ID}`}
+                                        </Typography>
+                                        <Typography variant="caption" color="text.secondary">
+                                            Generada el {formatearFechaBoleta(nomina.NOM_FECHA_GENERACION) || 'sin fecha'}
                                         </Typography>
                                     </Box>
-                                    <Chip
-                                        label={nomina.NOM_ESTADO === 'A' ? 'Aprobada' : nomina.NOM_ESTADO === 'P' ? 'Pendiente' : 'Borrador'}
-                                        color={nomina.NOM_ESTADO === 'A' ? 'success' : nomina.NOM_ESTADO === 'P' ? 'warning' : 'default'}
-                                    />
+                                    <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>
+                                        <Chip
+                                            label={obtenerTextoEstadoNomina(nomina.NOM_ESTADO)}
+                                            color={nomina.NOM_ESTADO === 'A' ? 'success' : nomina.NOM_ESTADO === 'P' ? 'warning' : 'default'}
+                                        />
+                                        <Button
+                                            variant="contained"
+                                            startIcon={<PictureAsPdfIcon />}
+                                            onClick={() => descargarBoletaEmpleado(nomina, detalles, ingresosTotal, descuentosTotal)}
+                                            disabled={detalles.length === 0}
+                                        >
+                                            Descargar PDF
+                                        </Button>
+                                    </Box>
                                 </Box>
 
                                 <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(3, 1fr)' }, gap: 2, mb: 2 }}>
@@ -828,7 +1022,8 @@ function NominaDetalleCRUD() {
                                     </Table>
                                 </TableContainer>
                             </Paper>
-                        ))
+                            );
+                        })
                     ) : (
                         <Alert severity="info">No tienes boletas de pago registradas.</Alert>
                     )}

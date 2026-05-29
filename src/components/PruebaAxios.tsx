@@ -21,11 +21,13 @@ import { obtenerDepartamentos } from '../services/departamentos.service';
 
 import {
   Alert,
+  Autocomplete,
   Avatar,
   Box,
   Button,
   Chip,
   Dialog,
+  DialogActions,
   DialogContent,
   DialogTitle,
   Divider,
@@ -94,6 +96,127 @@ const getToday = () => new Date().toISOString().slice(0, 10);
 
 const soloDigitos = (valor: string) => valor.replace(/\D+/g, '');
 const limitarLongitud = (valor: string, maxLength: number) => valor.slice(0, maxLength);
+const normalizarMonto = (valor: number | string | undefined) => Math.round(Number(valor || 0) * 100);
+
+type PhoneCountry = {
+  code: string;
+  name: string;
+  dialCode: string;
+  localLength?: number;
+};
+
+const PHONE_COUNTRIES: PhoneCountry[] = [
+  { code: 'GT', name: 'Guatemala', dialCode: '502', localLength: 8 },
+  { code: 'US', name: 'Estados Unidos', dialCode: '1', localLength: 10 },
+  { code: 'CA', name: 'Canada', dialCode: '1', localLength: 10 },
+  { code: 'MX', name: 'Mexico', dialCode: '52', localLength: 10 },
+  { code: 'BZ', name: 'Belice', dialCode: '501' },
+  { code: 'SV', name: 'El Salvador', dialCode: '503', localLength: 8 },
+  { code: 'HN', name: 'Honduras', dialCode: '504', localLength: 8 },
+  { code: 'NI', name: 'Nicaragua', dialCode: '505', localLength: 8 },
+  { code: 'CR', name: 'Costa Rica', dialCode: '506', localLength: 8 },
+  { code: 'PA', name: 'Panama', dialCode: '507' },
+  { code: 'AR', name: 'Argentina', dialCode: '54' },
+  { code: 'BO', name: 'Bolivia', dialCode: '591' },
+  { code: 'BR', name: 'Brasil', dialCode: '55' },
+  { code: 'CL', name: 'Chile', dialCode: '56' },
+  { code: 'CO', name: 'Colombia', dialCode: '57' },
+  { code: 'EC', name: 'Ecuador', dialCode: '593' },
+  { code: 'PY', name: 'Paraguay', dialCode: '595' },
+  { code: 'PE', name: 'Peru', dialCode: '51' },
+  { code: 'UY', name: 'Uruguay', dialCode: '598' },
+  { code: 'VE', name: 'Venezuela', dialCode: '58' },
+  { code: 'ES', name: 'Espana', dialCode: '34', localLength: 9 },
+  { code: 'FR', name: 'Francia', dialCode: '33' },
+  { code: 'DE', name: 'Alemania', dialCode: '49' },
+  { code: 'IT', name: 'Italia', dialCode: '39' },
+  { code: 'PT', name: 'Portugal', dialCode: '351' },
+  { code: 'GB', name: 'Reino Unido', dialCode: '44' },
+  { code: 'IE', name: 'Irlanda', dialCode: '353' },
+  { code: 'NL', name: 'Paises Bajos', dialCode: '31' },
+  { code: 'BE', name: 'Belgica', dialCode: '32' },
+  { code: 'CH', name: 'Suiza', dialCode: '41' },
+  { code: 'AT', name: 'Austria', dialCode: '43' },
+  { code: 'DK', name: 'Dinamarca', dialCode: '45' },
+  { code: 'NO', name: 'Noruega', dialCode: '47' },
+  { code: 'SE', name: 'Suecia', dialCode: '46' },
+  { code: 'FI', name: 'Finlandia', dialCode: '358' },
+  { code: 'IS', name: 'Islandia', dialCode: '354' },
+  { code: 'PL', name: 'Polonia', dialCode: '48' },
+  { code: 'CZ', name: 'Chequia', dialCode: '420' },
+  { code: 'SK', name: 'Eslovaquia', dialCode: '421' },
+  { code: 'HU', name: 'Hungria', dialCode: '36' },
+  { code: 'RO', name: 'Rumania', dialCode: '40' },
+  { code: 'BG', name: 'Bulgaria', dialCode: '359' },
+  { code: 'GR', name: 'Grecia', dialCode: '30' },
+  { code: 'TR', name: 'Turquia', dialCode: '90' },
+  { code: 'UA', name: 'Ucrania', dialCode: '380' },
+  { code: 'RU', name: 'Rusia', dialCode: '7' },
+  { code: 'CN', name: 'China', dialCode: '86' },
+  { code: 'JP', name: 'Japon', dialCode: '81' },
+  { code: 'KR', name: 'Corea del Sur', dialCode: '82' },
+  { code: 'IN', name: 'India', dialCode: '91' },
+  { code: 'PK', name: 'Pakistan', dialCode: '92' },
+  { code: 'BD', name: 'Bangladesh', dialCode: '880' },
+  { code: 'ID', name: 'Indonesia', dialCode: '62' },
+  { code: 'PH', name: 'Filipinas', dialCode: '63' },
+  { code: 'TH', name: 'Tailandia', dialCode: '66' },
+  { code: 'VN', name: 'Vietnam', dialCode: '84' },
+  { code: 'MY', name: 'Malasia', dialCode: '60' },
+  { code: 'SG', name: 'Singapur', dialCode: '65' },
+  { code: 'AU', name: 'Australia', dialCode: '61' },
+  { code: 'NZ', name: 'Nueva Zelanda', dialCode: '64' },
+  { code: 'ZA', name: 'Sudafrica', dialCode: '27' },
+  { code: 'EG', name: 'Egipto', dialCode: '20' },
+  { code: 'MA', name: 'Marruecos', dialCode: '212' },
+  { code: 'DZ', name: 'Argelia', dialCode: '213' },
+  { code: 'NG', name: 'Nigeria', dialCode: '234' },
+  { code: 'KE', name: 'Kenia', dialCode: '254' },
+  { code: 'IL', name: 'Israel', dialCode: '972' },
+  { code: 'AE', name: 'Emiratos Arabes Unidos', dialCode: '971' },
+  { code: 'SA', name: 'Arabia Saudita', dialCode: '966' },
+  { code: 'QA', name: 'Qatar', dialCode: '974' },
+  { code: 'KW', name: 'Kuwait', dialCode: '965' },
+  { code: 'DO', name: 'Republica Dominicana', dialCode: '1' },
+  { code: 'PR', name: 'Puerto Rico', dialCode: '1' },
+  { code: 'CU', name: 'Cuba', dialCode: '53' },
+  { code: 'JM', name: 'Jamaica', dialCode: '1' },
+  { code: 'HT', name: 'Haiti', dialCode: '509' },
+];
+
+const DEFAULT_PHONE_COUNTRY = PHONE_COUNTRIES[0];
+
+const getFlagEmoji = (countryCode: string) =>
+  countryCode
+    .toUpperCase()
+    .replace(/./g, (char) => String.fromCodePoint(127397 + char.charCodeAt(0)));
+
+const getPhoneLocalMaxLength = (country: PhoneCountry) =>
+  country.localLength ?? Math.max(6, 15 - country.dialCode.length);
+
+const splitPhoneValue = (value: string, country: PhoneCountry) => {
+  const digits = soloDigitos(value);
+  if (digits.startsWith(country.dialCode) && digits.length > country.dialCode.length) {
+    return digits.slice(country.dialCode.length);
+  }
+
+  return digits;
+};
+
+const buildPhoneValue = (country: PhoneCountry, localPhone: string) => {
+  const localDigits = limitarLongitud(soloDigitos(localPhone), getPhoneLocalMaxLength(country));
+  return localDigits;
+};
+
+const detectPhoneCountry = (value: string) => {
+  const digits = soloDigitos(value);
+  if (digits.length === 8) return DEFAULT_PHONE_COUNTRY;
+
+  return PHONE_COUNTRIES
+    .slice()
+    .sort((a, b) => b.dialCode.length - a.dialCode.length)
+    .find((country) => digits.length > country.dialCode.length && digits.startsWith(country.dialCode)) ?? DEFAULT_PHONE_COUNTRY;
+};
 
 type ContratoEmpleadoSnapshot = {
   tic_id: string;
@@ -171,6 +294,11 @@ function PruebaAxios() {
   const [empleadoId, setEmpleadoId] = useState<number | null>(null);
   const [form, setForm] = useState<EmpleadoForm>(initialForm);
   const [contratoOriginal, setContratoOriginal] = useState<ContratoEmpleadoSnapshot | null>(null);
+  const [telefonoPais, setTelefonoPais] = useState<PhoneCountry>(DEFAULT_PHONE_COUNTRY);
+  const [modalJustificacionSalario, setModalJustificacionSalario] = useState(false);
+  const [justificacionSalario, setJustificacionSalario] = useState('');
+  const [justificacionSalarioDraft, setJustificacionSalarioDraft] = useState('');
+  const [sueldoConJustificacion, setSueldoConJustificacion] = useState('');
 
   const [horNombre, setHorNombre] = useState('');
 
@@ -366,6 +494,18 @@ function PruebaAxios() {
     return tipo?.TIC_NOMBRE.toLowerCase().includes('indefinido') ?? false;
   };
 
+  const puestoSeleccionado = puestosMap.get(String(form.pue_id || ''));
+  const sueldoBasePuesto = puestoSeleccionado?.PUE_SALARIO_BASE;
+  const sueldoDiferenteAlPuesto = Boolean(
+    puestoSeleccionado &&
+    form.emp_sueldo &&
+    normalizarMonto(form.emp_sueldo) !== normalizarMonto(sueldoBasePuesto)
+  );
+  const justificacionSalarioValida = Boolean(
+    justificacionSalario.trim() &&
+    sueldoConJustificacion === String(form.emp_sueldo)
+  );
+
   const obtenerFotoEmpleado = (empleado: Empleado) =>
     fotosEmpleados.get(empleado.EMP_ID) ?? '';
 
@@ -427,14 +567,34 @@ function PruebaAxios() {
   ) => {
     const { name, value } = e.target;
     if (name === 'tic_id') {
-      setForm((prev) => ({
-        ...prev,
-        tic_id: value,
-        emp_fecha_inicio_contrato:
+      setForm((prev) => {
+        const fechaInicio =
           modoEdicion && String(value) !== String(contratoOriginal?.tic_id ?? '')
             ? getToday()
-            : prev.emp_fecha_inicio_contrato,
-        emp_fecha_fin_contrato: esContratoIndefinido(value) ? '' : prev.emp_fecha_fin_contrato
+            : prev.emp_fecha_inicio_contrato;
+
+        return {
+          ...prev,
+          tic_id: value,
+          emp_fecha_inicio_contrato: fechaInicio,
+          emp_fecha_fin_contrato:
+            esContratoIndefinido(value) ||
+            (prev.emp_fecha_fin_contrato && fechaInicio && prev.emp_fecha_fin_contrato < fechaInicio)
+              ? ''
+              : prev.emp_fecha_fin_contrato
+        };
+      });
+      return;
+    }
+
+    if (name === 'emp_fecha_inicio_contrato') {
+      setForm((prev) => ({
+        ...prev,
+        emp_fecha_inicio_contrato: value,
+        emp_fecha_fin_contrato:
+          prev.emp_fecha_fin_contrato && prev.emp_fecha_fin_contrato < value
+            ? ''
+            : prev.emp_fecha_fin_contrato
       }));
       return;
     }
@@ -447,11 +607,27 @@ function PruebaAxios() {
         dep_id: puesto?.DEP_ID ? String(puesto.DEP_ID) : '',
         emp_sueldo: puesto ? String(puesto.PUE_SALARIO_BASE) : prev.emp_sueldo
       }));
+      setJustificacionSalario('');
+      setJustificacionSalarioDraft('');
+      setSueldoConJustificacion('');
       return;
     }
 
-    if (['emp_dpi', 'emp_nit', 'emp_telefono'].includes(name)) {
-      const maxLength = name === 'emp_dpi' ? 13 : name === 'emp_nit' ? 9 : 8;
+    if (name === 'emp_sueldo') {
+      const puesto = puestosMap.get(String(form.pue_id || ''));
+      const coincideConBase = puesto && normalizarMonto(value) === normalizarMonto(puesto.PUE_SALARIO_BASE);
+      setForm((prev) => ({ ...prev, emp_sueldo: value }));
+      if (coincideConBase) {
+        setJustificacionSalario('');
+        setJustificacionSalarioDraft('');
+        setSueldoConJustificacion('');
+        setModalJustificacionSalario(false);
+      }
+      return;
+    }
+
+    if (['emp_dpi', 'emp_nit'].includes(name)) {
+      const maxLength = name === 'emp_dpi' ? 13 : 9;
       const soloNumeros = limitarLongitud(soloDigitos(value), maxLength);
       setForm((prev) => ({ ...prev, [name as string]: soloNumeros }));
       return;
@@ -462,6 +638,24 @@ function PruebaAxios() {
 
   const handleDigitFieldChange = (name: string, value: string) => {
     setForm((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const telefonoLocal = splitPhoneValue(form.emp_telefono, telefonoPais);
+
+  const handleTelefonoPaisChange = (_event: unknown, country: PhoneCountry | null) => {
+    const nextCountry = country ?? DEFAULT_PHONE_COUNTRY;
+    setTelefonoPais(nextCountry);
+    setForm((prev) => ({
+      ...prev,
+      emp_telefono: buildPhoneValue(nextCountry, splitPhoneValue(prev.emp_telefono, telefonoPais)),
+    }));
+  };
+
+  const handleTelefonoLocalChange = (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    setForm((prev) => ({
+      ...prev,
+      emp_telefono: buildPhoneValue(telefonoPais, event.target.value),
+    }));
   };
 
   const handleFilterChange = (
@@ -477,6 +671,11 @@ function PruebaAxios() {
 
   const limpiarFormulario = () => {
     setForm(initialForm);
+    setTelefonoPais(DEFAULT_PHONE_COUNTRY);
+    setJustificacionSalario('');
+    setJustificacionSalarioDraft('');
+    setSueldoConJustificacion('');
+    setModalJustificacionSalario(false);
     setHorNombre('');
     setModoEdicion(false);
     setEmpleadoId(null);
@@ -493,6 +692,34 @@ function PruebaAxios() {
       String(form.emp_fecha_fin_contrato || '') !== contratoOriginal.fecha_fin
     )
   );
+  const minFechaContratoFin = form.emp_fecha_inicio_contrato || getToday();
+
+  const abrirJustificacionSalario = () => {
+    if (!sueldoDiferenteAlPuesto || justificacionSalarioValida) return;
+    setJustificacionSalarioDraft(justificacionSalario);
+    setModalJustificacionSalario(true);
+  };
+
+  const guardarJustificacionSalario = () => {
+    if (!justificacionSalarioDraft.trim()) {
+      setError('Ingresa la justificacion del cambio de salario para este empleado');
+      return;
+    }
+    setJustificacionSalario(justificacionSalarioDraft.trim());
+    setSueldoConJustificacion(String(form.emp_sueldo));
+    setModalJustificacionSalario(false);
+    setError('');
+  };
+
+  const cancelarJustificacionSalario = () => {
+    setJustificacionSalarioDraft('');
+    setJustificacionSalario('');
+    setSueldoConJustificacion('');
+    setModalJustificacionSalario(false);
+    if (sueldoBasePuesto !== undefined) {
+      setForm((prev) => ({ ...prev, emp_sueldo: String(sueldoBasePuesto) }));
+    }
+  };
 
   const validarFormulario = () => {
     if (
@@ -522,6 +749,16 @@ function PruebaAxios() {
       return false;
     }
 
+    if (form.emp_fecha_inicio_contrato < getToday()) {
+      setError('La fecha de inicio de contrato no puede ser anterior a la fecha actual');
+      return false;
+    }
+
+    if (form.emp_fecha_fin_contrato && form.emp_fecha_fin_contrato < getToday()) {
+      setError('La fecha fin de contrato no puede ser anterior a la fecha actual');
+      return false;
+    }
+
     if (
       contratoCambioPendiente &&
       form.emp_fecha_inicio_contrato <= contratoOriginal!.fecha_inicio
@@ -539,12 +776,18 @@ function PruebaAxios() {
       form.emp_fecha_fin_contrato &&
       form.emp_fecha_fin_contrato < form.emp_fecha_inicio_contrato
     ) {
-      setError('La fecha fin de contrato no puede ser anterior a la fecha de contrataciÃ³n');
+      setError('La fecha fin de contrato no puede ser anterior a la fecha de contratacion');
       return false;
     }
 
     if (Number(form.emp_sueldo) <= 0) {
       setError('El sueldo debe ser mayor a 0');
+      return false;
+    }
+
+    if (sueldoDiferenteAlPuesto && !justificacionSalarioValida) {
+      setError('Ingresa la justificacion del cambio de salario para este empleado');
+      abrirJustificacionSalario();
       return false;
     }
     return true;
@@ -601,10 +844,18 @@ function PruebaAxios() {
   };
 
   const handleEditar = (empleado: Empleado) => {
+    const telefono = String(empleado.EMP_TELEFONO || '');
+    const telefonoPaisDetectado = detectPhoneCountry(telefono);
+
     setModoEdicion(true);
     setEmpleadoId(empleado.EMP_ID);
     setMensaje('');
     setError('');
+    setTelefonoPais(telefonoPaisDetectado);
+    setJustificacionSalario('');
+    setJustificacionSalarioDraft('');
+    setSueldoConJustificacion('');
+    setModalJustificacionSalario(false);
 
     const hor = horarios.find((h) => h.HOR_ID === empleado.HOR_ID);
 
@@ -631,7 +882,7 @@ function PruebaAxios() {
       emp_apellido: empleado.EMP_APELLIDO || '',
       emp_dpi: String(empleado.EMP_DPI || ''),
       emp_nit: String(empleado.EMP_NIT || ''),
-      emp_telefono: String(empleado.EMP_TELEFONO || ''),
+      emp_telefono: telefono,
       emp_fecha_contratacion: empleado.EMP_FECHA_CONTRATACION
         ? String(empleado.EMP_FECHA_CONTRATACION).slice(0, 10)
         : '',
@@ -743,13 +994,20 @@ function PruebaAxios() {
     [empleadosFiltrados]
   );
 
-  const resumenEmpleados = useMemo(() => ({
-    activos: datos.filter((empleado) => empleado.EMP_ESTADO === 'A').length,
-    sinHorario: datos.filter((empleado) => !empleado.HOR_ID).length,
-    sinSede: datos.filter((empleado) => !empleado.SED_ID).length,
-    sinPuesto: datos.filter((empleado) => !empleado.PUE_ID).length,
-    sinContrato: datos.filter((empleado) => !empleado.TIC_ID).length
-  }), [datos]);
+  const resumenEmpleados = useMemo(() => {
+    const empleadosActivos = datos.filter((empleado) =>
+      String(empleado.EMP_ESTADO || 'A').toUpperCase() === 'A' &&
+      !empleado.EMP_FECHA_LIQUIDACION
+    );
+
+    return {
+      activos: empleadosActivos.length,
+      sinHorario: empleadosActivos.filter((empleado) => !empleado.HOR_ID).length,
+      sinSede: empleadosActivos.filter((empleado) => !empleado.SED_ID).length,
+      sinPuesto: empleadosActivos.filter((empleado) => !empleado.PUE_ID).length,
+      sinContrato: empleadosActivos.filter((empleado) => !empleado.TIC_ID).length
+    };
+  }, [datos]);
 
   if (cargando) {
     return (
@@ -854,15 +1112,60 @@ function PruebaAxios() {
           </Grid>
 
           <Grid size={{ xs: 12, md: 6 }}>
-            <DigitField
-              label="Telefono"
-              name="emp_telefono"
-              value={form.emp_telefono}
-              maxLength={8}
-              onValueChange={handleDigitFieldChange}
-              required
-              helperText="Solo numeros. Maximo 8 digitos para telefono guatemalteco."
-            />
+            <Grid container spacing={1.5}>
+              <Grid size={{ xs: 12, sm: 5 }}>
+                <Autocomplete
+                  options={PHONE_COUNTRIES}
+                  value={telefonoPais}
+                  onChange={handleTelefonoPaisChange}
+                  disableClearable
+                  getOptionLabel={(country) => `${getFlagEmoji(country.code)} ${country.name} +${country.dialCode}`}
+                  isOptionEqualToValue={(option, value) => option.code === value.code && option.dialCode === value.dialCode}
+                  renderInput={(params) => (
+                    <TextField {...params} label="Pais" required />
+                  )}
+                  renderOption={(props, country) => (
+                    <Box component="li" {...props}>
+                      <Box component="span" sx={{ mr: 1.25, fontSize: 20 }}>
+                        {getFlagEmoji(country.code)}
+                      </Box>
+                      <Box component="span" sx={{ flexGrow: 1 }}>
+                        {country.name}
+                      </Box>
+                      <Typography component="span" color="text.secondary">
+                        +{country.dialCode}
+                      </Typography>
+                    </Box>
+                  )}
+                />
+              </Grid>
+              <Grid size={{ xs: 12, sm: 7 }}>
+                <TextField
+                  fullWidth
+                  label="Telefono"
+                  name="emp_telefono_local"
+                  type="tel"
+                  value={telefonoLocal}
+                  onChange={handleTelefonoLocalChange}
+                  required
+                  helperText={`Prefijo seleccionado: +${telefonoPais.dialCode}. Se guardara el numero local${telefonoLocal ? `: ${telefonoLocal}` : ''}`}
+                  slotProps={{
+                    input: {
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          +{telefonoPais.dialCode}
+                        </InputAdornment>
+                      ),
+                    },
+                    htmlInput: {
+                      inputMode: 'numeric',
+                      pattern: '[0-9]*',
+                      maxLength: getPhoneLocalMaxLength(telefonoPais),
+                    },
+                  }}
+                />
+              </Grid>
+            </Grid>
           </Grid>
           <Grid size={{ xs: 12, md: 6 }}>
             <FormControl fullWidth required>
@@ -989,7 +1292,10 @@ function PruebaAxios() {
               value={form.emp_fecha_inicio_contrato}
               onChange={handleChange}
               helperText="Esta fecha se usara como fecha de contratacion inicial"
-              slotProps={{ inputLabel: { shrink: true } }}
+              slotProps={{
+                inputLabel: { shrink: true },
+                htmlInput: { min: getToday() }
+              }}
               required
             />
           </Grid>
@@ -1008,7 +1314,10 @@ function PruebaAxios() {
                   ? 'No aplica para contratos indefinidos'
                   : 'Requerida para contratos temporales o con plazo'
               }
-              slotProps={{ inputLabel: { shrink: true } }}
+              slotProps={{
+                inputLabel: { shrink: true },
+                htmlInput: { min: minFechaContratoFin }
+              }}
               required={!esContratoIndefinido(form.tic_id)}
             />
           </Grid>
@@ -1039,12 +1348,13 @@ function PruebaAxios() {
           <Grid size={{ xs: 12, md: 6 }}>
             <TextField
               fullWidth
-              label="Sueldo"
+              label="Salario"
               name="emp_sueldo"
               type="number"
               value={form.emp_sueldo}
               onChange={handleChange}
-              helperText="Se llena con el sueldo base del puesto, pero puedes modificarlo para este empleado"
+              onBlur={abrirJustificacionSalario}
+              helperText="Se llena con el salario base del puesto, pero puedes modificarlo para este empleado"
               slotProps={{
                 input: {
                   startAdornment: <InputAdornment position="start">Q</InputAdornment>,
@@ -1053,6 +1363,14 @@ function PruebaAxios() {
               }}
               required
             />
+            {sueldoDiferenteAlPuesto && justificacionSalarioValida && (
+              <Alert severity="info" sx={{ mt: 1.5 }}>
+                <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>
+                  Justificacion del cambio de salario
+                </Typography>
+                <Typography variant="body2">{justificacionSalario}</Typography>
+              </Alert>
+            )}
           </Grid>
 
           <Grid size={{ xs: 12 }}>
@@ -1299,6 +1617,42 @@ function PruebaAxios() {
           </Table>
         </TableContainer>
       </Paper>
+
+      <Dialog
+        open={modalJustificacionSalario}
+        onClose={cancelarJustificacionSalario}
+        fullWidth
+        maxWidth="sm"
+        slotProps={{ paper: { sx: { borderRadius: 3 } } }}
+      >
+        <DialogTitle sx={{ pb: 1 }}>
+          Ingresa la justificacion del cambio de salario para este empleado
+        </DialogTitle>
+        <DialogContent sx={{ pt: 1 }}>
+          <TextField
+            fullWidth
+            multiline
+            minRows={4}
+            autoFocus
+            value={justificacionSalarioDraft}
+            onChange={(event) => setJustificacionSalarioDraft(event.target.value)}
+            placeholder="Ej: ajuste por experiencia, negociacion contractual, responsabilidades adicionales..."
+          />
+          {puestoSeleccionado && (
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1.5 }}>
+              Salario base del puesto: {formatearMoneda(sueldoBasePuesto)}. Salario indicado: {formatearMoneda(form.emp_sueldo)}.
+            </Typography>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button variant="outlined" color="secondary" onClick={cancelarJustificacionSalario}>
+            Cancelar
+          </Button>
+          <Button variant="contained" onClick={guardarJustificacionSalario}>
+            Guardar
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       <Dialog
         open={modalDepartamentos}
