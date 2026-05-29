@@ -48,6 +48,7 @@ import { getApiErrorMessage } from '../api/errors';
 import { formatearFecha, formatearMoneda, obtenerNombreEmpleado } from '../utils/relations';
 import PeriodoBadge from './common/PeriodoBadge';
 import { useUnsavedFormGuard } from '../hooks/useUnsavedFormGuard';
+import LookupSelect from './common/LookupSelect';
 
 const initialForm: NominaAsignacionForm = {
   per_id: '',
@@ -372,32 +373,35 @@ function NominaAsignaciones() {
 
         <Grid container spacing={2}>
           <Grid size={{ xs: 12, md: 4 }}>
-            <FormControl fullWidth required>
-              <InputLabel>Periodo</InputLabel>
-              <Select name="per_id" value={String(form.per_id)} label="Periodo" onChange={handleChange}>
-                <MenuItem value="">Seleccione periodo</MenuItem>
-                {periodos.map((periodo) => (
-                  <MenuItem key={periodo.PER_ID} value={String(periodo.PER_ID)}>
-                    {obtenerPeriodo(periodo.PER_ID)}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
+            <LookupSelect
+              required
+              label="Periodo"
+              value={String(form.per_id)}
+              placeholder="Buscar periodo"
+              options={periodos.map((periodo) => ({
+                value: String(periodo.PER_ID),
+                label: obtenerPeriodo(periodo.PER_ID),
+                description: `Estado ${periodo.PER_ESTADO}`,
+              }))}
+              onChange={(value) => setForm((prev) => ({ ...prev, per_id: value }))}
+            />
           </Grid>
 
           <Grid size={{ xs: 12, md: 4 }}>
-            <FormControl fullWidth required>
-              <InputLabel>Empleado</InputLabel>
-              <Select name="emp_id" value={String(form.emp_id)} label="Empleado" onChange={handleChange}>
-                <MenuItem value="">Seleccione empleado</MenuItem>
-                {empleadosAsignables.map((empleado) => (
-                  <MenuItem key={empleado.EMP_ID} value={String(empleado.EMP_ID)}>
-                    {obtenerNombreEmpleado(empleado)}
-                    {empleado.EMP_FECHA_LIQUIDACION || String(empleado.EMP_ESTADO || 'A').toUpperCase() !== 'A' ? ' - liquidado' : ''}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
+            <LookupSelect
+              required
+              label="Empleado"
+              value={String(form.emp_id)}
+              placeholder="Buscar empleado"
+              options={empleadosAsignables.map((empleado) => ({
+                value: String(empleado.EMP_ID),
+                label: obtenerNombreEmpleado(empleado) || `Empleado #${empleado.EMP_ID}`,
+                description: empleado.EMP_FECHA_LIQUIDACION || String(empleado.EMP_ESTADO || 'A').toUpperCase() !== 'A'
+                  ? `ID ${empleado.EMP_ID} - liquidado`
+                  : `ID ${empleado.EMP_ID}`,
+              }))}
+              onChange={(value) => setForm((prev) => ({ ...prev, emp_id: value }))}
+            />
           </Grid>
 
           <Grid size={{ xs: 12, md: 4 }}>
@@ -413,33 +417,33 @@ function NominaAsignaciones() {
 
           {form.nas_tipo === 'I' && (
             <Grid size={{ xs: 12, md: 6 }}>
-              <FormControl fullWidth required>
-                <InputLabel>Concepto de ingreso</InputLabel>
-                <Select name="tis_id" value={String(form.tis_id ?? '')} label="Concepto de ingreso" onChange={handleChange}>
-                  <MenuItem value="">Seleccione ingreso</MenuItem>
-                  {ingresos.map((ingreso) => (
-                    <MenuItem key={ingreso.TIS_ID} value={String(ingreso.TIS_ID)}>
-                      {ingreso.TIS_CODIGO} - {ingreso.TIS_NOMBRE}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
+              <LookupSelect
+                required
+                label="Concepto de ingreso"
+                value={String(form.tis_id ?? '')}
+                placeholder="Buscar ingreso"
+                options={ingresos.map((ingreso) => ({
+                  value: String(ingreso.TIS_ID),
+                  label: `${ingreso.TIS_CODIGO} - ${ingreso.TIS_NOMBRE}`,
+                }))}
+                onChange={(value) => setForm((prev) => ({ ...prev, tis_id: value || null }))}
+              />
             </Grid>
           )}
 
           {form.nas_tipo === 'D' && (
             <Grid size={{ xs: 12, md: 6 }}>
-              <FormControl fullWidth required>
-                <InputLabel>Concepto de egreso</InputLabel>
-                <Select name="tds_id" value={String(form.tds_id ?? '')} label="Concepto de egreso" onChange={handleChange}>
-                  <MenuItem value="">Seleccione egreso</MenuItem>
-                  {descuentos.map((descuento) => (
-                    <MenuItem key={descuento.TDS_ID} value={String(descuento.TDS_ID)}>
-                      {descuento.TDS_CODIGO} - {descuento.TDS_NOMBRE}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
+              <LookupSelect
+                required
+                label="Concepto de egreso"
+                value={String(form.tds_id ?? '')}
+                placeholder="Buscar egreso"
+                options={descuentos.map((descuento) => ({
+                  value: String(descuento.TDS_ID),
+                  label: `${descuento.TDS_CODIGO} - ${descuento.TDS_NOMBRE}`,
+                }))}
+                onChange={(value) => setForm((prev) => ({ ...prev, tds_id: value || null }))}
+              />
             </Grid>
           )}
 

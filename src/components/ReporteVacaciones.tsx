@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+﻿import { useEffect, useState, useCallback } from 'react';
 import type { SelectChangeEvent } from '@mui/material/Select';
 import {
   Alert,
@@ -44,11 +44,12 @@ import { getReporteVacaciones } from '../services/reporte_vacaciones.service';
 import { obtenerDepartamentos } from '../services/departamentos.service';
 import { getApiErrorMessage } from '../api/errors';
 import ReportPdfButton from './common/ReportPdfButton';
+import PageHeader from './common/PageHeader';
 
 import type { VacacionesResponse, VacacionesEstado, VacacionesParams } from '../interfaces/reporteVacaciones';
 import type { Departamento } from '../interfaces/departamentos';
 
-// ── helpers ───────────────────────────────────────────────────────────────────
+// â”€â”€ helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const AVATAR_COLORS = [
   '#1976D2', '#388E3C', '#F57C00', '#7B1FA2',
@@ -64,14 +65,15 @@ function hashColor(name: string): string {
 }
 
 function estadoColor(estado: VacacionesEstado): 'success' | 'warning' | 'error' | 'info' {
-  if (estado === 'Al día')    return 'success';
-  if (estado === 'Pendiente') return 'warning';
-  if (estado === 'Alerta')    return 'error';
+  const estadoTexto = String(estado);
+  if (estadoTexto === 'Al dÃ­a')    return 'success';
+  if (estadoTexto === 'Pendiente') return 'warning';
+  if (estadoTexto === 'Alerta')    return 'error';
   return 'info';
 }
 
 const ESTADO_PIE_COLORS: Record<string, string> = {
-  'Al día':    '#388E3C',
+  'Al dÃ­a':    '#388E3C',
   'Pendiente': '#F57C00',
   'Alerta':    '#C62828',
   'En proceso':'#1976D2',
@@ -79,13 +81,13 @@ const ESTADO_PIE_COLORS: Record<string, string> = {
 
 const ANTIGUEDAD_OPTIONS = [
   { value: 0,  label: 'Todos' },
-  { value: 1,  label: '1+ año' },
-  { value: 2,  label: '2+ años' },
-  { value: 3,  label: '3+ años' },
-  { value: 5,  label: '5+ años' },
+  { value: 1,  label: '1+ aÃ±o' },
+  { value: 2,  label: '2+ aÃ±os' },
+  { value: 3,  label: '3+ aÃ±os' },
+  { value: 5,  label: '5+ aÃ±os' },
 ];
 
-// ── KPI card ─────────────────────────────────────────────────────────────────
+// â”€â”€ KPI card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function KpiCard({
   label, value, color = 'inherit',
@@ -102,7 +104,7 @@ function KpiCard({
   );
 }
 
-// ── component ─────────────────────────────────────────────────────────────────
+// â”€â”€ component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export default function ReporteVacaciones() {
   const [data, setData]                     = useState<VacacionesResponse | null>(null);
@@ -142,7 +144,7 @@ export default function ReporteVacaciones() {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  // ── derived ─────────────────────────────────────────────────────────────────
+  // â”€â”€ derived â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   const estadoPieData = (() => {
     if (!data) return [];
@@ -155,33 +157,27 @@ export default function ReporteVacaciones() {
 
   return (
     <Box data-report-pdf-root>
-      {/* ── header ──────────────────────────────────────────────────────────── */}
-      <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', mb: 3, flexWrap: 'wrap', gap: 2 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-          <BeachAccessIcon sx={{ fontSize: 32, color: 'primary.main' }} />
-          <Box>
-            <Typography variant="h5" sx={{ fontWeight: 700 }}>
-              Reporte de vacaciones
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              Dias acumulados, disfrutados y pendientes · Minimo 15 dias habiles anuales
-            </Typography>
-          </Box>
-        </Box>
-        <ReportPdfButton
-          filename="reporte-vacaciones.pdf"
-          title="Reporte de vacaciones"
-          endpoint="/api/reportes/vacaciones/pdf"
-          params={{
-            ...(depId !== '' ? { departamentoId: depId } : {}),
-            ...(estado !== '' ? { estado } : {}),
-            ...(antiguedadMin > 0 ? { antiguedadMin } : {}),
-          }}
-          disabled={!data}
-        />
-      </Box>
+      {/* â”€â”€ header â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+      <PageHeader
+        title="Reporte de vacaciones"
+        subtitle="Dias acumulados, disfrutados y pendientes. Minimo 15 dias habiles anuales."
+        icon={<BeachAccessIcon />}
+        actions={
+          <ReportPdfButton
+            filename="reporte-vacaciones.pdf"
+            title="Reporte de vacaciones"
+            endpoint="/api/reportes/vacaciones/pdf"
+            params={{
+              ...(depId !== '' ? { departamentoId: depId } : {}),
+              ...(estado !== '' ? { estado } : {}),
+              ...(antiguedadMin > 0 ? { antiguedadMin } : {}),
+            }}
+            disabled={!data}
+          />
+        }
+      />
 
-      {/* ── alerta empleados críticos ───────────────────────────────────────── */}
+      {/* â”€â”€ alerta empleados crÃ­ticos â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       {data && data.resumen.empleadosConAlerta > 0 && (
         <Alert
           severity="warning"
@@ -194,7 +190,7 @@ export default function ReporteVacaciones() {
         </Alert>
       )}
 
-      {/* ── filters ─────────────────────────────────────────────────────────── */}
+      {/* â”€â”€ filters â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <Paper variant="outlined" sx={{ p: 2, mb: 3 }}>
         <Grid container spacing={2}>
           <Grid size={{ xs: 12, sm: 6, md: 3 }}>
@@ -226,7 +222,7 @@ export default function ReporteVacaciones() {
                 }
               >
                 <MenuItem value="">Todos</MenuItem>
-                <MenuItem value="Al día">Al dia</MenuItem>
+                <MenuItem value="Al dÃ­a">Al dia</MenuItem>
                 <MenuItem value="Pendiente">Pendiente</MenuItem>
                 <MenuItem value="Alerta">Alerta</MenuItem>
                 <MenuItem value="En proceso">En proceso</MenuItem>
@@ -253,7 +249,7 @@ export default function ReporteVacaciones() {
         </Grid>
       </Paper>
 
-      {/* ── loading / error ─────────────────────────────────────────────────── */}
+      {/* â”€â”€ loading / error â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       {loading && (
         <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
           <CircularProgress />
@@ -263,7 +259,7 @@ export default function ReporteVacaciones() {
 
       {data && !loading && (
         <>
-          {/* ── KPI cards ─────────────────────────────────────────────────── */}
+          {/* â”€â”€ KPI cards â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
           <Grid container spacing={2} sx={{ mb: 3 }}>
             <Grid size={{ xs: 6, sm: 3 }}>
               <KpiCard label="Total dias acumulados" value={data.resumen.totalAcumulados} />
@@ -283,7 +279,7 @@ export default function ReporteVacaciones() {
             </Grid>
           </Grid>
 
-          {/* ── Row 1: Bar chart + Legal panel ────────────────────────────── */}
+          {/* â”€â”€ Row 1: Bar chart + Legal panel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
           <Grid container spacing={2} sx={{ mb: 3 }}>
             {/* Bar chart: pendientes por departamento */}
             <Grid size={{ xs: 12, md: 7 }}>
@@ -318,14 +314,14 @@ export default function ReporteVacaciones() {
                   Marco legal aplicable
                 </Typography>
                 <Typography variant="caption" color="text.secondary">
-                  Codigo de Trabajo — Articulo 130
+                  Codigo de Trabajo â€” Articulo 130
                 </Typography>
                 <Divider sx={{ my: 1.5 }} />
                 {[
                   ['Dias minimos anuales', '15 dias habiles'],
-                  ['Antiguedad requerida', '1 año continuo'],
+                  ['Antiguedad requerida', '1 aÃ±o continuo'],
                   ['Son compensables', 'Solo al liquidar'],
-                  ['Son renunciables', <Typography component="span" color="error" variant="body2" key="ren">No — irrenunciables</Typography>],
+                  ['Son renunciables', <Typography component="span" color="error" variant="body2" key="ren">No â€” irrenunciables</Typography>],
                   ['Pago vacaciones', 'Salario + 30%'],
                   ['Notificacion previa', '15 dias antes'],
                 ].map(([label, value], i) => (
@@ -340,9 +336,9 @@ export default function ReporteVacaciones() {
             </Grid>
           </Grid>
 
-          {/* ── Row 2: Estado pie + Area chart ────────────────────────────── */}
+          {/* â”€â”€ Row 2: Estado pie + Area chart â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
           <Grid container spacing={2} sx={{ mb: 3 }}>
-            {/* Pie chart: distribución por estado */}
+            {/* Pie chart: distribuciÃ³n por estado */}
             <Grid size={{ xs: 12, md: 5 }}>
               <Paper variant="outlined" sx={{ p: 2, height: 300 }}>
                 <Typography variant="subtitle2" sx={{ fontWeight: 700 }} gutterBottom>
@@ -439,7 +435,7 @@ export default function ReporteVacaciones() {
             </Grid>
           </Grid>
 
-          {/* ── Employee table ────────────────────────────────────────────── */}
+          {/* â”€â”€ Employee table â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
           <Paper variant="outlined">
             <TableContainer>
               <Table size="small">

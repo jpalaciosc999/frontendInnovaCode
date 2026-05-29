@@ -11,19 +11,17 @@ import {
 } from '../services/kpi-resultado.service';
 import { obtenerKPIs } from '../services/kpi.service';
 import { obtenerEmpleados } from '../services/empleados.service';
+import { useAuth } from '../context/AuthContext';
+import { isRole } from '../auth/access';
 
 import {
   Alert,
   Box,
   Button,
   Chip,
-  FormControl,
   Grid,
   InputAdornment,
-  InputLabel,
-  MenuItem,
   Paper,
-  Select,
   Snackbar,
   Table,
   TableBody,
@@ -41,6 +39,7 @@ import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AssessmentIcon from '@mui/icons-material/Assessment';
 import { useUnsavedFormGuard } from '../hooks/useUnsavedFormGuard';
+import LookupSelect from './common/LookupSelect';
 
 const initialForm: KPIResultadoForm = {
   kre_monto_total: '',
@@ -58,7 +57,29 @@ const formatearMoneda = (valor: number) => `Q${Number(valor || 0).toLocaleString
   maximumFractionDigits: 2,
 })}`;
 
+const normalizarTexto = (value: unknown) =>
+  String(value ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, ' ');
+
+const getEmpleadoSesion = (user: unknown, empleados: Empleado[]) => {
+  const record = (user && typeof user === 'object' ? user : {}) as Record<string, unknown>;
+  const empId = Number(record.emp_id ?? record.EMP_ID);
+  if (Number.isFinite(empId) && empId > 0) {
+    return empleados.find((empleado) => Number(empleado.EMP_ID) === empId) ?? null;
+  }
+  const nombreUsuario = normalizarTexto(record.nombre_completo);
+  return empleados.find((empleado) =>
+    normalizarTexto(`${empleado.EMP_NOMBRE} ${empleado.EMP_APELLIDO}`) === nombreUsuario
+  ) ?? null;
+};
+
 function KPIResultadoCRUD() {
+  const { user } = useAuth();
+  const esEmpleado = isRole(user as any, 'empleado');
   const [datos, setDatos] = useState<KPIResultado[]>([]);
   const [kpis, setKpis] = useState<KPI[]>([]);
   const [empleados, setEmpleados] = useState<Empleado[]>([]);
@@ -82,6 +103,12 @@ function KPIResultadoCRUD() {
       setDatos(resultadosData);
       setKpis(kpisData);
       setEmpleados(empleadosData);
+      if (esEmpleado) {
+        const empleadoSesion = getEmpleadoSesion(user, empleadosData);
+        setDatos(resultadosData.filter((resultado) => String(resultado.EMP_ID ?? '') === String(empleadoSesion?.EMP_ID ?? '')));
+      } else {
+        setDatos(resultadosData);
+      }
     } catch (err: any) {
       setError('Error al cargar resultados, KPIs o empleados: ' + err.message);
     } finally {
@@ -91,7 +118,7 @@ function KPIResultadoCRUD() {
 
   useEffect(() => {
     cargarDatos();
-  }, []);
+  }, [esEmpleado, user]);
 
   const kpisPorId = useMemo(
     () => new Map(kpis.map((kpi) => [String(kpi.KPI_ID), kpi])),
@@ -102,6 +129,18 @@ function KPIResultadoCRUD() {
     () => new Map(empleados.map((empleado) => [String(empleado.EMP_ID), empleado])),
     [empleados]
   );
+
+  const resumenEmpleado = useMemo(() => {
+    const totalBonos = datos.reduce((total, resultado) => total + Number(resultado.KRE_MONTO_TOTAL || 0), 0);
+    const promedio = datos.length
+      ? datos.reduce((total, resultado) => total + Number(resultado.KRE_CALCULO || 0), 0) / datos.length
+      : 0;
+    const ultimo = [...datos].sort((a, b) =>
+      new Date(String(b.KRE_FECHA)).getTime() - new Date(String(a.KRE_FECHA)).getTime()
+    )[0];
+
+    return { totalBonos, promedio, ultimo };
+  }, [datos]);
 
   const calcularBono = (kpi: KPI | undefined, calculo: string | number) => {
     const valorBase = Number(kpi?.KPI_VALOR || 0);
@@ -173,7 +212,7 @@ function KPIResultadoCRUD() {
     }
   };
 
-  useUnsavedFormGuard(form, initialForm, guardar);
+  useUnsavedFormGuard(form, initialForm, esEmpleado ? () => false : guardar);
 
   const handleEditar = (r: KPIResultado) => {
     setModoEdicion(true);
@@ -224,15 +263,17 @@ function KPIResultadoCRUD() {
   }
 
   return (
-    <Box sx={{ py: 2 }}>
+    <Box sx={{ py: 2 }} data-skip-unsaved={esEmpleado ? 'true' : undefined}>
       <Paper elevation={3} sx={{ p: 3, mb: 3 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 3 }}>
           <AssessmentIcon color="primary" />
           <Typography variant="h4" sx={{ fontWeight: 'bold' }}>
-            Bonos de Productividad por Empleado
+            {esEmpleado ? 'Mis resultados KPI' : 'Bonos de Productividad por Empleado'}
           </Typography>
         </Box>
 
+        {!esEmpleado && (
+        <>
         <Alert severity="info" sx={{ mb: 2 }}>
           Selecciona un KPI, asigna el porcentaje de productividad por empleado y el sistema calcula el bono automaticamente.
         </Alert>
@@ -243,29 +284,31 @@ function KPIResultadoCRUD() {
 
         <Grid container spacing={2}>
           <Grid size={{ xs: 12, md: 6 }}>
-            <FormControl fullWidth>
-              <InputLabel>Empleado</InputLabel>
-              <Select name="emp_id" value={form.emp_id ?? ''} label="Empleado" onChange={handleChange}>
-                {empleados.map((empleado) => (
-                  <MenuItem key={empleado.EMP_ID} value={String(empleado.EMP_ID)}>
-                    {obtenerNombreEmpleado(empleado)}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
+            <LookupSelect
+              label="Empleado"
+              value={form.emp_id ?? ''}
+              placeholder="Buscar empleado"
+              options={empleados.map((empleado) => ({
+                value: String(empleado.EMP_ID),
+                label: obtenerNombreEmpleado(empleado) || `Empleado #${empleado.EMP_ID}`,
+                description: `ID ${empleado.EMP_ID}`,
+              }))}
+              onChange={(value) => setForm((prev) => ({ ...prev, emp_id: value }))}
+            />
           </Grid>
 
           <Grid size={{ xs: 12, md: 6 }}>
-            <FormControl fullWidth>
-              <InputLabel>KPI</InputLabel>
-              <Select name="kpi_id" value={form.kpi_id} label="KPI" onChange={handleChange}>
-                {kpis.map((kpi) => (
-                  <MenuItem key={kpi.KPI_ID} value={String(kpi.KPI_ID)}>
-                    {kpi.KPI_NOMBRE} - Base {formatearMoneda(kpi.KPI_VALOR)}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
+            <LookupSelect
+              label="KPI"
+              value={form.kpi_id}
+              placeholder="Buscar KPI"
+              options={kpis.map((kpi) => ({
+                value: String(kpi.KPI_ID),
+                label: kpi.KPI_NOMBRE,
+                description: `Base ${formatearMoneda(kpi.KPI_VALOR)}`,
+              }))}
+              onChange={(value) => setForm((prev) => ({ ...prev, kpi_id: value }))}
+            />
           </Grid>
 
           <Grid size={{ xs: 12, md: 4 }}>
@@ -332,12 +375,35 @@ function KPIResultadoCRUD() {
             </Box>
           </Grid>
         </Grid>
+        </>
+        )}
       </Paper>
 
       <Paper elevation={3} sx={{ p: 3 }}>
         <Typography variant="h6" sx={{ mb: 2 }}>
-          Bonos registrados: {datos.length}
+          {esEmpleado ? `Resultados registrados: ${datos.length}` : `Bonos registrados: ${datos.length}`}
         </Typography>
+
+        {esEmpleado && (
+          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(3, 1fr)' }, gap: 2, mb: 3 }}>
+            <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
+              <Typography variant="caption" color="text.secondary">Bono acumulado</Typography>
+              <Typography variant="h4" sx={{ fontWeight: 800 }}>{formatearMoneda(resumenEmpleado.totalBonos)}</Typography>
+            </Paper>
+            <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
+              <Typography variant="caption" color="text.secondary">Productividad promedio</Typography>
+              <Typography variant="h4" sx={{ fontWeight: 800 }}>{resumenEmpleado.promedio.toFixed(1)}%</Typography>
+            </Paper>
+            <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
+              <Typography variant="caption" color="text.secondary">Ultimo registro</Typography>
+              <Typography variant="h6" sx={{ fontWeight: 800 }}>
+                {resumenEmpleado.ultimo?.KRE_FECHA
+                  ? new Date(resumenEmpleado.ultimo.KRE_FECHA).toLocaleDateString('es-GT')
+                  : 'Sin registros'}
+              </Typography>
+            </Paper>
+          </Box>
+        )}
 
         <TableContainer>
           <Table>
@@ -349,7 +415,7 @@ function KPIResultadoCRUD() {
                 <TableCell><strong>Bono</strong></TableCell>
                 <TableCell><strong>Productividad</strong></TableCell>
                 <TableCell><strong>Fecha</strong></TableCell>
-                <TableCell><strong>Acciones</strong></TableCell>
+                {!esEmpleado && <TableCell><strong>Acciones</strong></TableCell>}
               </TableRow>
             </TableHead>
 
@@ -371,6 +437,7 @@ function KPIResultadoCRUD() {
                           ? new Date(r.KRE_FECHA).toLocaleDateString('es-GT')
                           : ''}
                       </TableCell>
+                      {!esEmpleado && (
                       <TableCell>
                         <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
                           <Button
@@ -393,13 +460,14 @@ function KPIResultadoCRUD() {
                           </Button>
                         </Box>
                       </TableCell>
+                      )}
                     </TableRow>
                   );
                 })
               ) : (
                 <TableRow>
-                  <TableCell colSpan={7} align="center">
-                    No hay bonos registrados
+                  <TableCell colSpan={esEmpleado ? 6 : 7} align="center">
+                    {esEmpleado ? 'No tienes resultados KPI registrados.' : 'No hay bonos registrados'}
                   </TableCell>
                 </TableRow>
               )}

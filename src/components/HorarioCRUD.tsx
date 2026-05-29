@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { Horario, HorarioForm } from '../interfaces/horario';
+import type { Empleado } from '../interfaces/empleados';
 import {
   obtenerHorarios,
   crearHorario,
@@ -8,11 +9,15 @@ import {
 } from '../services/horario.service';
 import { getApiErrorMessage } from '../api/errors';
 import { ERROR_MESSAGES, validarDescripcion } from '../utils/fieldValidation';
+import { useAuth } from '../context/AuthContext';
+import { isRole } from '../auth/access';
+import { obtenerEmpleados } from '../services/empleados.service';
 
 import {
   Alert,
   Box,
   Button,
+  Chip,
   Checkbox,
   FormControlLabel,
   Grid,
@@ -48,7 +53,29 @@ const initialForm: HorarioForm = {
   hor_domingo: 0
 };
 
+const normalizarTexto = (value: unknown) =>
+  String(value ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, ' ');
+
+const getEmpleadoSesion = (user: unknown, empleados: Empleado[]) => {
+  const record = (user && typeof user === 'object' ? user : {}) as Record<string, unknown>;
+  const empId = Number(record.emp_id ?? record.EMP_ID);
+  if (Number.isFinite(empId) && empId > 0) {
+    return empleados.find((empleado) => Number(empleado.EMP_ID) === empId) ?? null;
+  }
+  const nombreUsuario = normalizarTexto(record.nombre_completo);
+  return empleados.find((empleado) =>
+    normalizarTexto(`${empleado.EMP_NOMBRE} ${empleado.EMP_APELLIDO}`) === nombreUsuario
+  ) ?? null;
+};
+
 function HorarioCRUD() {
+  const { user } = useAuth();
+  const esEmpleado = isRole(user as any, 'empleado');
   const [datos, setDatos] = useState<Horario[]>([]);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState('');
@@ -62,7 +89,13 @@ function HorarioCRUD() {
       setCargando(true);
       setError('');
       const data = await obtenerHorarios();
-      setDatos(data);
+      if (esEmpleado) {
+        const empleados = await obtenerEmpleados();
+        const empleadoSesion = getEmpleadoSesion(user, empleados);
+        setDatos(data.filter((horario) => horario.HOR_ID === empleadoSesion?.HOR_ID));
+      } else {
+        setDatos(data);
+      }
     } catch (err: unknown) {
       setError(getApiErrorMessage(err, 'Error cargando horarios'));
     } finally {
@@ -72,7 +105,7 @@ function HorarioCRUD() {
 
   useEffect(() => {
     cargarDatos();
-  }, []);
+  }, [esEmpleado, user]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -153,7 +186,7 @@ function HorarioCRUD() {
     }
   };
 
-  useUnsavedFormGuard(form, initialForm, guardar);
+  useUnsavedFormGuard(form, initialForm, esEmpleado ? () => false : guardar);
 
   const handleEliminar = async (idEliminar: number) => {
     if (!window.confirm('¿Deseas eliminar este horario?')) return;
@@ -203,6 +236,8 @@ function HorarioCRUD() {
     return dias.join(', ');
   };
 
+  const colSpan = useMemo(() => esEmpleado ? 5 : 6, [esEmpleado]);
+
   if (cargando) {
     return (
       <Box sx={{ p: 3 }}>
@@ -212,7 +247,7 @@ function HorarioCRUD() {
   }
 
   return (
-    <Box sx={{ py: 2 }}>
+    <Box sx={{ py: 2 }} data-skip-unsaved={esEmpleado ? 'true' : undefined}>
       <Paper elevation={3} sx={{ p: 3, mb: 3 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 3 }}>
           <ScheduleIcon color="primary" />
@@ -221,11 +256,13 @@ function HorarioCRUD() {
           </Typography>
         </Box>
 
-        <Typography variant="h6" sx={{ mb: 2 }}>
-          {modoEdicion ? 'Editar horario' : 'Nuevo horario'}
-        </Typography>
+        {!esEmpleado && (
+        <>
+          <Typography variant="h6" sx={{ mb: 2 }}>
+            {modoEdicion ? 'Editar horario' : 'Nuevo horario'}
+          </Typography>
 
-        <Grid container spacing={2}>
+          <Grid container spacing={2}>
           <Grid size={{ xs: 12, md: 6 }}>
             <TextField
               fullWidth
@@ -359,14 +396,56 @@ function HorarioCRUD() {
               </Button>
             </Box>
           </Grid>
-        </Grid>
+          </Grid>
+        </>
+        )}
       </Paper>
 
       <Paper elevation={3} sx={{ p: 3 }}>
         <Typography variant="h6" sx={{ mb: 2 }}>
-          Listado de horarios: {datos.length}
+          {esEmpleado ? 'Mi horario asignado' : `Listado de horarios: ${datos.length}`}
         </Typography>
 
+        {esEmpleado && datos[0] ? (
+          <Box
+            sx={{
+              display: 'grid',
+              gap: 2,
+              p: 3,
+              border: '1px solid',
+              borderColor: 'divider',
+              borderRadius: 2,
+              bgcolor: 'background.default',
+            }}
+          >
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 2, flexWrap: 'wrap' }}>
+              <Box>
+                <Typography variant="overline" color="text.secondary">Jornada</Typography>
+                <Typography variant="h5" sx={{ fontWeight: 800 }}>
+                  {datos[0].HOR_DESCRIPCION}
+                </Typography>
+              </Box>
+              <Chip color="primary" label={`ID ${datos[0].HOR_ID}`} />
+            </Box>
+
+            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2 }}>
+              <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
+                <Typography variant="caption" color="text.secondary">Entrada</Typography>
+                <Typography variant="h4" sx={{ fontWeight: 800 }}>{datos[0].HOR_HORA_INICIO}</Typography>
+              </Paper>
+              <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
+                <Typography variant="caption" color="text.secondary">Salida</Typography>
+                <Typography variant="h4" sx={{ fontWeight: 800 }}>{datos[0].HOR_HORA_FIN}</Typography>
+              </Paper>
+            </Box>
+
+            <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+              {diasTexto(datos[0]).split(', ').filter(Boolean).map((dia) => (
+                <Chip key={dia} label={dia} color="success" variant="outlined" />
+              ))}
+            </Box>
+          </Box>
+        ) : (
         <TableContainer>
           <Table>
             <TableHead>
@@ -376,7 +455,7 @@ function HorarioCRUD() {
                 <TableCell><strong>Hora inicio</strong></TableCell>
                 <TableCell><strong>Hora fin</strong></TableCell>
                 <TableCell><strong>Días</strong></TableCell>
-                <TableCell><strong>Acciones</strong></TableCell>
+                {!esEmpleado && <TableCell><strong>Acciones</strong></TableCell>}
               </TableRow>
             </TableHead>
 
@@ -389,6 +468,7 @@ function HorarioCRUD() {
                     <TableCell>{h.HOR_HORA_INICIO}</TableCell>
                     <TableCell>{h.HOR_HORA_FIN}</TableCell>
                     <TableCell>{diasTexto(h)}</TableCell>
+                    {!esEmpleado && (
                     <TableCell>
                       <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
                         <Button
@@ -411,18 +491,20 @@ function HorarioCRUD() {
                         </Button>
                       </Box>
                     </TableCell>
+                    )}
                   </TableRow>
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={6} align="center">
-                    No hay horarios registrados
+                  <TableCell colSpan={colSpan} align="center">
+                    {esEmpleado ? 'No tienes un horario asignado.' : 'No hay horarios registrados'}
                   </TableCell>
                 </TableRow>
               )}
             </TableBody>
           </Table>
         </TableContainer>
+        )}
       </Paper>
 
       <Snackbar

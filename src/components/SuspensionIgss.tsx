@@ -40,6 +40,7 @@ import {
   obtenerSuspensionesIgss
 } from '../services/suspensionIgss.service';
 import { useUnsavedFormGuard } from '../hooks/useUnsavedFormGuard';
+import LookupSelect from './common/LookupSelect';
 
 // Regla IGSS: días 1-3 empleador paga 100%, días 4+ IGSS paga 66.67%
 const calcularImpacto = (salarioDiario: number, dias: number) => {
@@ -53,6 +54,9 @@ const calcularImpacto = (salarioDiario: number, dias: number) => {
     : `Empleador: días 1-3 (Q${pago_empleador.toFixed(2)}) | IGSS: días 4-${dias} al 66.67% (Q${pago_igss.toFixed(2)})`;
   return { dias_empleador, dias_igss, pago_empleador, pago_igss, descuento_salario, detalle };
 };
+
+const obtenerNombreEmpleado = (empleado: Empleado) =>
+  `${empleado.EMP_NOMBRE ?? ''} ${empleado.EMP_APELLIDO ?? ''}`.trim();
 
 const initialForm: SuspensionIgssForm = {
   emp_id: '', sus_no_certificado: '', sus_fecha_inicio: '',
@@ -262,18 +266,21 @@ function SuspensionIGSS() {
         <Grid container spacing={2}>
           {/* Select de empleados desde la API */}
           <Grid size={{ xs: 12, md: 4 }}>
-            <FormControl fullWidth>
-              <InputLabel>Empleado</InputLabel>
-              <Select name="emp_id" value={String(form.emp_id)}
-                label="Empleado" onChange={handleChange}>
-                <MenuItem value="">Seleccione empleado</MenuItem>
-                {empleados.map((e) => (
-                  <MenuItem key={e.EMP_ID} value={String(e.EMP_ID)}>
-                    {e.EMP_NOMBRE} {e.EMP_APELLIDO}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
+            <LookupSelect
+              label="Empleado"
+              value={String(form.emp_id)}
+              placeholder="Buscar empleado"
+              options={empleados.map((empleado) => ({
+                value: String(empleado.EMP_ID),
+                label: obtenerNombreEmpleado(empleado) || `Empleado #${empleado.EMP_ID}`,
+                description: `ID ${empleado.EMP_ID}`,
+              }))}
+              onChange={(value) => setForm((prev) => ({
+                ...prev,
+                emp_id: value,
+                sus_salario_diario: obtenerSalarioDiario(value),
+              }))}
+            />
           </Grid>
 
           <Grid size={{ xs: 12, md: 4 }}>

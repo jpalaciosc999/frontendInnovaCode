@@ -26,6 +26,10 @@ import PaymentsIcon from '@mui/icons-material/Payments';
 import CalculateIcon from '@mui/icons-material/Calculate';
 import SummarizeIcon from '@mui/icons-material/Summarize';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import ScheduleIcon from '@mui/icons-material/Schedule';
+import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
+import AssessmentIcon from '@mui/icons-material/Assessment';
+import PlaylistAddCheckIcon from '@mui/icons-material/PlaylistAddCheck';
 
 import type { Empleado } from '../interfaces/empleados';
 import type { ControlLaboral } from '../interfaces/controlLaboral';
@@ -37,6 +41,8 @@ import { obtenerControles } from '../services/controlLaboral.service';
 import { obtenerCuentas } from '../services/cuentaBancaria.service';
 import { obtenerContratos } from '../services/empleado_contrato.service';
 import { useAuth } from '../context/AuthContext';
+import { isRole } from '../auth/access';
+import PageHeader from '../components/common/PageHeader';
 
 type GuideStep = {
   title: string;
@@ -131,17 +137,74 @@ const MetricCard = ({ title, value, helper, icon, color, to, disabled }: MetricC
   </Paper>
 );
 
+const normalizarTexto = (value: unknown) =>
+  String(value ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, ' ');
+
+const getEmpleadoSesion = (user: unknown, empleados: Empleado[]) => {
+  const record = (user && typeof user === 'object' ? user : {}) as Record<string, unknown>;
+  const empId = Number(record.emp_id ?? record.EMP_ID);
+  if (Number.isFinite(empId) && empId > 0) {
+    return empleados.find((empleado) => Number(empleado.EMP_ID) === empId) ?? null;
+  }
+
+  const nombreUsuario = normalizarTexto(record.nombre_completo);
+  return empleados.find((empleado) =>
+    normalizarTexto(`${empleado.EMP_NOMBRE} ${empleado.EMP_APELLIDO}`) === nombreUsuario
+  ) ?? null;
+};
+
+const EmployeeActionCard = ({ title, helper, icon, to, color }: Omit<MetricCardProps, 'value'>) => (
+  <Paper
+    component={RouterLink}
+    to={to}
+    elevation={1}
+    sx={{
+      p: 2.25,
+      height: '100%',
+      display: 'block',
+      textDecoration: 'none',
+      color: 'inherit',
+      border: '1px solid',
+      borderColor: 'divider',
+      transition: 'transform 140ms ease, box-shadow 140ms ease',
+      '&:hover': {
+        transform: 'translateY(-2px)',
+        boxShadow: 4,
+      },
+    }}
+  >
+    <Box sx={{ width: 46, height: 46, borderRadius: 2, display: 'grid', placeItems: 'center', bgcolor: color, color: 'white', mb: 2 }}>
+      {icon}
+    </Box>
+    <Typography variant="h6" sx={{ fontWeight: 800 }}>{title}</Typography>
+    <Typography variant="body2" color="text.secondary">{helper}</Typography>
+  </Paper>
+);
+
 function Home() {
   const [empleados, setEmpleados] = useState<Empleado[]>([]);
   const [controles, setControles] = useState<ControlLaboral[]>([]);
   const [cuentas, setCuentas] = useState<CuentaBancaria[]>([]);
   const [contratos, setContratos] = useState<EmpleadoContrato[]>([]);
   const [error, setError] = useState('');
-  const { canAccessPath } = useAuth();
+  const { canAccessPath, user } = useAuth();
+  const esEmpleado = isRole(user as any, 'empleado');
 
   useEffect(() => {
     const cargarDashboard = async () => {
       setError('');
+
+      if (esEmpleado) {
+        const empleadosRes = await Promise.allSettled([obtenerEmpleados()]);
+        if (empleadosRes[0].status === 'fulfilled') setEmpleados(empleadosRes[0].value);
+        if (empleadosRes[0].status === 'rejected') setError('No pudimos cargar tus datos de empleado por ahora.');
+        return;
+      }
 
       const [empleadosRes, controlesRes, cuentasRes, contratosRes] = await Promise.allSettled([
         obtenerEmpleados(),
@@ -161,7 +224,7 @@ function Home() {
     };
 
     cargarDashboard();
-  }, []);
+  }, [esEmpleado]);
 
   const metrics = useMemo(() => {
     const empleadosActivos = empleados.filter((emp) => emp.EMP_ESTADO === 'A').length;
@@ -169,7 +232,7 @@ function Home() {
       (emp) => !cuentas.some((cuenta) => cuenta.EMP_ID === emp.EMP_ID)
     ).length;
     const empleadosSinContrato = empleados.filter(
-      (emp) => !contratos.some((contrato) => Number(contrato.TIC_ID) === emp.EMP_ID)
+      (emp) => !contratos.some((contrato) => Number(contrato.EMP_ID) === emp.EMP_ID)
     ).length;
     const controlesPendientes = controles.filter((control) => control.CTL_ESTADO === 'P').length;
     const progresoBase = [
@@ -192,24 +255,85 @@ function Home() {
   const visibleSteps = payrollSteps.filter((step) => canAccessPath(step.path));
   const activeStep = visibleSteps.findIndex((step) => step.path === '/nomina');
   const startPath = visibleSteps[0]?.path || '/';
+  const empleadoSesion = useMemo(() => getEmpleadoSesion(user, empleados), [empleados, user]);
+
+  if (esEmpleado) {
+    return (
+      <Box sx={{ py: 1 }} data-skip-unsaved="true">
+        <PageHeader
+          title={`Hola, ${empleadoSesion ? `${empleadoSesion.EMP_NOMBRE} ${empleadoSesion.EMP_APELLIDO}` : user?.nombre_completo || 'bienvenido'}`}
+          subtitle="Revisa tu jornada, marca asistencia y consulta tus pagos desde un solo lugar."
+          icon={<PeopleIcon />}
+          meta={
+            <Chip
+              icon={<CalendarMonthIcon />}
+              label={new Date().toLocaleDateString('es-GT', { weekday: 'long', day: '2-digit', month: 'long' })}
+              color="primary"
+              variant="outlined"
+            />
+          }
+        />
+
+        {error ? <Alert severity="warning" sx={{ mb: 2 }}>{error}</Alert> : null}
+
+        <Grid container spacing={2}>
+          <Grid size={{ xs: 12, md: 6 }}>
+            <EmployeeActionCard
+              title="Marcar asistencia"
+              helper="Registra tu entrada o salida dentro de la ventana permitida por tu horario."
+              icon={<AccessTimeIcon />}
+              color="#1976d2"
+              to="/marcajes"
+            />
+          </Grid>
+          <Grid size={{ xs: 12, md: 6 }}>
+            <EmployeeActionCard
+              title="Mi horario"
+              helper="Consulta tu jornada asignada, horas de entrada y salida, y dias laborales."
+              icon={<ScheduleIcon />}
+              color="#0288d1"
+              to="/horarios"
+            />
+          </Grid>
+          <Grid size={{ xs: 12, md: 6 }}>
+            <EmployeeActionCard
+              title="Mi boleta de pago"
+              helper="Visualiza tus ingresos, descuentos y liquido a recibir por nomina."
+              icon={<ReceiptLongIcon />}
+              color="#2e7d32"
+              to="/nomina-detalle"
+            />
+          </Grid>
+          <Grid size={{ xs: 12, md: 6 }}>
+            <EmployeeActionCard
+              title="Mis resultados KPI"
+              helper="Consulta tus bonos de productividad y resultados registrados."
+              icon={<AssessmentIcon />}
+              color="#7b1fa2"
+              to="/kpi-resultado"
+            />
+          </Grid>
+        </Grid>
+      </Box>
+    );
+  }
 
   return (
     <Box sx={{ py: 1 }}>
-      <Paper elevation={2} sx={{ p: { xs: 2, md: 3 }, mb: 3 }}>
-        <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} sx={{ justifyContent: 'space-between' }}>
-          <Box>
-            <Typography variant="h4" sx={{ fontWeight: 800 }}>Guia de nomina</Typography>
-            <Typography color="text.secondary">
-              Sigue el flujo de trabajo de izquierda a derecha hasta generar y revisar la planilla.
-            </Typography>
-          </Box>
-          <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', alignItems: 'center' }}>
+      <PageHeader
+        title="Guia de nomina"
+        subtitle="Sigue el flujo de trabajo de izquierda a derecha hasta generar y revisar la planilla."
+        icon={<PlaylistAddCheckIcon />}
+        meta={
+          <>
             <Chip icon={<CheckCircleIcon />} label={`${metrics.progreso}% preparado`} color="primary" />
             <Chip label={`${empleados.length} empleados`} />
             <Chip color={metrics.controlesPendientes ? 'warning' : 'success'} label={`${metrics.controlesPendientes} pendientes`} />
-          </Stack>
-        </Stack>
+          </>
+        }
+      />
 
+      <Paper sx={{ p: { xs: 2, md: 3 }, mb: 3 }}>
         <Box sx={{ mt: 3 }}>
           <LinearProgress variant="determinate" value={metrics.progreso} sx={{ height: 8, borderRadius: 1 }} />
         </Box>
