@@ -29,7 +29,7 @@ import type { Empleado } from '../interfaces/empleados';
 import type { Horario } from '../interfaces/horario';
 import type { Marcaje } from '../interfaces/marcaje';
 
-type EstadoAsistencia = 'A tiempo' | 'Tarde' | 'Ausente' | 'En jornada' | 'Sin jornada';
+type EstadoAsistencia = 'A tiempo' | 'Tarde' | 'Ausente' | 'En jornada' | 'Inconsistente' | 'Sin jornada';
 
 type ResumenFila = {
   empleadoId: number;
@@ -102,6 +102,7 @@ const estadoColor: Record<EstadoAsistencia, 'success' | 'warning' | 'error' | 'i
   Tarde: 'warning',
   Ausente: 'error',
   'En jornada': 'info',
+  Inconsistente: 'warning',
   'Sin jornada': 'default',
 };
 
@@ -110,7 +111,36 @@ const estadoIcon: Record<EstadoAsistencia, ReactElement> = {
   Tarde: <AccessTimeIcon fontSize="small" />,
   Ausente: <ErrorOutlinedIcon fontSize="small" />,
   'En jornada': <ScheduleIcon fontSize="small" />,
+  Inconsistente: <ErrorOutlinedIcon fontSize="small" />,
   'Sin jornada': <ScheduleIcon fontSize="small" />,
+};
+
+const getMarcajeDate = (marcaje: Marcaje) =>
+  normalizeDate(marcaje.MAR_FECHA) || normalizeDate(marcaje.MAR_ENTRADA) || normalizeDate(marcaje.MAR_SALIDA);
+
+const getTimeMs = (value?: string | null) => {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.getTime();
+};
+
+const resumirMarcajesDia = (marcajes: Marcaje[], empleadoId: number, fecha: string) => {
+  const timestamps = marcajes
+    .filter((item) => Number(item.EMP_ID) === Number(empleadoId) && getMarcajeDate(item) === fecha)
+    .flatMap((item) => [item.MAR_ENTRADA, item.MAR_SALIDA])
+    .filter((value): value is string => Boolean(value))
+    .map((value) => ({ value, time: getTimeMs(value) }))
+    .filter((item): item is { value: string; time: number } => item.time !== null)
+    .sort((a, b) => a.time - b.time);
+
+  if (timestamps.length === 0) return null;
+
+  return {
+    entrada: timestamps[0].value,
+    salida: timestamps.length > 1 ? timestamps[timestamps.length - 1].value : null,
+    cantidad: timestamps.length,
+  };
 };
 
 function buildRows(empleados: Empleado[], horarios: Horario[], marcajes: Marcaje[], fecha: string): ResumenFila[] {
@@ -122,11 +152,7 @@ function buildRows(empleados: Empleado[], horarios: Horario[], marcajes: Marcaje
     .filter((empleado) => String(empleado.EMP_ESTADO ?? '').toLowerCase() !== 'inactivo')
     .map((empleado) => {
       const horario = horariosById.get(Number(empleado.HOR_ID));
-      const marcaje = marcajes.find((item) => {
-        const sameEmployee = Number(item.EMP_ID) === Number(empleado.EMP_ID);
-        const markDate = normalizeDate(item.MAR_FECHA) || normalizeDate(item.MAR_ENTRADA);
-        return sameEmployee && markDate === fecha;
-      });
+      const resumenMarcaje = resumirMarcajesDia(marcajes, Number(empleado.EMP_ID), fecha);
 
       if (!horario) {
         return {
@@ -135,8 +161,8 @@ function buildRows(empleados: Empleado[], horarios: Horario[], marcajes: Marcaje
           horario: 'Sin horario asignado',
           entradaProgramada: '-',
           salidaProgramada: '-',
-          entradaReal: formatTime(marcaje?.MAR_ENTRADA),
-          salidaReal: formatTime(marcaje?.MAR_SALIDA),
+          entradaReal: formatTime(resumenMarcaje?.entrada),
+          salidaReal: formatTime(resumenMarcaje?.salida),
           estado: 'Sin jornada' as EstadoAsistencia,
           diferencia: '-',
         };
@@ -153,14 +179,14 @@ function buildRows(empleados: Empleado[], horarios: Horario[], marcajes: Marcaje
           horario: horario.HOR_DESCRIPCION,
           entradaProgramada,
           salidaProgramada,
-          entradaReal: formatTime(marcaje?.MAR_ENTRADA),
-          salidaReal: formatTime(marcaje?.MAR_SALIDA),
+          entradaReal: formatTime(resumenMarcaje?.entrada),
+          salidaReal: formatTime(resumenMarcaje?.salida),
           estado: 'Sin jornada' as EstadoAsistencia,
           diferencia: '-',
         };
       }
 
-      if (!marcaje) {
+      if (!resumenMarcaje) {
         return {
           empleadoId: Number(empleado.EMP_ID),
           empleado: `${empleado.EMP_NOMBRE} ${empleado.EMP_APELLIDO}`.trim(),
@@ -174,12 +200,16 @@ function buildRows(empleados: Empleado[], horarios: Horario[], marcajes: Marcaje
         };
       }
 
+      const esFechaPasada = fecha < todayInputValue();
+      const marcajeIncompleto = !resumenMarcaje.salida;
       const scheduledStart = minutesFromTime(horario.HOR_HORA_INICIO);
-      const actualStart = minutesFromDateTime(marcaje.MAR_ENTRADA);
+      const actualStart = minutesFromDateTime(resumenMarcaje.entrada);
       const lateMinutes =
         scheduledStart === null || actualStart === null ? 0 : Math.max(0, actualStart - scheduledStart);
       const graceMinutes = 10;
-      const estado: EstadoAsistencia = lateMinutes > graceMinutes ? 'Tarde' : marcaje.MAR_SALIDA ? 'A tiempo' : 'En jornada';
+      const estado: EstadoAsistencia = marcajeIncompleto
+        ? esFechaPasada ? 'Inconsistente' : 'En jornada'
+        : lateMinutes > graceMinutes ? 'Tarde' : 'A tiempo';
 
       return {
         empleadoId: Number(empleado.EMP_ID),
@@ -187,10 +217,10 @@ function buildRows(empleados: Empleado[], horarios: Horario[], marcajes: Marcaje
         horario: horario.HOR_DESCRIPCION,
         entradaProgramada,
         salidaProgramada,
-        entradaReal: formatTime(marcaje.MAR_ENTRADA),
-        salidaReal: formatTime(marcaje.MAR_SALIDA),
+        entradaReal: formatTime(resumenMarcaje.entrada),
+        salidaReal: formatTime(resumenMarcaje.salida),
         estado,
-        diferencia: formatMinutes(lateMinutes),
+        diferencia: marcajeIncompleto ? 'Solo un marcaje' : formatMinutes(lateMinutes),
       };
     })
     .sort((a, b) => a.empleado.localeCompare(b.empleado));

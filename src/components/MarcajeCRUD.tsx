@@ -48,6 +48,16 @@ type DiferenciaMarcaje = {
   positiva: boolean;
 };
 
+const horarioDiaKeys: Array<keyof Horario> = [
+  'HOR_DOMINGO',
+  'HOR_LUNES',
+  'HOR_MARTES',
+  'HOR_MIERCOLES',
+  'HOR_JUEVES',
+  'HOR_VIERNES',
+  'HOR_SABADO',
+];
+
 const normalizarTexto = (value: unknown) =>
   String(value ?? '')
     .normalize('NFD')
@@ -56,15 +66,40 @@ const normalizarTexto = (value: unknown) =>
     .toLowerCase()
     .replace(/\s+/g, ' ');
 
-const getEmpleadoSesion = (user: unknown, empleados: Empleado[]) => {
+const leerCampoUsuario = (user: unknown, keys: string[]) => {
   const record = (user && typeof user === 'object' ? user : {}) as Record<string, unknown>;
-  const empId = Number(record.emp_id ?? record.EMP_ID);
+  const nestedRecords = [
+    record,
+    record.usuario,
+    record.user,
+    record.empleado,
+  ].filter((item): item is Record<string, unknown> => Boolean(item && typeof item === 'object'));
+
+  for (const nestedRecord of nestedRecords) {
+    for (const key of keys) {
+      const value = nestedRecord[key];
+      if (value !== undefined && value !== null && String(value).trim() !== '') return value;
+    }
+  }
+
+  return undefined;
+};
+
+const getEmpleadoSesion = (user: unknown, empleados: Empleado[]) => {
+  const empId = Number(leerCampoUsuario(user, [
+    'emp_id',
+    'EMP_ID',
+    'empleado_id',
+    'EMPLEADO_ID',
+    'id_empleado',
+    'ID_EMPLEADO',
+  ]));
 
   if (Number.isFinite(empId) && empId > 0) {
     return empleados.find((empleado) => Number(empleado.EMP_ID) === empId) ?? null;
   }
 
-  const nombreUsuario = normalizarTexto(record.nombre_completo);
+  const nombreUsuario = normalizarTexto(leerCampoUsuario(user, ['nombre_completo', 'NOMBRE_COMPLETO', 'nombre', 'NOMBRE']));
   if (!nombreUsuario) return null;
 
   return empleados.find((empleado) =>
@@ -137,40 +172,42 @@ const calcularDiferencia = (
   };
 };
 
+const horarioAplicaEnFecha = (horario: Horario | undefined, fecha: Date) => {
+  if (!horario) return true;
+  return Number(horario[horarioDiaKeys[fecha.getDay()]] ?? 0) === 1;
+};
+
 const obtenerMensajeErrorMarcaje = (
   err: any,
-  marcajeHoy?: Marcaje,
-  horario?: Horario
+  _marcajeHoy?: Marcaje,
+  _horario?: Horario
 ) => {
   const mensajeServidor = String(
     err?.response?.data?.message || err?.response?.data?.error || err?.message || ''
   ).trim();
+  const status = err?.response?.status;
   const mensajeNormalizado = normalizarTexto(mensajeServidor);
 
   if (mensajeNormalizado) {
-    if (mensajeNormalizado.includes('ya') && mensajeNormalizado.includes('marc')) {
-      return 'Ya has marcado en este dia. Revisa tu historial de marcajes.';
-    }
-
     if (mensajeNormalizado.includes('jornada') || mensajeNormalizado.includes('horario') || mensajeNormalizado.includes('ventana')) {
-      return 'Estas fuera de tu jornada laboral o de la ventana permitida para marcar.';
+      return 'El servidor no permitio registrar este marcaje por reglas de horario. Segun el nuevo flujo, el backend debe aceptar marcajes en cualquier momento del dia.';
     }
 
     if (mensajeNormalizado.includes('entrada') && mensajeNormalizado.includes('salida')) {
-      return 'Tu jornada de hoy ya tiene entrada y salida registradas.';
+      return 'El servidor indico que la jornada ya tiene entrada y salida. Segun el nuevo flujo, se deben permitir marcajes adicionales durante el dia.';
+    }
+
+    if (mensajeNormalizado.includes('ya') && mensajeNormalizado.includes('marc')) {
+      return 'El servidor indico que ya existe un marcaje. Segun el nuevo flujo, se deben permitir varios marcajes en el dia.';
     }
 
     if (!mensajeNormalizado.includes('error en el servidor')) {
       return mensajeServidor;
     }
-  }
 
-  if (marcajeHoy?.MAR_ENTRADA && marcajeHoy.MAR_SALIDA) {
-    return 'Ya has registrado entrada y salida para este dia.';
-  }
-
-  if (horario) {
-    return 'No fue posible registrar el marcaje. Verifica que estes dentro de tu jornada laboral.';
+    return status
+      ? `El servidor rechazo el marcaje (HTTP ${status}): ${mensajeServidor}`
+      : mensajeServidor;
   }
 
   return 'No fue posible registrar el marcaje. Intenta nuevamente o consulta con Recursos Humanos.';
@@ -255,31 +292,45 @@ function MarcajeCRUD() {
   );
 
   const empleadosDisponibles = useMemo(() => {
-    if (esEmpleado && empleadoSeleccionado) return [empleadoSeleccionado];
-
-    return empleados.filter((empleado) => {
+    const empleadosMarcables = empleados.filter((empleado) => {
       const estado = String(empleado.EMP_ESTADO || 'A').toUpperCase();
       const estaLiquidado = empleadosLiquidadosIds.has(String(empleado.EMP_ID))
         || Boolean(empleado.EMP_FECHA_LIQUIDACION)
         || estado === 'L';
-      return !estaLiquidado;
+      return estado === 'A' && !estaLiquidado;
     });
+
+    if (esEmpleado) {
+      return empleadoSeleccionado
+        ? empleadosMarcables.filter((empleado) => Number(empleado.EMP_ID) === Number(empleadoSeleccionado.EMP_ID))
+        : [];
+    }
+
+    return empleadosMarcables;
   }, [empleadoSeleccionado, empleados, empleadosLiquidadosIds, esEmpleado]);
 
   const horarioSeleccionado = horarios.find(
     (horario) => horario.HOR_ID === empleadoSeleccionado?.HOR_ID
   );
+  const horarioAplicaHoy = horarioAplicaEnFecha(horarioSeleccionado, fechaHoy);
 
-  const marcajeHoy = useMemo(() => {
+  const marcajesHoy = useMemo(() => {
     const hoy = fechaHoy.toDateString();
-    return datos.find((marcaje) => marcaje.MAR_FECHA && new Date(marcaje.MAR_FECHA).toDateString() === hoy);
+    return datos.filter((marcaje) => marcaje.MAR_FECHA && new Date(marcaje.MAR_FECHA).toDateString() === hoy);
   }, [datos, fechaHoy]);
+  const marcajeHoy = marcajesHoy[0];
+  const empleadoSinVinculo = esEmpleado && !cargandoEmpleados && !empleadoSeleccionado;
+  const empleadoNoDisponible = Boolean(
+    esEmpleado &&
+    empleadoSeleccionado &&
+    (
+      String(empleadoSeleccionado.EMP_ESTADO || 'A').toUpperCase() !== 'A' ||
+      empleadosLiquidadosIds.has(String(empleadoSeleccionado.EMP_ID)) ||
+      Boolean(empleadoSeleccionado.EMP_FECHA_LIQUIDACION)
+    )
+  );
 
-  const textoAccionMarcaje = marcajeHoy?.MAR_ENTRADA && !marcajeHoy.MAR_SALIDA
-    ? 'Registrar salida'
-    : marcajeHoy?.MAR_ENTRADA && marcajeHoy.MAR_SALIDA
-      ? 'Jornada completada'
-      : 'Registrar entrada';
+  const textoAccionMarcaje = marcajesHoy.length > 0 ? 'Registrar otro marcaje' : 'Registrar primer marcaje';
 
   const cargarDatos = useCallback(
     async (nuevoOffset: number = 0) => {
@@ -450,6 +501,30 @@ function MarcajeCRUD() {
             </Box>
           )}
 
+          {empleadoSinVinculo && (
+            <Box sx={{ flexBasis: '100%' }}>
+              <Alert severity="warning">
+                Tu usuario tiene rol empleado, pero no esta vinculado a un empleado activo. Solicita a RRHH que asigne el empleado en Usuarios para poder marcar.
+              </Alert>
+            </Box>
+          )}
+
+          {empleadoNoDisponible && (
+            <Box sx={{ flexBasis: '100%' }}>
+              <Alert severity="warning">
+                Tu empleado esta inactivo o liquidado, por eso no se pueden registrar marcajes.
+              </Alert>
+            </Box>
+          )}
+
+          {esEmpleado && horarioSeleccionado && !horarioAplicaHoy && (
+            <Box sx={{ flexBasis: '100%' }}>
+              <Alert severity="warning">
+                Hoy no esta habilitado en tu horario asignado. El nuevo flujo permite marcar, pero el backend puede seguir rechazandolo hasta que se actualice esa regla.
+              </Alert>
+            </Box>
+          )}
+
           <Box>
             <Typography
               variant="caption"
@@ -474,7 +549,7 @@ function MarcajeCRUD() {
               )
             }
             onClick={handleRegistrar}
-            disabled={cargandoMas || !empleadoSeleccionado || Boolean(marcajeHoy?.MAR_ENTRADA && marcajeHoy.MAR_SALIDA)}
+            disabled={cargandoMas || empleadoSinVinculo || empleadoNoDisponible || !empleadoSeleccionado}
           >
             {textoAccionMarcaje}
           </Button>
@@ -482,7 +557,7 @@ function MarcajeCRUD() {
 
         {esEmpleado && (
           <Alert severity="info" sx={{ mt: 2 }}>
-            Tu marcaje se valida contra tu horario: entrada dentro de la ventana permitida y salida cerca del fin de jornada.
+            Puedes marcar en cualquier momento del dia. El primer marcaje se toma como entrada y el ultimo como salida para calcular horas trabajadas, faltantes u horas extra.
           </Alert>
         )}
 
