@@ -1,0 +1,438 @@
+FUNCIONALIDAD DEL FRONTEND - INNOVA NOMINAS
+==========================================
+
+1. Descripcion general
+----------------------
+El frontend de Innova Nominas es una aplicacion web para gestionar planilla,
+asistencia, empleados, catalogos laborales, calculos de nomina, reportes y
+seguridad de usuarios.
+
+La aplicacion esta construida con React, TypeScript, Vite y Material UI. Consume
+servicios REST del backend mediante Axios y organiza la navegacion por rutas
+protegidas segun el rol del usuario.
+
+El objetivo principal del sistema es centralizar la informacion necesaria para
+preparar, generar, revisar y aprobar nominas, incluyendo ingresos, descuentos,
+empleados, periodos, marcajes, KPI, suspensiones, liquidaciones y reportes.
+
+
+2. Acceso, autenticacion y roles
+-------------------------------
+El sistema cuenta con pantalla de inicio de sesion y manejo de usuario activo.
+Despues de autenticarse, el usuario entra a la aplicacion principal con menu
+lateral y navegacion protegida.
+
+Los roles principales configurados son:
+
+- EMPLEADO
+- RRHH
+- ADMIN
+- CONTABILIDAD
+- GERENTE
+- AUDITORIA
+- ANALISTA_NOMINA
+- SUPERVISOR_ASISTENCIA
+- SUPREMO
+
+Cada rol tiene acceso a un conjunto distinto de pantallas. Por ejemplo:
+
+- EMPLEADO puede acceder a marcaje, horarios, resultados KPI y detalle de nomina.
+- ADMIN y SUPREMO tienen acceso amplio al sistema.
+- CONTABILIDAD y ANALISTA_NOMINA se enfocan en nomina, reportes, calculadoras y archivos de deposito.
+- AUDITORIA tiene acceso a reportes, bitacora y pantallas de consulta.
+- SUPERVISOR_ASISTENCIA se enfoca en asistencia, horarios y control laboral.
+
+La aplicacion valida el acceso a cada ruta mediante rutas protegidas. Si un
+usuario intenta entrar a una pantalla sin permiso, se muestra una vista de acceso
+denegado.
+
+
+3. Navegacion principal
+----------------------
+El frontend usa rutas internas para cada modulo. Las pantallas principales son:
+
+- Inicio
+- Empleados
+- Departamentos
+- Puestos
+- Sucursales / Sede
+- Horarios
+- Marcajes
+- Resumen de Marcaje
+- Control Laboral
+- Cuenta Bancaria
+- Contratos de Empleado
+- Tipos de Contrato
+- Ingresos
+- Descuentos
+- Periodos
+- Asignaciones de Nomina
+- Nomina
+- Detalle de Nomina
+- Aprobacion de Nomina
+- Prestamos
+- Detalle de Prestamos
+- Liquidaciones
+- KPI
+- Resultados KPI
+- Suspensiones IGSS
+- Calculadora IGSS
+- Calculadora ISR
+- Generacion de CSV de Deposito
+- Usuarios
+- Roles
+- Permisos
+- Roles y Permisos
+- Bitacora
+- Trazabilidad Usuario-Bitacora
+- Auditoria
+- Reportes
+
+Tambien existen redirecciones para rutas antiguas o equivalentes, por ejemplo:
+
+- /tipos-descuento redirige a /descuentos
+- /prestamos-banco redirige a /prestamos
+- /registro-vacaciones redirige a /control-laboral
+- /reporte-igss, /reporte-isr y otros reportes redirigen al modulo central de reportes
+
+
+4. Gestion de empleados y estructura organizacional
+--------------------------------------------------
+El modulo de empleados permite registrar, consultar, editar y administrar datos
+del personal. La informacion de empleados se utiliza en nomina, marcajes,
+contratos, suspensiones, KPI, cuentas bancarias y reportes.
+
+Pantallas relacionadas:
+
+- Empleados: administracion de datos personales y laborales.
+- Departamentos: catalogo de areas o unidades organizacionales.
+- Puestos: catalogo de puestos, salarios base y relacion con empleados.
+- Sucursales / Sede: administracion de ubicaciones.
+- Cuenta Bancaria: informacion bancaria para pagos de nomina.
+- Empleado Contrato: relacion entre empleado y contrato vigente.
+- Tipo Contrato: catalogo de tipos de contrato y condiciones laborales.
+
+
+5. Asistencia, horarios y control laboral
+----------------------------------------
+El frontend incluye modulos para registrar y revisar asistencia.
+
+Funciones principales:
+
+- Marcaje: permite registrar entradas, salidas u otros eventos de asistencia.
+- Horarios: administra horarios laborales.
+- Resumen de Marcaje: muestra una vista consolidada de asistencia por fecha y empleado.
+- Control Laboral: gestiona eventos laborales como vacaciones, permisos u otros controles.
+- Suspensiones IGSS: registra suspensiones y calcula impacto en salario o descuentos.
+
+Estas pantallas alimentan reportes y pueden impactar calculos de nomina cuando
+corresponde.
+
+
+6. Catalogos de ingresos y descuentos
+------------------------------------
+El sistema cuenta con catalogos separados para definir conceptos usados en nomina.
+
+Ingresos:
+
+- Permite crear conceptos como salario base, bonificacion incentivo, horas extra,
+  comisiones, bono KPI, aguinaldo, bono 14, vacaciones pagadas, reintegros,
+  viaticos, indemnizacion y otros ingresos.
+- Cada ingreso tiene codigo, nombre, descripcion, valor base, indicador de
+  recurrencia y fecha de modificacion.
+- El valor base se usa para sugerir montos automaticos en asignaciones y detalles
+  de nomina.
+
+Descuentos:
+
+- Permite crear conceptos como IGSS laboral, ISR, anticipos, prestamos,
+  ausencias, embargos, pension alimenticia, cuota sindical, seguro privado y
+  otros descuentos.
+- Cada descuento tiene codigo, nombre, descripcion, tipo de calculo, valor base,
+  porcentaje, indicador de obligatoriedad, estado y fechas.
+- Los descuentos pueden ser de tipo fijo, porcentaje o mixto.
+- En asignaciones, el sistema puede sugerir montos segun valor base, porcentaje
+  sobre salario o calculo especial como ISR.
+
+
+7. Periodos de nomina
+--------------------
+El modulo de periodos administra los rangos de fechas sobre los que se procesa la
+nomina.
+
+Un periodo puede tener estados que controlan si se permite modificar informacion.
+Cuando un periodo esta aprobado o cerrado, varias pantallas bloquean cambios para
+evitar alteraciones posteriores.
+
+Los periodos se usan en:
+
+- Asignaciones de nomina
+- Generacion de nomina
+- Reportes
+- Detalles de pago
+- Filtros de consulta
+
+
+8. Asignaciones de nomina
+------------------------
+La pantalla de Asignaciones de Nomina permite preparar ingresos y descuentos antes
+de generar la nomina final.
+
+Flujo principal:
+
+1. Seleccionar un periodo.
+2. Seleccionar uno o varios empleados.
+3. Seleccionar uno o varios tipos de ingreso.
+4. Seleccionar uno o varios tipos de descuento.
+5. El sistema genera una casilla de monto por cada ingreso y por cada descuento seleccionado.
+6. Los montos se cargan automaticamente desde los catalogos de ingresos y descuentos.
+7. Si el catalogo tiene valor base cero, se muestra 0.00 y el usuario puede ajustarlo.
+8. Si el descuento es porcentual, se puede calcular sobre el salario del empleado.
+9. Si el descuento es ISR, se calcula con la funcion de ISR disponible en el frontend cuando hay salario.
+10. Se muestra una tabla resumen con ingresos seleccionados y sus montos.
+11. Se muestra una tabla resumen con descuentos seleccionados y sus montos.
+12. Al guardar, se crea una asignacion por cada combinacion de empleado y concepto.
+13. Si ya existe una asignacion para el mismo periodo, empleado y concepto, el frontend la actualiza en lugar de crear duplicados.
+14. Despues de guardar, se recarga la tabla inferior con las asignaciones almacenadas.
+
+La restriccion de unicidad del backend evita duplicar la misma combinacion de
+periodo, empleado y concepto. Por eso el frontend maneja el guardado como
+"crear o actualizar".
+
+La tabla inferior muestra las asignaciones registradas, incluyendo:
+
+- ID
+- Periodo
+- Empleado
+- Tipo
+- Concepto
+- Monto
+- Referencia
+- Estado
+- Acciones de editar o eliminar
+
+
+9. Generacion y administracion de nomina
+---------------------------------------
+El modulo de Nomina permite generar o administrar la cabecera de nomina para un
+periodo y empleados seleccionados.
+
+La generacion toma informacion de:
+
+- Empleados
+- Periodos
+- Salarios
+- Asignaciones de ingresos
+- Asignaciones de descuentos
+- Conceptos obligatorios
+- Prestamos, suspensiones u otros conceptos relacionados, segun configuracion
+
+El objetivo es crear registros de nomina con totales de ingresos, descuentos y
+salario liquido.
+
+El sistema tambien incluye Aprobacion de Nomina, donde usuarios autorizados pueden
+revisar y cambiar el estado de las nominas.
+
+
+10. Detalle de nomina y boletas
+-------------------------------
+La pantalla de Detalle de Nomina muestra los movimientos asociados a una nomina.
+
+Funciones principales:
+
+- Crear detalles de ingreso, descuento o resultado KPI.
+- Calcular montos sugeridos segun el concepto seleccionado.
+- Evitar modificar nominas pendientes o aprobadas.
+- Sincronizar totales de cabecera cuando se crean, editan o eliminan detalles.
+- Filtrar detalles por nomina.
+- Para empleados, mostrar boletas disponibles.
+- Descargar boleta de pago en PDF.
+
+En vista de empleado, el usuario puede revisar sus ingresos, descuentos y liquido
+a recibir por periodo, sin acceder a informacion de otros empleados.
+
+
+11. Prestamos y liquidaciones
+----------------------------
+Prestamos:
+
+- Permite registrar prestamos internos o bancarios asociados a empleados.
+- Permite consultar montos, saldos, cuotas y estados.
+- Existe una pantalla de detalle de prestamo para consultar o administrar cuotas.
+
+Liquidaciones:
+
+- Permite administrar liquidaciones de empleados.
+- Se relaciona con reportes y calculos finales de pago.
+- Puede impactar el estado laboral del empleado y reportes asociados.
+
+
+12. KPI y resultados
+-------------------
+El sistema incluye modulos para indicadores de desempeno.
+
+KPIs:
+
+- Permite definir indicadores.
+- Sirve como catalogo base para evaluar productividad o cumplimiento.
+
+Resultados KPI:
+
+- Permite registrar resultados por empleado.
+- Puede calcular bonos segun porcentaje o valor base.
+- Los resultados pueden conectarse con detalles de nomina como ingresos variables.
+
+
+13. Calculadoras y archivos de pago
+----------------------------------
+Calculadora IGSS:
+
+- Permite estimar cuotas o valores relacionados con IGSS.
+
+Calculadora ISR:
+
+- Permite estimar ISR segun reglas configuradas en el frontend.
+
+Generar CSV Deposito:
+
+- Permite preparar archivo CSV para pagos o depositos de nomina.
+- Usa informacion de nominas, empleados y cuentas bancarias.
+
+
+14. Reportes
+------------
+El modulo de reportes centraliza reportes disponibles segun el rol del usuario.
+
+Reportes principales:
+
+- Reporte de Marcajes
+- Reporte IGSS
+- Reporte ISR Anual
+- Reporte Aguinaldo / Bono 14
+- Reporte de Vacaciones
+- Reporte de Descuentos
+- Reporte de Liquidaciones
+- Reporte KPIs
+- Reporte Horas Extra
+- Dashboard Ejecutivo
+
+Los reportes permiten consultar informacion consolidada, filtrar datos y en
+algunos casos exportar o descargar documentos.
+
+
+15. Seguridad, administracion y auditoria
+----------------------------------------
+Usuarios:
+
+- Administra usuarios del sistema.
+- Relaciona usuarios con empleados cuando corresponde.
+- Permite revisar empleados con o sin usuario.
+
+Roles:
+
+- Administra roles del sistema.
+
+Permisos:
+
+- Administra permisos disponibles.
+
+Roles y Permisos:
+
+- Relaciona roles con permisos para controlar accesos.
+
+Bitacora:
+
+- Muestra eventos registrados del sistema.
+- Apoya auditoria y trazabilidad.
+
+Trazabilidad Usuario-Bitacora:
+
+- Permite revisar relacion entre usuarios y eventos registrados.
+
+Auditoria:
+
+- Pantalla de consulta para cambios o eventos auditables.
+
+
+16. Protecciones de experiencia de usuario
+-----------------------------------------
+El frontend incluye varias protecciones para mejorar la experiencia:
+
+- Rutas protegidas por rol.
+- Pantalla de acceso denegado.
+- Carga diferida de componentes para mejorar rendimiento.
+- Indicador de carga mientras se abren pantallas.
+- Guardado de cambios no confirmados para evitar salir con formularios editados.
+- Validaciones de campos obligatorios.
+- Validaciones contra montos negativos.
+- Bloqueo de edicion en periodos o nominas cerradas, aprobadas o pendientes segun corresponda.
+- Mensajes de exito y error mediante alertas y snackbars.
+- Redirecciones para rutas antiguas o equivalentes.
+- Panel guia de nomina para orientar el flujo de preparacion.
+
+
+17. Flujo recomendado de uso para nomina
+---------------------------------------
+Un flujo normal para preparar nomina seria:
+
+1. Registrar o actualizar empleados.
+2. Configurar departamentos, puestos, contratos y cuentas bancarias.
+3. Crear o revisar periodo de nomina.
+4. Revisar catalogo de ingresos.
+5. Revisar catalogo de descuentos.
+6. Registrar prestamos, suspensiones, KPI u otros elementos si aplica.
+7. Entrar a Asignaciones de Nomina.
+8. Seleccionar periodo, empleados, ingresos y descuentos.
+9. Revisar o ajustar los montos individuales.
+10. Guardar asignaciones.
+11. Confirmar que aparezcan almacenadas en la tabla inferior.
+12. Generar nomina.
+13. Revisar detalle de nomina.
+14. Descargar o revisar boletas.
+15. Aprobar nomina cuando corresponda.
+16. Generar reportes o CSV de deposito.
+
+
+18. Archivos y estructura relevante del frontend
+------------------------------------------------
+Archivos principales:
+
+- src/App.tsx: define rutas principales, layout y protecciones generales.
+- src/config/roleViews.ts: define vistas visibles por rol y reportes por rol.
+- src/components/Navbar.tsx: menu y navegacion principal.
+- src/context/AuthContext.tsx: contexto de autenticacion.
+- src/context/UnsavedChangesContext.tsx: control de cambios sin guardar.
+- src/context/PayrollGuideContext.tsx: guia de flujo de nomina.
+- src/api/axios.ts: cliente HTTP para comunicacion con backend.
+- src/api/errors.ts: manejo de mensajes de error del backend.
+- src/services/: servicios que llaman a endpoints del backend.
+- src/interfaces/: tipos TypeScript de entidades usadas por el frontend.
+- src/components/: pantallas y componentes principales.
+- src/components/common/: componentes reutilizables.
+
+
+19. Notas importantes
+--------------------
+- El frontend depende de que el backend exponga correctamente los endpoints
+  usados en la carpeta src/services.
+- Las reglas de negocio definitivas, restricciones unicas y persistencia se
+  validan en backend/base de datos.
+- El frontend intenta prevenir errores comunes, pero algunas validaciones se
+  confirman definitivamente al guardar contra el backend.
+- En asignaciones de nomina, el frontend evita duplicados actualizando registros
+  existentes cuando ya existe periodo + empleado + concepto.
+- Los montos automaticos dependen de los valores base configurados en los
+  catalogos de ingresos y descuentos.
+- Si un concepto tiene valor base 0, el sistema carga 0.00 y permite editarlo.
+
+
+20. Resumen final
+-----------------
+El frontend de Innova Nominas permite administrar el ciclo completo de planilla:
+empleados, asistencia, catalogos, asignaciones, generacion de nomina, detalle,
+aprobacion, reportes, seguridad y auditoria.
+
+Su funcionalidad esta organizada por roles para que cada usuario vea solamente
+las pantallas necesarias para su trabajo. El flujo de nomina se apoya en
+catalogos y asignaciones previas, permitiendo automatizar montos, evitar
+duplicados y revisar la informacion antes de generar o aprobar la nomina final.
