@@ -72,6 +72,12 @@ const toInputDate = (value?: string) => {
   return String(value).slice(0, 10);
 };
 
+const obtenerFechaLocalInput = () => {
+  const ahora = new Date();
+  const local = new Date(ahora.getTime() - ahora.getTimezoneOffset() * 60_000);
+  return local.toISOString().slice(0, 10);
+};
+
 const diffDaysInclusive = (fechaInicio: string, fechaFin: string) => {
   if (!fechaInicio || !fechaFin) return 0;
 
@@ -99,6 +105,7 @@ function Periodos() {
   const [cerrarDialogOpen, setCerrarDialogOpen] = useState(false);
   const [motivoCierre, setMotivoCierre] = useState('');
   const { user } = useAuth();
+  const fechaActual = obtenerFechaLocalInput();
 
   const cargarPeriodos = async () => {
     try {
@@ -132,6 +139,10 @@ function Periodos() {
   const validarFormulario = () => {
     if (!form.fecha_inicio || !form.fecha_fin || !form.fecha_pago || !String(form.estado).trim()) {
       setError('Todos los campos son obligatorios');
+      return false;
+    }
+    if (form.fecha_inicio < fechaActual || form.fecha_fin < fechaActual || form.fecha_pago < fechaActual) {
+      setError('La fecha de inicio, fecha fin y fecha de pago no pueden ser anteriores a la fecha actual');
       return false;
     }
     if (new Date(form.fecha_fin) < new Date(form.fecha_inicio)) {
@@ -281,7 +292,10 @@ function Periodos() {
               type="date"
               label="Fecha Inicio"
               name="fecha_inicio"
-              slotProps={{ inputLabel: { shrink: true } }}
+              slotProps={{
+                inputLabel: { shrink: true },
+                htmlInput: { min: fechaActual }
+              }}
               value={form.fecha_inicio}
               onChange={handleChange}
             />
@@ -292,7 +306,10 @@ function Periodos() {
               type="date"
               label="Fecha Fin"
               name="fecha_fin"
-              slotProps={{ inputLabel: { shrink: true } }}
+              slotProps={{
+                inputLabel: { shrink: true },
+                htmlInput: { min: form.fecha_inicio || fechaActual }
+              }}
               value={form.fecha_fin}
               onChange={handleChange}
             />
@@ -303,7 +320,10 @@ function Periodos() {
               type="date"
               label="Fecha de Pago"
               name="fecha_pago"
-              slotProps={{ inputLabel: { shrink: true } }}
+              slotProps={{
+                inputLabel: { shrink: true },
+                htmlInput: { min: fechaActual }
+              }}
               value={form.fecha_pago}
               onChange={handleChange}
             />

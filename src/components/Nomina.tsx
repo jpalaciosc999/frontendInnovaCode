@@ -1,5 +1,4 @@
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
-import type { SelectChangeEvent } from '@mui/material/Select';
 import {
   Alert,
   Box,
@@ -59,7 +58,7 @@ import { obtenerIngresos } from '../services/tipoIngresos.service';
 import { obtenerDescuentos } from '../services/descuentos.service';
 import { obtenerLiquidaciones } from '../services/liquidacion.service';
 import { getApiErrorMessage } from '../api/errors';
-import { formatearFecha, formatearMoneda, obtenerNombreEmpleado } from '../utils/relations';
+import { formatearMoneda, obtenerNombreEmpleado } from '../utils/relations';
 import {
   esPeriodoAbierto,
   esPeriodoAprobado,
@@ -131,6 +130,19 @@ const toInputDate = (value: string | null | undefined) => {
 
   const oracleMatch = raw.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
   if (oracleMatch) return `${oracleMatch[3]}-${oracleMatch[2]}-${oracleMatch[1]}`;
+
+  return raw.slice(0, 10);
+};
+
+const formatearFecha = (fecha: string | null | undefined) => {
+  if (!fecha) return '';
+
+  const raw = String(fecha);
+  const isoMatch = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (isoMatch) return `${isoMatch[3]}/${isoMatch[2]}/${isoMatch[1]}`;
+
+  const slashMatch = raw.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
+  if (slashMatch) return `${slashMatch[1]}/${slashMatch[2]}/${slashMatch[3]}`;
 
   return raw.slice(0, 10);
 };
@@ -293,6 +305,10 @@ function NominaCRUD() {
 
   useEffect(() => {
     cargarDatos();
+    setGeneracionForm((prev) => ({
+      ...prev,
+      fecha_generacion: obtenerFechaLocalInput(),
+    }));
   }, []);
 
   const empleadosPorId = useMemo(
@@ -550,18 +566,9 @@ function NominaCRUD() {
     nom_estado: estado,
   });
 
-  const handleGeneracionChange = (
-    e:
-      | React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
-      | SelectChangeEvent
-  ) => {
-    const { name, value } = e.target;
-    setGeneracionForm((prev) => ({ ...prev, [name as string]: value }));
-  };
-
   const generarNominaPeriodo = async (recalcular = false) => {
-    if (!generacionForm.per_id || !generacionForm.fecha_generacion) {
-      setError('Periodo y fecha de generacion son obligatorios para generar nomina');
+    if (!generacionForm.per_id) {
+      setError('Selecciona el periodo para generar nomina');
       return;
     }
     if (!esPeriodoAbierto(periodoGeneracion?.PER_ESTADO)) {
@@ -573,6 +580,11 @@ function NominaCRUD() {
       setGenerando(true);
       setError('');
       setMensaje('');
+      const fechaGeneracionActual = obtenerFechaLocalInput();
+      setGeneracionForm((prev) => ({
+        ...prev,
+        fecha_generacion: fechaGeneracionActual,
+      }));
       const empleadosObjetivo = generacionForm.empleado_id
         ? [Number(generacionForm.empleado_id)]
         : empleadosGenerables.map((empleado) => Number(empleado.EMP_ID));
@@ -584,7 +596,7 @@ function NominaCRUD() {
 
       const respuesta = await generarNominas({
         per_id: Number(generacionForm.per_id),
-        fecha_generacion: generacionForm.fecha_generacion,
+        fecha_generacion: fechaGeneracionActual,
         estado: 'B',
         emp_ids: empleadosObjetivo,
         recalcular,
@@ -1003,9 +1015,9 @@ function NominaCRUD() {
               required
               label="Fecha de generacion"
               name="fecha_generacion"
-              type="date"
-              value={generacionForm.fecha_generacion}
-              onChange={handleGeneracionChange}
+              value={formatearFecha(generacionForm.fecha_generacion)}
+              disabled
+              helperText="Se usa automaticamente la fecha actual al generar."
               slotProps={{ inputLabel: { shrink: true } }}
             />
           </Grid>
