@@ -20,6 +20,26 @@ const formatPeriodoPayload = (data: PeriodoForm): PeriodoForm => ({
   fecha_pago: toOracleDateLiteral(data.fecha_pago),
 });
 
+const toInputDate = (value?: string) => {
+  if (!value) return '';
+
+  const raw = String(value);
+  const isoMatch = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (isoMatch) return `${isoMatch[1]}-${isoMatch[2]}-${isoMatch[3]}`;
+
+  const oracleMatch = raw.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
+  if (oracleMatch) return `${oracleMatch[3]}-${oracleMatch[2]}-${oracleMatch[1]}`;
+
+  return raw.slice(0, 10);
+};
+
+const periodoToForm = (periodo: Periodo, estado: PeriodoEstado): PeriodoForm => ({
+  fecha_inicio: toInputDate(periodo.PER_FECHA_INICIO),
+  fecha_fin: toInputDate(periodo.PER_FECHA_FIN),
+  fecha_pago: toInputDate(periodo.PER_FECHA_PAGO),
+  estado,
+});
+
 export const obtenerPeriodos = async (): Promise<Periodo[]> => {
   const res = await api.get<Periodo[]>(`${ENDPOINT}/`);
   return res.data;
@@ -43,10 +63,17 @@ export const actualizarEstadoPeriodo = async (
   estado: PeriodoEstado,
   motivo?: string
 ): Promise<void> => {
-  await api.put(`${ENDPOINT}/${periodo.PER_ID}/estado`, {
-    estado,
-    motivo,
-  });
+  try {
+    await api.put(`${ENDPOINT}/${periodo.PER_ID}/estado`, {
+      estado,
+      motivo,
+    });
+  } catch (err: unknown) {
+    const status = (err as { response?: { status?: number } })?.response?.status;
+    if (status !== 404) throw err;
+
+    await actualizarPeriodo(periodo.PER_ID, periodoToForm(periodo, estado));
+  }
 };
 
 export const eliminarPeriodo = async (id: number): Promise<void> => {

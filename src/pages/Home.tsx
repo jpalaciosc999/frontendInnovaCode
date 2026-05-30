@@ -87,9 +87,21 @@ const payrollSteps: GuideStep[] = [
     icon: <CalendarMonthIcon />,
   },
   {
-    title: 'Configurar ingresos y descuentos',
-    helper: 'Confirma conceptos, descuentos, prestamos e ingresos variables.',
+    title: 'Revisar ingresos',
+    helper: 'Confirma conceptos de ingreso antes de asignarlos.',
     path: '/tipo-ingresos',
+    icon: <PaymentsIcon />,
+  },
+  {
+    title: 'Revisar descuentos',
+    helper: 'Confirma descuentos antes de asignarlos.',
+    path: '/descuentos',
+    icon: <PaymentsIcon />,
+  },
+  {
+    title: 'Asignar ingresos y descuentos',
+    helper: 'Selecciona periodo, empleado, concepto y monto.',
+    path: '/nomina-asignaciones',
     icon: <PaymentsIcon />,
   },
   {
