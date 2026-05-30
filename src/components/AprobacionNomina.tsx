@@ -216,8 +216,9 @@ function AprobacionNomina() {
 
   const periodoActivoId = periodoRevisionId || String(periodosPendientes[0]?.PER_ID ?? '');
   const periodoActivo = periodos.find((periodo) => String(periodo.PER_ID) === periodoActivoId);
+  const periodoActivoEstado = normalizePeriodoEstado(periodoActivo?.PER_ESTADO || '');
   const periodoActivoEnRevision = esPeriodoEnRevision(periodoActivo?.PER_ESTADO);
-  const periodoActivoProcesable = ['ABIERTO', 'EN_REVISION'].includes(normalizePeriodoEstado(periodoActivo?.PER_ESTADO || ''));
+  const periodoActivoProcesable = Boolean(periodoActivo) && !['APROBADO', 'CERRADO'].includes(periodoActivoEstado);
 
   const nominasPendientesPeriodo = useMemo(
     () => pendientes.filter((nomina) => periodoActivoId && String(nomina.PER_ID) === periodoActivoId),
@@ -376,6 +377,14 @@ function AprobacionNomina() {
 
   const planillaTieneInconsistencias = filasPlanilla.some((fila) => fila.conceptos === 0 || fila.duplicados > 0 || !fila.cuadra);
   const puedeAprobarPlanilla = filasPlanilla.length > 0 && periodoActivoProcesable && !planillaTieneInconsistencias;
+  const obtenerMotivoBloqueoAprobacion = () => {
+    if (filasPlanilla.length === 0) return 'No hay nominas pendientes para aprobar en este periodo.';
+    if (!periodoActivo) return 'Selecciona un periodo pendiente.';
+    if (!periodoActivoProcesable) return 'Este periodo ya esta aprobado o cerrado.';
+    if (planillaTieneInconsistencias) return 'Hay nominas sin detalle, duplicadas o descuadradas.';
+    return '';
+  };
+  const motivoBloqueoAprobacion = puedeAprobarPlanilla ? '' : obtenerMotivoBloqueoAprobacion();
 
   const obtenerEtiquetaPeriodo = (periodo?: Periodo) =>
     periodo
@@ -409,7 +418,7 @@ function AprobacionNomina() {
         return;
       }
       if (!periodoActivo || !periodoActivoProcesable) {
-        setError('Solo puedes aprobar o rechazar planillas de periodos abiertos o en revision.');
+        setError('Solo puedes aprobar o rechazar planillas de periodos que no esten aprobados o cerrados.');
         return;
       }
 
@@ -518,7 +527,13 @@ function AprobacionNomina() {
 
         {filasPlanilla.length > 0 && !periodoActivoEnRevision && (
           <Alert severity="warning" sx={{ mb: 2 }}>
-            Hay nominas pendientes en este periodo, pero el periodo aun esta Abierto. Al aprobar o rechazar se sincronizara el estado del periodo.
+            Hay nominas pendientes en este periodo, pero el periodo aun no esta En revision. Al aprobar o rechazar se sincronizara el estado del periodo.
+          </Alert>
+        )}
+
+        {motivoBloqueoAprobacion && (
+          <Alert severity="info" sx={{ mb: 2 }}>
+            {motivoBloqueoAprobacion}
           </Alert>
         )}
 

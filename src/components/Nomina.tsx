@@ -61,7 +61,6 @@ import { getApiErrorMessage } from '../api/errors';
 import { formatearMoneda, obtenerNombreEmpleado } from '../utils/relations';
 import {
   esPeriodoAbierto,
-  esPeriodoAprobado,
   normalizePeriodoEstado,
   periodoEstadoLabels,
 } from '../utils/payroll';
@@ -168,6 +167,34 @@ const contarRespuesta = (data: Record<string, unknown>, keys: string[]) => {
   return undefined;
 };
 
+const extraerDetalleRespuesta = (data: Record<string, unknown>, keys: string[]) => {
+  for (const key of keys) {
+    const value = data[key];
+    if (Array.isArray(value) && value.length > 0) {
+      return value
+        .slice(0, 3)
+        .map((item) => {
+          if (typeof item === 'string') return item;
+          if (typeof item === 'number') return String(item);
+          if (item && typeof item === 'object') {
+            const registro = item as Record<string, unknown>;
+            return String(
+              registro.mensaje
+              ?? registro.message
+              ?? registro.error
+              ?? registro.detalle
+              ?? registro.reason
+              ?? JSON.stringify(registro)
+            );
+          }
+          return String(item);
+        })
+        .join(' | ');
+    }
+  }
+  return '';
+};
+
 const redondearMoneda = (value: number) => Math.round(value * 100) / 100;
 
 const obtenerClaveConcepto = (detalle: NominaDetalle) => {
@@ -187,6 +214,14 @@ const sanitizarNombreArchivo = (value: string) =>
     .replace(/[^a-zA-Z0-9_-]+/g, '_')
     .replace(/^_+|_+$/g, '')
     .toLowerCase();
+
+const escapeHtml = (value: string | number | null | undefined) =>
+  String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 
 const obtenerTextoEstadoNomina = (estado: string) => {
   if (estado === 'A' || estado === 'Activo') return 'Aprobada';
@@ -251,6 +286,8 @@ function NominaCRUD() {
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState('');
   const [mensaje, setMensaje] = useState('');
+  const [resultadoGeneracion, setResultadoGeneracion] = useState('');
+  const [resultadoGeneracionSeveridad, setResultadoGeneracionSeveridad] = useState<'success' | 'warning' | 'error'>('success');
   const [generacionForm, setGeneracionForm] = useState<GeneracionNominaForm>(initialGeneracionForm);
   const [generando, setGenerando] = useState(false);
   const [empleados, setEmpleados] = useState<Empleado[]>([]);
@@ -339,7 +376,6 @@ function NominaCRUD() {
   const periodoGeneracion = periodosPorId.get(String(generacionForm.per_id));
   const periodoPlanilla = periodosPorId.get(String(planillaPeriodoId));
   const periodoPlanillaAbierto = esPeriodoAbierto(periodoPlanilla?.PER_ESTADO);
-  const periodoPlanillaAprobado = esPeriodoAprobado(periodoPlanilla?.PER_ESTADO);
   const periodoGeneracionBloqueado = ['APROBADO', 'CERRADO'].includes(normalizePeriodoEstado(periodoGeneracion?.PER_ESTADO || ''));
   const periodoPlanillaLectura = ['APROBADO', 'CERRADO'].includes(normalizePeriodoEstado(periodoPlanilla?.PER_ESTADO || ''));
   const periodoActivo = periodoPlanilla || periodoGeneracion;
@@ -518,14 +554,15 @@ function NominaCRUD() {
 
   const planillaTieneInconsistencias = filasPlanilla.some((fila) => fila.conceptos === 0 || fila.duplicados > 0 || !fila.cuadra);
   const filasEnviables = filasPlanilla.filter((fila) => ['B', 'R'].includes(fila.nomina.NOM_ESTADO));
+  const planillaAprobadaPorGerencia = filasPlanilla.length > 0
+    && filasPlanilla.every((fila) => fila.nomina.NOM_ESTADO === 'A');
   const planillaPuedeEnviar = filasPlanilla.length > 0
     && periodoPlanillaAbierto
     && !planillaTieneInconsistencias
     && filasEnviables.length > 0;
   const planillaPuedeExportar = filasPlanilla.length > 0
-    && periodoPlanillaAprobado
     && !planillaTieneInconsistencias
-    && filasPlanilla.every((fila) => fila.nomina.NOM_ESTADO === 'A');
+    && planillaAprobadaPorGerencia;
   const nominasEliminables = filasPlanilla.filter((fila) => ['B', 'R'].includes(fila.nomina.NOM_ESTADO));
   const planillaPuedeEliminar = periodoPlanillaAbierto && nominasEliminables.length > 0;
 
@@ -550,6 +587,14 @@ function NominaCRUD() {
   };
 
   const motivoBloqueoEnvio = planillaPuedeEnviar ? '' : obtenerMotivoBloqueoEnvio();
+  const obtenerMotivoBloqueoExportacion = () => {
+    if (!planillaPeriodoId) return 'Selecciona un periodo de planilla.';
+    if (filasPlanilla.length === 0) return 'No hay nominas generadas para exportar.';
+    if (planillaTieneInconsistencias) return 'Hay nominas con detalle faltante, duplicado o descuadrado.';
+    if (!planillaAprobadaPorGerencia) return 'La planilla debe estar aprobada por gerencia antes de descargar el CSV.';
+    return '';
+  };
+  const motivoBloqueoExportacion = planillaPuedeExportar ? '' : obtenerMotivoBloqueoExportacion();
 
   const crearPayloadNomina = (
     datosForm: NominaForm,
@@ -580,6 +625,7 @@ function NominaCRUD() {
       setGenerando(true);
       setError('');
       setMensaje('');
+      setResultadoGeneracion('');
       const fechaGeneracionActual = obtenerFechaLocalInput();
       setGeneracionForm((prev) => ({
         ...prev,
@@ -621,8 +667,20 @@ function NominaCRUD() {
         omitidas !== undefined ? `${omitidas} omitidas` : '',
         errores !== undefined ? `${errores} con error` : '',
       ].filter(Boolean);
+      const detalleOmitidas = extraerDetalleRespuesta(respuestaPlano, ['omitidas', 'duplicadas', 'nominas_omitidas', 'nominasOmitidas']);
+      const detalleErrores = extraerDetalleRespuesta(respuestaPlano, ['errores']);
+      const resumenTexto = partes.length ? partes.join(', ') : 'sin resumen numerico del backend';
+      const resultadoTexto = [
+        `Respuesta del servidor: ${resumenTexto}.`,
+        detalleOmitidas ? `Omitidas: ${detalleOmitidas}` : '',
+        detalleErrores ? `Errores: ${detalleErrores}` : '',
+      ].filter(Boolean).join(' ');
+      const hayErrores = Number(errores ?? 0) > 0 || Boolean(detalleErrores);
+      const generacionSinFilas = generadas !== undefined && Number(generadas) === 0;
 
       setMensaje(respuesta.mensaje || respuesta.message || `${recalcular ? 'Recalculo' : 'Generacion'} finalizada${partes.length ? `: ${partes.join(', ')}` : ''}`);
+      setResultadoGeneracion(resultadoTexto);
+      setResultadoGeneracionSeveridad(hayErrores ? 'error' : generacionSinFilas ? 'warning' : 'success');
       setPlanillaPeriodoId(String(generacionForm.per_id));
       await cargarDatos();
     } catch (err: unknown) {
@@ -712,12 +770,6 @@ function NominaCRUD() {
     if (!planillaPuedeExportar) return;
 
     const periodo = periodosPorId.get(String(planillaPeriodoId));
-    const encabezado = [
-      ['EMPRESA "Innova"'],
-      [`Periodo del ${formatearFecha(periodo?.PER_FECHA_INICIO)} al ${formatearFecha(periodo?.PER_FECHA_FIN)}`],
-      ['NIT: 123456-6'],
-      [],
-    ];
     const headers = [
       'ID',
       'Colaborador',
@@ -741,61 +793,99 @@ function NominaCRUD() {
       'Total Egresos',
       'Liquido a Percibir',
     ];
-    const filas = filasPlanilla.map((fila) => [
+    const filas = filasPlanilla.map((fila) => ([
       fila.empleadoId,
       fila.colaborador,
       fila.departamento,
       fila.puesto,
-      fila.salarioBase.toFixed(2),
-      fila.bonificacion.toFixed(2),
+      redondearMoneda(fila.salarioBase),
+      redondearMoneda(fila.bonificacion),
       fila.diasLaborados,
-      fila.salarioOrdinario.toFixed(2),
+      redondearMoneda(fila.salarioOrdinario),
       fila.horasExtra,
-      fila.sueldoExtraordinario.toFixed(2),
-      fila.comisiones.toFixed(2),
-      fila.otrosIngresos.toFixed(2),
-      fila.totalIngresos.toFixed(2),
-      fila.anticipo.toFixed(2),
-      fila.igss.toFixed(2),
-      fila.isr.toFixed(2),
-      fila.prestamo.toFixed(2),
-      fila.descuentosJudiciales.toFixed(2),
-      fila.otrosEgresos.toFixed(2),
-      fila.totalEgresos.toFixed(2),
-      fila.liquido.toFixed(2),
-    ]);
+      redondearMoneda(fila.sueldoExtraordinario),
+      redondearMoneda(fila.comisiones),
+      redondearMoneda(fila.otrosIngresos),
+      redondearMoneda(fila.totalIngresos),
+      redondearMoneda(fila.anticipo),
+      redondearMoneda(fila.igss),
+      redondearMoneda(fila.isr),
+      redondearMoneda(fila.prestamo),
+      redondearMoneda(fila.descuentosJudiciales),
+      redondearMoneda(fila.otrosEgresos),
+      redondearMoneda(fila.totalEgresos),
+      redondearMoneda(fila.liquido),
+    ]));
     const total = [
       'TOTAL',
       '',
       '',
       '',
-      totalesPlanilla.salarioBase.toFixed(2),
-      totalesPlanilla.bonificacion.toFixed(2),
+      redondearMoneda(totalesPlanilla.salarioBase),
+      redondearMoneda(totalesPlanilla.bonificacion),
       '',
-      totalesPlanilla.salarioOrdinario.toFixed(2),
-      totalesPlanilla.horasExtra.toFixed(2),
-      totalesPlanilla.sueldoExtraordinario.toFixed(2),
-      totalesPlanilla.comisiones.toFixed(2),
-      totalesPlanilla.otrosIngresos.toFixed(2),
-      totalesPlanilla.totalIngresos.toFixed(2),
-      totalesPlanilla.anticipo.toFixed(2),
-      totalesPlanilla.igss.toFixed(2),
-      totalesPlanilla.isr.toFixed(2),
-      totalesPlanilla.prestamo.toFixed(2),
-      totalesPlanilla.descuentosJudiciales.toFixed(2),
-      totalesPlanilla.otrosEgresos.toFixed(2),
-      totalesPlanilla.totalEgresos.toFixed(2),
-      totalesPlanilla.liquido.toFixed(2),
+      redondearMoneda(totalesPlanilla.salarioOrdinario),
+      redondearMoneda(totalesPlanilla.horasExtra),
+      redondearMoneda(totalesPlanilla.sueldoExtraordinario),
+      redondearMoneda(totalesPlanilla.comisiones),
+      redondearMoneda(totalesPlanilla.otrosIngresos),
+      redondearMoneda(totalesPlanilla.totalIngresos),
+      redondearMoneda(totalesPlanilla.anticipo),
+      redondearMoneda(totalesPlanilla.igss),
+      redondearMoneda(totalesPlanilla.isr),
+      redondearMoneda(totalesPlanilla.prestamo),
+      redondearMoneda(totalesPlanilla.descuentosJudiciales),
+      redondearMoneda(totalesPlanilla.otrosEgresos),
+      redondearMoneda(totalesPlanilla.totalEgresos),
+      redondearMoneda(totalesPlanilla.liquido),
     ];
 
-    const csvContent = [...encabezado, headers, ...filas, [], total]
-      .map((row) => row.map((value) => `"${String(value).replace(/"/g, '""')}"`).join(','))
-      .join('\n');
-    const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const periodoTexto = `${formatearFecha(periodo?.PER_FECHA_INICIO)} al ${formatearFecha(periodo?.PER_FECHA_FIN)}`;
+    const renderCell = (value: string | number, index: number, isTotal = false) => {
+      const isNumber = typeof value === 'number';
+      const isCurrency = isNumber && ![0, 6, 8].includes(index);
+      const className = [
+        isNumber ? 'num' : 'text',
+        isCurrency ? 'money' : '',
+        isTotal ? 'total-cell' : '',
+      ].filter(Boolean).join(' ');
+      return `<td class="${className}">${escapeHtml(value)}</td>`;
+    };
+    const html = `<!doctype html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <style>
+    body { font-family: Calibri, Arial, sans-serif; color: #111827; }
+    table { border-collapse: collapse; width: 100%; }
+    .title { font-size: 20px; font-weight: 700; color: #0f3f8f; text-align: left; }
+    .meta { font-size: 12px; color: #374151; }
+    th { background: #174ea6; color: #ffffff; font-weight: 700; border: 1px solid #8eaadb; padding: 8px; white-space: nowrap; }
+    td { border: 1px solid #d9e2f3; padding: 7px; vertical-align: middle; }
+    .text { mso-number-format: "\\@"; }
+    .num { text-align: right; mso-number-format: "0.00"; }
+    .money { mso-number-format: '"Q"#,##0.00'; }
+    .total-row td { background: #eaf2ff; font-weight: 700; border-top: 2px solid #174ea6; }
+    .section { background: #f8fafc; font-weight: 700; color: #0f172a; }
+  </style>
+</head>
+<body>
+  <table>
+    <tr><td class="title" colspan="${headers.length}">Planilla de Nomina - EMPRESA "Innova"</td></tr>
+    <tr><td class="meta" colspan="${headers.length}">Periodo: ${escapeHtml(periodoTexto)}</td></tr>
+    <tr><td class="meta" colspan="${headers.length}">NIT: 123456-6 | Generado: ${escapeHtml(formatearFecha(obtenerFechaLocalInput()))}</td></tr>
+    <tr><td colspan="${headers.length}"></td></tr>
+    <tr>${headers.map((header) => `<th>${escapeHtml(header)}</th>`).join('')}</tr>
+    ${filas.map((fila) => `<tr>${fila.map((value, index) => renderCell(value, index)).join('')}</tr>`).join('')}
+    <tr class="total-row">${total.map((value, index) => renderCell(value, index, true)).join('')}</tr>
+  </table>
+</body>
+</html>`;
+    const blob = new Blob(['\uFEFF' + html], { type: 'application/vnd.ms-excel;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `planilla_periodo_${planillaPeriodoId}.csv`;
+    a.download = `planilla_periodo_${planillaPeriodoId}.xls`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -915,7 +1005,9 @@ function NominaCRUD() {
     {
       label: 'Genera la planilla',
       description: planillaPeriodoId
-        ? `${filasPlanilla.length} nomina(s) cargadas para revision.`
+        ? filasPlanilla.length > 0
+          ? `${filasPlanilla.length} nomina(s) generadas para revision.`
+          : 'No hay nominas generadas para el periodo seleccionado. Presiona Generar nomina del periodo.'
         : 'Genera para todos los elegibles o para un empleado especifico.',
       completed: filasPlanilla.length > 0,
       error: Boolean(planillaPeriodoId && filasPlanilla.length === 0),
@@ -933,10 +1025,10 @@ function NominaCRUD() {
     {
       label: 'Enviar o descargar',
       description: planillaPuedeExportar
-        ? 'La planilla esta aprobada y lista para descargar CSV.'
+        ? 'La planilla esta aprobada y lista para descargar en Excel.'
         : planillaPuedeEnviar
           ? 'La planilla esta lista para enviarse a aprobacion gerencial.'
-          : 'Cuando todo cuadre, envia a aprobacion. Al aprobarse, podras descargar CSV.',
+          : 'Cuando todo cuadre, envia a aprobacion. Al aprobarse, podras descargar Excel.',
       completed: planillaPuedeExportar,
       error: false,
     },
@@ -992,6 +1084,12 @@ function NominaCRUD() {
           Elige el periodo, genera la planilla en borrador y revisa que cada colaborador tenga conceptos y totales cuadrados.
         </Alert>
 
+        {resultadoGeneracion && (
+          <Alert severity={resultadoGeneracionSeveridad} sx={{ mb: 2 }}>
+            {resultadoGeneracion}
+          </Alert>
+        )}
+
         <Grid container spacing={2}>
           <Grid size={{ xs: 12, md: 4 }}>
             <LookupSelect
@@ -1004,7 +1102,10 @@ function NominaCRUD() {
                 label: obtenerEtiquetaPeriodo(periodo),
                 description: `Pago ${formatearFecha(periodo.PER_FECHA_PAGO)}`,
               }))}
-              onChange={(value) => setGeneracionForm((prev) => ({ ...prev, per_id: value }))}
+              onChange={(value) => {
+                setGeneracionForm((prev) => ({ ...prev, per_id: value }));
+                setPlanillaPeriodoId(value);
+              }}
               helperText={periodosAbiertos.length === 0 ? 'No hay periodos abiertos' : undefined}
             />
           </Grid>
@@ -1070,7 +1171,7 @@ function NominaCRUD() {
         </Box>
 
         <Alert severity="info" sx={{ mb: 2 }}>
-          Cuando la revision marque OK, envia la planilla al gerente. Si ya esta aprobada, descarga el CSV para pago.
+          Cuando la revision marque OK, envia la planilla al gerente. Si ya esta aprobada, descarga el Excel para pago.
         </Alert>
 
         <Grid container spacing={2} sx={{ mb: 2 }}>
@@ -1125,7 +1226,7 @@ function NominaCRUD() {
               onClick={exportarPlanillaCSV}
               disabled={!planillaPuedeExportar}
             >
-              Descargar CSV
+              Descargar Excel
             </Button>
           </Grid>
 
@@ -1158,6 +1259,12 @@ function NominaCRUD() {
         {motivoBloqueoEnvio && filasPlanilla.length > 0 && (
           <Alert severity="info" sx={{ mb: 2 }}>
             Enviar al gerente esta deshabilitado: {motivoBloqueoEnvio}
+          </Alert>
+        )}
+
+        {motivoBloqueoExportacion && filasPlanilla.length > 0 && (
+          <Alert severity="info" sx={{ mb: 2 }}>
+            Descargar Excel esta deshabilitado: {motivoBloqueoExportacion}
           </Alert>
         )}
 

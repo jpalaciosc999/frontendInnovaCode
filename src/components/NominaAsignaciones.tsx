@@ -3,10 +3,12 @@ import {
   Alert,
   Box,
   Button,
+  Checkbox,
   Chip,
   FormControl,
   Grid,
   InputLabel,
+  ListItemText,
   MenuItem,
   Paper,
   Select,
@@ -71,6 +73,7 @@ function NominaAsignaciones() {
   const [ingresos, setIngresos] = useState<Ingreso[]>([]);
   const [descuentos, setDescuentos] = useState<Descuento[]>([]);
   const [form, setForm] = useState<NominaAsignacionForm>(initialForm);
+  const [empleadosSeleccionados, setEmpleadosSeleccionados] = useState<string[]>([]);
   const [editandoId, setEditandoId] = useState<number | null>(null);
   const [filtroPeriodo, setFiltroPeriodo] = useState('');
   const [cargando, setCargando] = useState(true);
@@ -81,22 +84,28 @@ function NominaAsignaciones() {
     try {
       setCargando(true);
       setError('');
-      const [asignacionesData, empleadosData, periodosData, puestosData, ingresosData, descuentosData] = await Promise.all([
-        obtenerNominaAsignaciones(filtroPeriodo ? { per_id: filtroPeriodo } : undefined),
+      const [empleadosData, periodosData, puestosData, ingresosData, descuentosData] = await Promise.all([
         obtenerEmpleados(),
         obtenerPeriodos(),
         obtenerPuestos(),
         obtenerIngresos(),
         obtenerDescuentos(),
       ]);
-      setAsignaciones(asignacionesData);
       setEmpleados(empleadosData);
       setPeriodos(periodosData);
       setPuestos(puestosData);
       setIngresos(ingresosData);
       setDescuentos(descuentosData);
+
+      try {
+        const asignacionesData = await obtenerNominaAsignaciones(filtroPeriodo ? { per_id: filtroPeriodo } : undefined);
+        setAsignaciones(asignacionesData);
+      } catch (err: unknown) {
+        setAsignaciones([]);
+        setError(getApiErrorMessage(err, 'No se pudieron cargar las asignaciones, pero ya puedes seleccionar periodo y empleados.'));
+      }
     } catch (err: unknown) {
-      setError(getApiErrorMessage(err, 'Error cargando asignaciones. Verifica que el backend tenga /nomina-asignaciones.'));
+      setError(getApiErrorMessage(err, 'Error cargando empleados, periodos o conceptos para asignaciones.'));
     } finally {
       setCargando(false);
     }
@@ -112,12 +121,12 @@ function NominaAsignaciones() {
   );
 
   const empleadosAsignables = useMemo(
-    () => empleados.filter((empleado) => {
-      const estado = String(empleado.EMP_ESTADO || 'A').toUpperCase();
-      const estaLiquidado = Boolean(empleado.EMP_FECHA_LIQUIDACION);
-      return (estado === 'A' && !estaLiquidado) || String(empleado.EMP_ID) === String(form.emp_id || '');
+    () => [...empleados].sort((a, b) => {
+      const nombreA = obtenerNombreEmpleado(a) || `Empleado #${a.EMP_ID}`;
+      const nombreB = obtenerNombreEmpleado(b) || `Empleado #${b.EMP_ID}`;
+      return nombreA.localeCompare(nombreB, 'es');
     }),
-    [empleados, form.emp_id]
+    [empleados]
   );
 
   const periodosPorId = useMemo(
@@ -230,14 +239,25 @@ function NominaAsignaciones() {
     });
   };
 
+  const handleEmpleadosChange = (event: SelectChangeEvent<string[]>) => {
+    const value = event.target.value;
+    const seleccionados = typeof value === 'string' ? value.split(',') : value;
+    setEmpleadosSeleccionados(seleccionados);
+    setForm((prev) => completarMontoSiAplica({
+      ...prev,
+      emp_id: seleccionados[0] || '',
+    }));
+  };
+
   const limpiarFormulario = () => {
     setForm(initialForm);
+    setEmpleadosSeleccionados([]);
     setEditandoId(null);
     setError('');
   };
 
   const validar = () => {
-    if (!form.per_id || !form.emp_id || !form.nas_tipo || !form.nas_monto) {
+    if (!form.per_id || empleadosSeleccionados.length === 0 || !form.nas_tipo || !form.nas_monto) {
       setError('Periodo, empleado, tipo y monto son obligatorios.');
       return false;
     }
@@ -267,11 +287,19 @@ function NominaAsignaciones() {
       if (!validar()) return false;
 
       if (editandoId !== null) {
-        await actualizarNominaAsignacion(editandoId, form);
+        await actualizarNominaAsignacion(editandoId, {
+          ...form,
+          emp_id: empleadosSeleccionados[0] || form.emp_id,
+        });
         setMensaje('Asignacion actualizada correctamente.');
       } else {
-        await crearNominaAsignacion(form);
-        setMensaje('Asignacion creada correctamente.');
+        await Promise.all(empleadosSeleccionados.map((empleadoId) => crearNominaAsignacion({
+          ...form,
+          emp_id: empleadoId,
+        })));
+        setMensaje(empleadosSeleccionados.length === 1
+          ? 'Asignacion creada correctamente.'
+          : `${empleadosSeleccionados.length} asignaciones creadas correctamente.`);
       }
 
       limpiarFormulario();
@@ -283,7 +311,17 @@ function NominaAsignaciones() {
     }
   };
 
-  useUnsavedFormGuard(form, initialForm, guardar);
+  const formConSeleccion = useMemo(
+    () => ({ ...form, emp_ids: empleadosSeleccionados }),
+    [form, empleadosSeleccionados]
+  );
+
+  const initialFormConSeleccion = useMemo(
+    () => ({ ...initialForm, emp_ids: [] as string[] }),
+    []
+  );
+
+  useUnsavedFormGuard(formConSeleccion, initialFormConSeleccion, guardar);
 
   const editar = (asignacion: NominaAsignacion) => {
     setEditandoId(asignacion.NAS_ID);
@@ -299,6 +337,7 @@ function NominaAsignaciones() {
       nas_descripcion: asignacion.NAS_DESCRIPCION ?? '',
       nas_estado: asignacion.NAS_ESTADO || 'A',
     });
+    setEmpleadosSeleccionados([String(asignacion.EMP_ID)]);
   };
 
   const eliminar = async (id: number) => {
@@ -342,7 +381,7 @@ function NominaAsignaciones() {
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 3, flexWrap: 'wrap' }}>
           <AssignmentIcon color="primary" />
           <Typography variant="h4" sx={{ fontWeight: 'bold' }}>
-            Asignaciones por Periodo
+            Asignaciones de Ingresos y Descuentos por Empleado
           </Typography>
           {periodoForm && (
             <Box sx={{ ml: 'auto' }}>
@@ -352,7 +391,7 @@ function NominaAsignaciones() {
         </Box>
 
         <Alert severity="info" sx={{ mb: 2 }}>
-          Aqui se capturan ingresos y egresos variables antes de generar la nomina. La generacion toma estas asignaciones y crea el detalle final.
+          Aqui se asignan ingresos y descuentos a un empleado especifico antes de generar la nomina. La generacion toma estas asignaciones y las refleja en el detalle final.
         </Alert>
 
         {periodoFormBloqueado && (
@@ -388,20 +427,43 @@ function NominaAsignaciones() {
           </Grid>
 
           <Grid size={{ xs: 12, md: 4 }}>
-            <LookupSelect
-              required
-              label="Empleado"
-              value={String(form.emp_id)}
-              placeholder="Buscar empleado"
-              options={empleadosAsignables.map((empleado) => ({
-                value: String(empleado.EMP_ID),
-                label: obtenerNombreEmpleado(empleado) || `Empleado #${empleado.EMP_ID}`,
-                description: empleado.EMP_FECHA_LIQUIDACION || String(empleado.EMP_ESTADO || 'A').toUpperCase() !== 'A'
-                  ? `ID ${empleado.EMP_ID} - liquidado`
-                  : `ID ${empleado.EMP_ID}`,
-              }))}
-              onChange={(value) => setForm((prev) => ({ ...prev, emp_id: value }))}
-            />
+            <FormControl fullWidth required>
+              <InputLabel>Empleado</InputLabel>
+              <Select
+                multiple
+                label="Empleado"
+                value={empleadosSeleccionados}
+                onChange={handleEmpleadosChange}
+                renderValue={(selected) => {
+                  if (selected.length === 0) return 'Buscar empleado';
+                  if (selected.length === 1) {
+                    const empleado = empleadosPorId.get(String(selected[0]));
+                    return obtenerNombreEmpleado(empleado) || `Empleado #${selected[0]}`;
+                  }
+                  return `${selected.length} empleados seleccionados`;
+                }}
+                MenuProps={{ slotProps: { paper: { sx: { maxHeight: 360 } } } }}
+              >
+                {empleadosAsignables.length > 0 ? empleadosAsignables.map((empleado) => {
+                  const empleadoId = String(empleado.EMP_ID);
+                  const nombre = obtenerNombreEmpleado(empleado) || `Empleado #${empleado.EMP_ID}`;
+                  const estadoNoActivo = empleado.EMP_FECHA_LIQUIDACION || String(empleado.EMP_ESTADO || 'A').toUpperCase() !== 'A';
+                  return (
+                    <MenuItem key={empleado.EMP_ID} value={empleadoId}>
+                      <Checkbox checked={empleadosSeleccionados.includes(empleadoId)} />
+                      <ListItemText
+                        primary={nombre}
+                        secondary={estadoNoActivo ? `ID ${empleado.EMP_ID} - liquidado` : `ID ${empleado.EMP_ID}`}
+                      />
+                    </MenuItem>
+                  );
+                }) : (
+                  <MenuItem disabled value="">
+                    <ListItemText primary="No hay empleados disponibles" />
+                  </MenuItem>
+                )}
+              </Select>
+            </FormControl>
           </Grid>
 
           <Grid size={{ xs: 12, md: 4 }}>
@@ -410,7 +472,7 @@ function NominaAsignaciones() {
               <Select name="nas_tipo" value={form.nas_tipo} label="Tipo" onChange={handleChange}>
                 <MenuItem value="">Seleccione tipo</MenuItem>
                 <MenuItem value="I">Ingreso</MenuItem>
-                <MenuItem value="D">Egreso</MenuItem>
+                <MenuItem value="D">Descuento</MenuItem>
               </Select>
             </FormControl>
           </Grid>
@@ -426,7 +488,7 @@ function NominaAsignaciones() {
                   value: String(ingreso.TIS_ID),
                   label: `${ingreso.TIS_CODIGO} - ${ingreso.TIS_NOMBRE}`,
                 }))}
-                onChange={(value) => setForm((prev) => ({ ...prev, tis_id: value || null }))}
+                onChange={(value) => setForm((prev) => completarMontoSiAplica({ ...prev, tis_id: value || null }))}
               />
             </Grid>
           )}
@@ -435,14 +497,14 @@ function NominaAsignaciones() {
             <Grid size={{ xs: 12, md: 6 }}>
               <LookupSelect
                 required
-                label="Concepto de egreso"
+                label="Concepto de descuento"
                 value={String(form.tds_id ?? '')}
-                placeholder="Buscar egreso"
+                placeholder="Buscar descuento"
                 options={descuentos.map((descuento) => ({
                   value: String(descuento.TDS_ID),
                   label: `${descuento.TDS_CODIGO} - ${descuento.TDS_NOMBRE}`,
                 }))}
-                onChange={(value) => setForm((prev) => ({ ...prev, tds_id: value || null }))}
+                onChange={(value) => setForm((prev) => completarMontoSiAplica({ ...prev, tds_id: value || null }))}
               />
             </Grid>
           )}
@@ -493,7 +555,7 @@ function NominaAsignaciones() {
 
       <Paper elevation={3} sx={{ p: 3 }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 2, mb: 2, flexWrap: 'wrap' }}>
-          <Typography variant="h6">Asignaciones: {asignacionesFiltradas.length}</Typography>
+          <Typography variant="h6">Asignaciones por empleado: {asignacionesFiltradas.length}</Typography>
           <FormControl sx={{ minWidth: 320 }}>
             <InputLabel>Filtrar periodo</InputLabel>
             <Select value={filtroPeriodo} label="Filtrar periodo" onChange={(event) => setFiltroPeriodo(event.target.value)}>
@@ -535,7 +597,7 @@ function NominaAsignaciones() {
                       <TableCell>{obtenerNombreEmpleado(empleado) || `Empleado #${asignacion.EMP_ID}`}</TableCell>
                       <TableCell>
                         <Chip
-                          label={asignacion.NAS_TIPO === 'I' ? 'Ingreso' : 'Egreso'}
+                          label={asignacion.NAS_TIPO === 'I' ? 'Ingreso' : 'Descuento'}
                           color={asignacion.NAS_TIPO === 'I' ? 'success' : 'error'}
                           size="small"
                         />

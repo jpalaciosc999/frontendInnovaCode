@@ -49,9 +49,21 @@ export const payrollGuideSteps: PayrollGuideStep[] = [
     actionLabel: 'Ir a ingresos',
   },
   {
-    title: 'Configurar ingresos y descuentos',
-    helper: 'Revisa conceptos, descuentos, prestamos e ingresos variables aplicables.',
+    title: 'Revisar ingresos',
+    helper: 'Confirma que existan los conceptos de ingreso que se podran asignar a empleados.',
     path: '/tipo-ingresos',
+    actionLabel: 'Ir a descuentos',
+  },
+  {
+    title: 'Revisar descuentos',
+    helper: 'Confirma que existan los descuentos que se podran asignar a empleados.',
+    path: '/descuentos',
+    actionLabel: 'Ir a asignaciones',
+  },
+  {
+    title: 'Asignar ingresos y descuentos',
+    helper: 'Selecciona periodo, empleado, ingreso o descuento y monto antes de generar la nomina.',
+    path: '/nomina-asignaciones',
     actionLabel: 'Ir a generar nomina',
   },
   {
