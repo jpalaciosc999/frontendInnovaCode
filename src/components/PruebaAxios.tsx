@@ -58,6 +58,7 @@ import {
 import type { SelectChangeEvent } from '@mui/material/Select';
 
 import SaveIcon from '@mui/icons-material/Save';
+import AddIcon from '@mui/icons-material/Add';
 import CleaningServicesIcon from '@mui/icons-material/CleaningServices';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -343,6 +344,7 @@ function PruebaAxios() {
   const [error, setError] = useState('');
   const [mensaje, setMensaje] = useState('');
   const [modoEdicion, setModoEdicion] = useState(false);
+  const [mostrarFormulario, setMostrarFormulario] = useState(false);
   const [empleadoId, setEmpleadoId] = useState<number | null>(null);
   const [form, setForm] = useState<EmpleadoForm>(initialForm);
   const [contratoOriginal, setContratoOriginal] = useState<ContratoEmpleadoSnapshot | null>(null);
@@ -374,6 +376,7 @@ function PruebaAxios() {
   const [perfilEmpleado, setPerfilEmpleado] = useState<Empleado | null>(null);
   const [modalDepartamentos, setModalDepartamentos] = useState(false);
   const [filtroDep, setFiltroDep] = useState('');
+  const formularioEmpleadoRef = useRef<HTMLDivElement | null>(null);
   const tablaEmpleadosRef = useRef<HTMLDivElement | null>(null);
   const barraSuperiorRef = useRef<HTMLDivElement | null>(null);
   const sincronizandoScrollRef = useRef(false);
@@ -856,7 +859,7 @@ function PruebaAxios() {
     setFilters(initialFilters);
   };
 
-  const limpiarFormulario = () => {
+  const limpiarFormulario = (options: { mantenerFormulario?: boolean } = {}) => {
     setForm(initialForm);
     setTelefonoPais(DEFAULT_PHONE_COUNTRY);
     setJustificacionSalario('');
@@ -868,6 +871,18 @@ function PruebaAxios() {
     setEmpleadoId(null);
     setContratoOriginal(null);
     setError('');
+    setMostrarFormulario(Boolean(options.mantenerFormulario));
+  };
+
+  const desplazarAFormulario = () => {
+    window.requestAnimationFrame(() => {
+      formularioEmpleadoRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  };
+
+  const abrirNuevoEmpleado = () => {
+    limpiarFormulario({ mantenerFormulario: true });
+    desplazarAFormulario();
   };
 
   const contratoCambioPendiente = Boolean(
@@ -1053,6 +1068,7 @@ function PruebaAxios() {
     const telefonoPaisDetectado = detectPhoneCountry(telefono);
 
     setModoEdicion(true);
+    setMostrarFormulario(true);
     setEmpleadoId(empleado.EMP_ID);
     setMensaje('');
     setError('');
@@ -1099,6 +1115,7 @@ function PruebaAxios() {
       emp_sueldo: String(empleado.EMP_SUELDO ?? obtenerPuestoEmpleado(empleado)?.PUE_SALARIO_BASE ?? ''),
       emp_foto: obtenerFotoEmpleado(empleado)
     });
+    desplazarAFormulario();
   };
 
   const obtenerChipEstado = (estado: string) => {
@@ -1255,17 +1272,25 @@ function PruebaAxios() {
   }
 
   return (
-    <Box sx={{ py: 2 }}>
+    <Box sx={{ py: 2, display: 'flex', flexDirection: 'column' }}>
       <PageHeader
         title="Empleados"
         subtitle="Administra datos personales, contratos, puesto, horario, sede y salario base de cada colaborador."
         icon={<PeopleIcon />}
       />
 
-      <Paper sx={{ p: { xs: 2, md: 3 }, mb: 3 }}>
-        <Typography variant="h6" sx={{ mb: 2 }}>
-          {modoEdicion ? 'Editar empleado' : 'Nuevo empleado'}
-        </Typography>
+      <Paper
+        ref={formularioEmpleadoRef}
+        sx={{ p: { xs: 2, md: 3 }, mb: 0, order: 2, display: mostrarFormulario ? 'block' : 'none' }}
+      >
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 2, mb: 2 }}>
+          <Typography variant="h6">
+            {modoEdicion ? 'Editar empleado' : 'Nuevo empleado'}
+          </Typography>
+          <IconButton aria-label="Cerrar formulario" onClick={() => limpiarFormulario()}>
+            <CloseIcon />
+          </IconButton>
+        </Box>
 
         <Grid container spacing={2}>
           <Grid size={{ xs: 12 }}>
@@ -1611,20 +1636,32 @@ function PruebaAxios() {
                 variant="outlined"
                 color="secondary"
                 startIcon={<CleaningServicesIcon />}
-                onClick={limpiarFormulario}
+                onClick={() => limpiarFormulario({ mantenerFormulario: true })}
               >
                 Limpiar
+              </Button>
+
+              <Button
+                variant="text"
+                color="inherit"
+                startIcon={<CloseIcon />}
+                onClick={() => limpiarFormulario()}
+              >
+                Cancelar
               </Button>
             </Box>
           </Grid>
         </Grid>
       </Paper>
 
-      <Paper sx={{ p: { xs: 2, md: 3 } }}>
+      <Paper sx={{ p: { xs: 2, md: 3 }, mb: 3, order: 1 }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 2, flexWrap: 'wrap', mb: 2 }}>
           <Typography variant="h6">
             Listado de empleados: {empleadosFiltrados.length} de {datos.length}
           </Typography>
+          <Button variant="contained" startIcon={<AddIcon />} onClick={abrirNuevoEmpleado}>
+            Nuevo empleado
+          </Button>
         </Box>
 
         <Grid container spacing={2} sx={{ mb: 2 }}>
