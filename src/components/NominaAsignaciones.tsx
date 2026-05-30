@@ -48,6 +48,7 @@ import {
 } from '../services/nomina-asignacion.service';
 import { getApiErrorMessage } from '../api/errors';
 import { formatearFecha, formatearMoneda, obtenerNombreEmpleado } from '../utils/relations';
+import { calcularISR } from '../utils/payroll';
 import PeriodoBadge from './common/PeriodoBadge';
 import { useUnsavedFormGuard } from '../hooks/useUnsavedFormGuard';
 import LookupSelect from './common/LookupSelect';
@@ -74,6 +75,9 @@ function NominaAsignaciones() {
   const [descuentos, setDescuentos] = useState<Descuento[]>([]);
   const [form, setForm] = useState<NominaAsignacionForm>(initialForm);
   const [empleadosSeleccionados, setEmpleadosSeleccionados] = useState<string[]>([]);
+  const [ingresosSeleccionados, setIngresosSeleccionados] = useState<string[]>([]);
+  const [descuentosSeleccionados, setDescuentosSeleccionados] = useState<string[]>([]);
+  const [montosConceptos, setMontosConceptos] = useState<Record<string, string>>({});
   const [editandoId, setEditandoId] = useState<number | null>(null);
   const [filtroPeriodo, setFiltroPeriodo] = useState('');
   const [cargando, setCargando] = useState(true);
@@ -197,6 +201,11 @@ function NominaAsignaciones() {
       const descuento = descuentosPorId.get(String(next.tds_id));
       if (!descuento) return 0;
 
+      const codigo = String(descuento.TDS_CODIGO || '').toUpperCase();
+      if (codigo === 'ISR') {
+        return calcularISR(obtenerSalarioAsignado(next.emp_id)).isr_mensual;
+      }
+
       const tipoCalculo = String(descuento.TDS_TIPO_CALCULO || '').toUpperCase();
       const porcentaje = Number(descuento.TDS_PORCENTAJE || 0);
       if (tipoCalculo.includes('PORC') && porcentaje > 0) {
@@ -223,15 +232,56 @@ function NominaAsignaciones() {
     };
   };
 
+  const obtenerClaveConcepto = (tipo: 'I' | 'D', conceptoId: string | number) => `${tipo}-${conceptoId}`;
+
+  const obtenerMontoInicialConcepto = (
+    tipo: 'I' | 'D',
+    conceptoId: string,
+    empleadoId = empleadosSeleccionados[0] || form.emp_id
+  ) => {
+    const monto = obtenerMontoSugerido({
+      ...form,
+      emp_id: empleadoId || '',
+      nas_tipo: tipo,
+      tis_id: tipo === 'I' ? conceptoId : null,
+      tds_id: tipo === 'D' ? conceptoId : null,
+    });
+
+    return monto >= 0 ? monto.toFixed(2) : '';
+  };
+
+  const sincronizarMontosConceptos = (
+    ingresosIds: string[],
+    descuentosIds: string[],
+    empleadoId = empleadosSeleccionados[0] || form.emp_id
+  ) => {
+    setMontosConceptos((prev) => {
+      const next: Record<string, string> = {};
+
+      ingresosIds.forEach((ingresoId) => {
+        const key = obtenerClaveConcepto('I', ingresoId);
+        next[key] = prev[key] ?? obtenerMontoInicialConcepto('I', ingresoId, empleadoId);
+      });
+
+      descuentosIds.forEach((descuentoId) => {
+        const key = obtenerClaveConcepto('D', descuentoId);
+        next[key] = prev[key] ?? obtenerMontoInicialConcepto('D', descuentoId, empleadoId);
+      });
+
+      return next;
+    });
+  };
+
+  const handleMontoConceptoChange = (key: string, value: string) => {
+    setMontosConceptos((prev) => ({ ...prev, [key]: value }));
+  };
+
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement> | SelectChangeEvent
   ) => {
     const { name, value } = e.target;
     setForm((prev) => {
       const next = { ...prev, [name as string]: value };
-      if (name === 'nas_tipo') {
-        return { ...next, tis_id: null, tds_id: null, nas_monto: '' };
-      }
       if (name === 'emp_id' || name === 'tis_id' || name === 'tds_id') {
         return completarMontoSiAplica(next);
       }
@@ -243,38 +293,107 @@ function NominaAsignaciones() {
     const value = event.target.value;
     const seleccionados = typeof value === 'string' ? value.split(',') : value;
     setEmpleadosSeleccionados(seleccionados);
+    sincronizarMontosConceptos(ingresosSeleccionados, descuentosSeleccionados, seleccionados[0] || '');
     setForm((prev) => completarMontoSiAplica({
       ...prev,
       emp_id: seleccionados[0] || '',
     }));
   };
 
+  const handleIngresosChange = (event: SelectChangeEvent<string[]>) => {
+    const value = event.target.value;
+    const seleccionados = typeof value === 'string' ? value.split(',') : value;
+    setIngresosSeleccionados(seleccionados);
+    sincronizarMontosConceptos(seleccionados, descuentosSeleccionados);
+    setForm((prev) => completarMontoSiAplica({
+      ...prev,
+      nas_tipo: seleccionados.length > 0 ? 'I' : descuentosSeleccionados.length > 0 ? 'D' : '',
+      tis_id: seleccionados[0] || null,
+      tds_id: seleccionados.length > 0 ? null : descuentosSeleccionados[0] || null,
+    }));
+  };
+
+  const handleDescuentosChange = (event: SelectChangeEvent<string[]>) => {
+    const value = event.target.value;
+    const seleccionados = typeof value === 'string' ? value.split(',') : value;
+    setDescuentosSeleccionados(seleccionados);
+    sincronizarMontosConceptos(ingresosSeleccionados, seleccionados);
+    setForm((prev) => completarMontoSiAplica({
+      ...prev,
+      nas_tipo: ingresosSeleccionados.length > 0 ? 'I' : seleccionados.length > 0 ? 'D' : '',
+      tis_id: ingresosSeleccionados[0] || null,
+      tds_id: ingresosSeleccionados.length > 0 ? null : seleccionados[0] || null,
+    }));
+  };
+
   const limpiarFormulario = () => {
     setForm(initialForm);
     setEmpleadosSeleccionados([]);
+    setIngresosSeleccionados([]);
+    setDescuentosSeleccionados([]);
+    setMontosConceptos({});
     setEditandoId(null);
     setError('');
   };
 
   const validar = () => {
-    if (!form.per_id || empleadosSeleccionados.length === 0 || !form.nas_tipo || !form.nas_monto) {
-      setError('Periodo, empleado, tipo y monto son obligatorios.');
+    const totalConceptos = ingresosSeleccionados.length + descuentosSeleccionados.length;
+    if (!form.per_id || empleadosSeleccionados.length === 0 || totalConceptos === 0) {
+      setError('Periodo, empleado y al menos un ingreso o descuento son obligatorios.');
       return false;
     }
-    if (form.nas_tipo === 'I' && !form.tis_id) {
-      setError('Selecciona el concepto de ingreso.');
+    if (editandoId !== null && totalConceptos !== 1) {
+      setError('Para editar una asignacion selecciona un unico ingreso o descuento.');
       return false;
     }
-    if (form.nas_tipo === 'D' && !form.tds_id) {
-      setError('Selecciona el concepto de egreso.');
-      return false;
-    }
-    if (Number(form.nas_monto) < 0) {
-      setError('El monto no puede ser negativo.');
+    const montoInvalido = [
+      ...ingresosSeleccionados.map((id) => montosConceptos[obtenerClaveConcepto('I', id)]),
+      ...descuentosSeleccionados.map((id) => montosConceptos[obtenerClaveConcepto('D', id)]),
+    ].some((monto) => monto === '' || monto === undefined || Number(monto) < 0);
+
+    if (montoInvalido) {
+      setError('Cada ingreso o descuento seleccionado debe tener un monto valido.');
       return false;
     }
     return true;
   };
+
+  const crearPayloadAsignacion = (
+    empleadoId: string,
+    tipo: 'I' | 'D',
+    conceptoId: string
+  ): NominaAsignacionForm => {
+    const base: NominaAsignacionForm = {
+      ...form,
+      emp_id: empleadoId,
+      nas_tipo: tipo,
+      tis_id: tipo === 'I' ? conceptoId : null,
+      tds_id: tipo === 'D' ? conceptoId : null,
+    };
+    return {
+      ...base,
+      nas_monto: montosConceptos[obtenerClaveConcepto(tipo, conceptoId)],
+    };
+  };
+
+  const obtenerPayloadsAsignaciones = () =>
+    empleadosSeleccionados.flatMap((empleadoId) => [
+      ...ingresosSeleccionados.map((ingresoId) => crearPayloadAsignacion(empleadoId, 'I', ingresoId)),
+      ...descuentosSeleccionados.map((descuentoId) => crearPayloadAsignacion(empleadoId, 'D', descuentoId)),
+    ]);
+
+  const obtenerAsignacionExistente = (payload: NominaAsignacionForm) =>
+    asignaciones.find((asignacion) => {
+      if (String(asignacion.PER_ID) !== String(payload.per_id)) return false;
+      if (String(asignacion.EMP_ID) !== String(payload.emp_id)) return false;
+      if (payload.nas_tipo === 'I') {
+        return String(asignacion.TIS_ID ?? '') === String(payload.tis_id ?? '');
+      }
+      if (payload.nas_tipo === 'D') {
+        return String(asignacion.TDS_ID ?? '') === String(payload.tds_id ?? '');
+      }
+      return false;
+    });
 
   const guardar = async () => {
     try {
@@ -286,20 +405,29 @@ function NominaAsignaciones() {
       }
       if (!validar()) return false;
 
+      const payloads = obtenerPayloadsAsignaciones();
       if (editandoId !== null) {
-        await actualizarNominaAsignacion(editandoId, {
-          ...form,
-          emp_id: empleadosSeleccionados[0] || form.emp_id,
-        });
+        await actualizarNominaAsignacion(editandoId, payloads[0]);
         setMensaje('Asignacion actualizada correctamente.');
       } else {
-        await Promise.all(empleadosSeleccionados.map((empleadoId) => crearNominaAsignacion({
-          ...form,
-          emp_id: empleadoId,
-        })));
-        setMensaje(empleadosSeleccionados.length === 1
-          ? 'Asignacion creada correctamente.'
-          : `${empleadosSeleccionados.length} asignaciones creadas correctamente.`);
+        let creadas = 0;
+        let actualizadas = 0;
+
+        await Promise.all(payloads.map(async (payload) => {
+          const existente = obtenerAsignacionExistente(payload);
+          if (existente) {
+            actualizadas += 1;
+            await actualizarNominaAsignacion(existente.NAS_ID, payload);
+            return;
+          }
+
+          creadas += 1;
+          await crearNominaAsignacion(payload);
+        }));
+
+        setMensaje(payloads.length === 1
+          ? (actualizadas ? 'Asignacion actualizada correctamente.' : 'Asignacion creada correctamente.')
+          : `${creadas} asignaciones creadas y ${actualizadas} actualizadas correctamente.`);
       }
 
       limpiarFormulario();
@@ -312,12 +440,12 @@ function NominaAsignaciones() {
   };
 
   const formConSeleccion = useMemo(
-    () => ({ ...form, emp_ids: empleadosSeleccionados }),
-    [form, empleadosSeleccionados]
+    () => ({ ...form, emp_ids: empleadosSeleccionados, tis_ids: ingresosSeleccionados, tds_ids: descuentosSeleccionados, montos: montosConceptos }),
+    [form, empleadosSeleccionados, ingresosSeleccionados, descuentosSeleccionados, montosConceptos]
   );
 
   const initialFormConSeleccion = useMemo(
-    () => ({ ...initialForm, emp_ids: [] as string[] }),
+    () => ({ ...initialForm, emp_ids: [] as string[], tis_ids: [] as string[], tds_ids: [] as string[], montos: {} as Record<string, string> }),
     []
   );
 
@@ -338,6 +466,11 @@ function NominaAsignaciones() {
       nas_estado: asignacion.NAS_ESTADO || 'A',
     });
     setEmpleadosSeleccionados([String(asignacion.EMP_ID)]);
+    setIngresosSeleccionados(asignacion.TIS_ID ? [String(asignacion.TIS_ID)] : []);
+    setDescuentosSeleccionados(asignacion.TDS_ID ? [String(asignacion.TDS_ID)] : []);
+    setMontosConceptos({
+      [obtenerClaveConcepto(asignacion.NAS_TIPO, asignacion.TIS_ID ?? asignacion.TDS_ID ?? '')]: String(asignacion.NAS_MONTO ?? ''),
+    });
   };
 
   const eliminar = async (id: number) => {
@@ -371,9 +504,14 @@ function NominaAsignaciones() {
     return descuento ? `${descuento.TDS_CODIGO} - ${descuento.TDS_NOMBRE}` : `Egreso #${asignacion.TDS_ID}`;
   };
 
-  const montoSugeridoActual = obtenerMontoSugerido(form);
-  const conceptoConMontoSugerido = Boolean(form.nas_tipo && (form.tis_id || form.tds_id));
-  const conceptoSalarioSeleccionado = form.nas_tipo === 'I' && esConceptoSalario(form.tis_id);
+  const conceptoPreviewForm: NominaAsignacionForm = ingresosSeleccionados.length > 0
+    ? { ...form, nas_tipo: 'I', tis_id: ingresosSeleccionados[0], tds_id: null }
+    : descuentosSeleccionados.length > 0
+      ? { ...form, nas_tipo: 'D', tis_id: null, tds_id: descuentosSeleccionados[0] }
+      : form;
+  const montoSugeridoActual = obtenerMontoSugerido(conceptoPreviewForm);
+  const conceptoConMontoSugerido = Boolean(conceptoPreviewForm.nas_tipo && (conceptoPreviewForm.tis_id || conceptoPreviewForm.tds_id));
+  const conceptoSalarioSeleccionado = conceptoPreviewForm.nas_tipo === 'I' && esConceptoSalario(conceptoPreviewForm.tis_id);
 
   return (
     <Box sx={{ py: 2 }}>
@@ -406,7 +544,7 @@ function NominaAsignaciones() {
               ? `Monto sugerido detectado: ${formatearMoneda(montoSugeridoActual)}. Se carga automaticamente al seleccionar el concepto.`
               : conceptoSalarioSeleccionado
                 ? 'No se encontro salario asignado para este empleado. Revisa EMP_SUELDO o el salario base del puesto.'
-                : 'Este concepto no tiene valor base configurado. Revisa el catalogo de ingresos/descuentos o escribe el monto manualmente.'}
+                : 'El valor base configurado para este concepto es Q0.00. Puedes ajustarlo manualmente si aplica.'}
           </Alert>
         )}
 
@@ -468,56 +606,175 @@ function NominaAsignaciones() {
 
           <Grid size={{ xs: 12, md: 4 }}>
             <FormControl fullWidth required>
-              <InputLabel>Tipo</InputLabel>
-              <Select name="nas_tipo" value={form.nas_tipo} label="Tipo" onChange={handleChange}>
-                <MenuItem value="">Seleccione tipo</MenuItem>
-                <MenuItem value="I">Ingreso</MenuItem>
-                <MenuItem value="D">Descuento</MenuItem>
+              <InputLabel>Tipo de Ingreso</InputLabel>
+              <Select
+                multiple
+                label="Tipo de Ingreso"
+                value={ingresosSeleccionados}
+                onChange={handleIngresosChange}
+                renderValue={(selected) => {
+                  if (selected.length === 0) return 'Seleccione ingreso';
+                  if (selected.length === 1) {
+                    const ingreso = ingresosPorId.get(String(selected[0]));
+                    return ingreso ? `${ingreso.TIS_CODIGO} - ${ingreso.TIS_NOMBRE}` : `Ingreso #${selected[0]}`;
+                  }
+                  return `${selected.length} ingresos seleccionados`;
+                }}
+                MenuProps={{ slotProps: { paper: { sx: { maxHeight: 360 } } } }}
+              >
+                {ingresos.length > 0 ? ingresos.map((ingreso) => {
+                  const ingresoId = String(ingreso.TIS_ID);
+                  return (
+                    <MenuItem key={ingreso.TIS_ID} value={ingresoId}>
+                      <Checkbox checked={ingresosSeleccionados.includes(ingresoId)} />
+                      <ListItemText primary={`${ingreso.TIS_CODIGO} - ${ingreso.TIS_NOMBRE}`} />
+                    </MenuItem>
+                  );
+                }) : (
+                  <MenuItem disabled value="">
+                    <ListItemText primary="No hay ingresos disponibles" />
+                  </MenuItem>
+                )}
               </Select>
             </FormControl>
           </Grid>
 
-          {form.nas_tipo === 'I' && (
-            <Grid size={{ xs: 12, md: 6 }}>
-              <LookupSelect
-                required
-                label="Concepto de ingreso"
-                value={String(form.tis_id ?? '')}
-                placeholder="Buscar ingreso"
-                options={ingresos.map((ingreso) => ({
-                  value: String(ingreso.TIS_ID),
-                  label: `${ingreso.TIS_CODIGO} - ${ingreso.TIS_NOMBRE}`,
-                }))}
-                onChange={(value) => setForm((prev) => completarMontoSiAplica({ ...prev, tis_id: value || null }))}
-              />
+          <Grid size={{ xs: 12, md: 4 }}>
+            <FormControl fullWidth required>
+              <InputLabel>Tipo de Descuento</InputLabel>
+              <Select
+                multiple
+                label="Tipo de Descuento"
+                value={descuentosSeleccionados}
+                onChange={handleDescuentosChange}
+                renderValue={(selected) => {
+                  if (selected.length === 0) return 'Seleccione descuento';
+                  if (selected.length === 1) {
+                    const descuento = descuentosPorId.get(String(selected[0]));
+                    return descuento ? `${descuento.TDS_CODIGO} - ${descuento.TDS_NOMBRE}` : `Descuento #${selected[0]}`;
+                  }
+                  return `${selected.length} descuentos seleccionados`;
+                }}
+                MenuProps={{ slotProps: { paper: { sx: { maxHeight: 360 } } } }}
+              >
+                {descuentos.length > 0 ? descuentos.map((descuento) => {
+                  const descuentoId = String(descuento.TDS_ID);
+                  return (
+                    <MenuItem key={descuento.TDS_ID} value={descuentoId}>
+                      <Checkbox checked={descuentosSeleccionados.includes(descuentoId)} />
+                      <ListItemText primary={`${descuento.TDS_CODIGO} - ${descuento.TDS_NOMBRE}`} />
+                    </MenuItem>
+                  );
+                }) : (
+                  <MenuItem disabled value="">
+                    <ListItemText primary="No hay descuentos disponibles" />
+                  </MenuItem>
+                )}
+              </Select>
+            </FormControl>
+          </Grid>
+
+          {(ingresosSeleccionados.length > 0 || descuentosSeleccionados.length > 0) && (
+            <Grid size={{ xs: 12 }}>
+              <Grid container spacing={2}>
+                {ingresosSeleccionados.map((ingresoId) => {
+                  const ingreso = ingresosPorId.get(String(ingresoId));
+                  const key = obtenerClaveConcepto('I', ingresoId);
+                  return (
+                    <Grid key={key} size={{ xs: 12, md: 4 }}>
+                      <TextField
+                        fullWidth
+                        required
+                        label={`Monto ingreso: ${ingreso?.TIS_NOMBRE ?? ingresoId}`}
+                        type="number"
+                        value={montosConceptos[key] ?? ''}
+                        onChange={(event) => handleMontoConceptoChange(key, event.target.value)}
+                        slotProps={{ htmlInput: { step: 0.01, min: 0 } }}
+                      />
+                    </Grid>
+                  );
+                })}
+
+                {descuentosSeleccionados.map((descuentoId) => {
+                  const descuento = descuentosPorId.get(String(descuentoId));
+                  const key = obtenerClaveConcepto('D', descuentoId);
+                  return (
+                    <Grid key={key} size={{ xs: 12, md: 4 }}>
+                      <TextField
+                        fullWidth
+                        required
+                        label={`Monto descuento: ${descuento?.TDS_NOMBRE ?? descuentoId}`}
+                        type="number"
+                        value={montosConceptos[key] ?? ''}
+                        onChange={(event) => handleMontoConceptoChange(key, event.target.value)}
+                        slotProps={{ htmlInput: { step: 0.01, min: 0 } }}
+                      />
+                    </Grid>
+                  );
+                })}
+              </Grid>
             </Grid>
           )}
 
-          {form.nas_tipo === 'D' && (
-            <Grid size={{ xs: 12, md: 6 }}>
-              <LookupSelect
-                required
-                label="Concepto de descuento"
-                value={String(form.tds_id ?? '')}
-                placeholder="Buscar descuento"
-                options={descuentos.map((descuento) => ({
-                  value: String(descuento.TDS_ID),
-                  label: `${descuento.TDS_CODIGO} - ${descuento.TDS_NOMBRE}`,
-                }))}
-                onChange={(value) => setForm((prev) => completarMontoSiAplica({ ...prev, tds_id: value || null }))}
-              />
+          {(ingresosSeleccionados.length > 0 || descuentosSeleccionados.length > 0) && (
+            <Grid size={{ xs: 12 }}>
+              <Grid container spacing={2}>
+                {ingresosSeleccionados.length > 0 && (
+                  <Grid size={{ xs: 12, md: 6 }}>
+                    <TableContainer component={Paper} variant="outlined">
+                      <Table size="small">
+                        <TableHead>
+                          <TableRow>
+                            <TableCell><strong>Ingreso seleccionado</strong></TableCell>
+                            <TableCell align="right"><strong>Monto</strong></TableCell>
+                          </TableRow>
+                        </TableHead>
+                        <TableBody>
+                          {ingresosSeleccionados.map((ingresoId) => {
+                            const ingreso = ingresosPorId.get(String(ingresoId));
+                            const key = obtenerClaveConcepto('I', ingresoId);
+                            return (
+                              <TableRow key={key}>
+                                <TableCell>{ingreso ? `${ingreso.TIS_CODIGO} - ${ingreso.TIS_NOMBRE}` : `Ingreso #${ingresoId}`}</TableCell>
+                                <TableCell align="right">{formatearMoneda(Number(montosConceptos[key] || 0))}</TableCell>
+                              </TableRow>
+                            );
+                          })}
+                        </TableBody>
+                      </Table>
+                    </TableContainer>
+                  </Grid>
+                )}
+
+                {descuentosSeleccionados.length > 0 && (
+                  <Grid size={{ xs: 12, md: 6 }}>
+                    <TableContainer component={Paper} variant="outlined">
+                      <Table size="small">
+                        <TableHead>
+                          <TableRow>
+                            <TableCell><strong>Descuento seleccionado</strong></TableCell>
+                            <TableCell align="right"><strong>Monto</strong></TableCell>
+                          </TableRow>
+                        </TableHead>
+                        <TableBody>
+                          {descuentosSeleccionados.map((descuentoId) => {
+                            const descuento = descuentosPorId.get(String(descuentoId));
+                            const key = obtenerClaveConcepto('D', descuentoId);
+                            return (
+                              <TableRow key={key}>
+                                <TableCell>{descuento ? `${descuento.TDS_CODIGO} - ${descuento.TDS_NOMBRE}` : `Descuento #${descuentoId}`}</TableCell>
+                                <TableCell align="right">{formatearMoneda(Number(montosConceptos[key] || 0))}</TableCell>
+                              </TableRow>
+                            );
+                          })}
+                        </TableBody>
+                      </Table>
+                    </TableContainer>
+                  </Grid>
+                )}
+              </Grid>
             </Grid>
           )}
-
-          <Grid size={{ xs: 12, md: 3 }}>
-            <TextField fullWidth required label="Monto (Q)" name="nas_monto" type="number"
-              value={form.nas_monto} onChange={handleChange} />
-          </Grid>
-
-          <Grid size={{ xs: 12, md: 3 }}>
-            <TextField fullWidth label="Cantidad" name="nas_cantidad" type="number"
-              value={form.nas_cantidad ?? ''} onChange={handleChange} />
-          </Grid>
 
           <Grid size={{ xs: 12, md: 6 }}>
             <TextField fullWidth label="Referencia" name="nas_referencia"
